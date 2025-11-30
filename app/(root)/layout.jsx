@@ -23,12 +23,17 @@ const Layout = async ({ children }) => {
           <Link href="/interview" className="hover:text-primary-200">
             Practice
           </Link>
+          <Link href="/salary-negotiation" className="hover:text-primary-200">
+            Salary
+          </Link>
           <Link href="/analytics" className="hover:text-primary-200">
             Analytics
           </Link>
           <Link href="/upgrade" className="hover:text-primary-200">
             Upgrade
           </Link>
+          <Link href="/profile" className="hover:text-primary-200">Profile</Link>
+
         </div>
       </nav>
 

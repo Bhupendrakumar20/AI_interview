@@ -6,7 +6,7 @@ import {
   deleteAccountAction,
   clearHistoryAction,
   updateSettingsAction,
-} from "@/lib/actions/settings.action";
+} from "@/lib/actions/profile.action";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 

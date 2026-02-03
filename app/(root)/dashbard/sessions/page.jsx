@@ -1,5 +1,4 @@
 // app/(root)/dashboard/sessions/page.jsx
-import SessionCard from "@/components/SessionCard";
 import { Button } from "@/components/ui/button";
 
 export default function SessionsPage() {
@@ -116,7 +115,12 @@ export default function SessionsPage() {
           <h2 className="text-2xl font-bold mb-4">Upcoming Sessions</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {upcomingSessions.map((session) => (
-              <SessionCard key={session.id} session={session} />
+              <div key={session.id} className="card-border">
+                <div className="card p-4">
+                  <h4 className="font-bold text-lg mb-2">{session.title}</h4>
+                  <p className="text-sm text-light-100 mb-2">Status: {session.status}</p>
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -133,7 +137,12 @@ export default function SessionsPage() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {completedSessions.map((session) => (
-              <SessionCard key={session.id} session={session} />
+              <div key={session.id} className="card-border">
+                <div className="card p-4">
+                  <h4 className="font-bold text-lg mb-2">{session.title}</h4>
+                  <p className="text-sm text-light-100 mb-2">Status: {session.status}</p>
+                </div>
+              </div>
             ))}
           </div>
         </section>

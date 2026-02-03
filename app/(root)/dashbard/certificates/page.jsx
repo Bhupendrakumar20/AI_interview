@@ -1,5 +1,4 @@
 // app/(root)/dashboard/certificates/page.jsx
-import CertificateCard from "@/components/CertificateCard";
 import { Button } from "@/components/ui/button";
 
 export default function CertificatesPage() {
@@ -131,7 +130,12 @@ export default function CertificatesPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {certificates.map((certificate) => (
-            <CertificateCard key={certificate.id} certificate={certificate} />
+            <div key={certificate.id} className="card-border">
+              <div className="card p-4">
+                <h4 className="font-bold text-lg mb-2">{certificate.title}</h4>
+                <p className="text-sm text-light-100 mb-2">Issued: {certificate.issueDate}</p>
+              </div>
+            </div>
           ))}
         </div>
       </section>

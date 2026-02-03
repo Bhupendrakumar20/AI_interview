@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/actions/auth.action";
 import { getInterviewsByUserId, getUserFeedbacks } from "@/lib/actions/general.action";
 import ActivityTimeline from "@/components/ActivityTimeline";
 import StatsCard from "@/components/StatsCard";
-import ProgressChart from "@/components/ProgressChart";
 
 export default async function ActivityPage() {
   const user = await getCurrentUser();

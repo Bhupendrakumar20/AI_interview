@@ -1,7 +1,6 @@
 // app/(root)/dashboard/rounds/page.jsx
 import { getInterviewsByUserId, getUserFeedbacks } from "@/lib/actions/general.action";
 import { getCurrentUser } from "@/lib/actions/auth.action";
-import RoundCard from "@/components/RoundCard";
 import { Button } from "@/components/ui/button";
 
 export default async function RoundsPage() {
@@ -157,7 +156,12 @@ export default async function RoundsPage() {
       {/* Rounds List */}
       <div className="space-y-4">
         {rounds.map((round) => (
-          <RoundCard key={round.id} round={round} />
+          <div key={round.id} className="card-border">
+            <div className="card p-4">
+              <h4 className="font-bold text-lg mb-2">{round.title}</h4>
+              <p className="text-sm text-light-100 mb-2">Status: {round.status}</p>
+            </div>
+          </div>
         ))}
       </div>
 

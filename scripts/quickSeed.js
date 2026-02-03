@@ -1,0 +1,76 @@
+// scripts/quickSeed.js
+const admin = require('firebase-admin');
+
+// Initialize Firebase
+const serviceAccount = {
+  projectId: "careerlens-ai-37c8b",
+  clientEmail: "firebase-adminsdk-fbsvc@careerlens-ai-37c8b.iam.gserviceaccount.com",
+  privateKey: process.env.FIREBASE_PRIVATE_KEY || "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDAgM8DTzj90/Kv\ndKbsdU7XrWilDaxWIU0kqIVlJb44aTwCxq24dNEKaIuEXiUJPtDaShbYcwTKCQIH\naWk1x/zLKE208hfbkzinuTQ3pEkcjSnzKDZBU1waFC/S4uOlouhkNpOkLG4Cj8ve\ne74s0dryd4KpfV9u/Bd55ruUqiH1QVr621QMcyEaETLvQd2i0Zlb1R6gE4QPWBui\n/osvpW88Vvjet1yNgihGCPT0E88Oi2h6P5FyplACAvbx/e8wvzaZ4Vm9/QmXnVlT\npTeuA94crgoY2eHdtomECHKpMgMOU/C4hP81Gri7ZbVJOMqLV+V/OEvh3fc59WYd\nMIUtL0wvAgMBAAECggEAMNxg7wOcQR0bc7plpg4OcYLz1TUXwZLZTE0z8pz2X8Yi\nM8gvDusjpgMsKnBk8ShPBaEZlF35YLiRmcUBLePxf7Vep+ds89A16KiDHv5likgw\nViYmQ0V/0qS+EMaDJqcnWkxaBCk80Qyjn/iDqEepzbJU6WVHpFl7MfdFNHJMhT3c\nbLgvWE3TGYuiaNRYitQKze4mMK9eIYiQnQft3DN7HO3wVsV1Ub2w9jrw/l9o+baH\nKKod18rs/z2AqwMhpP/FRh97ay627JNB501qh2kXgP/43O9PJmyjIs848WA+S1jw\nglP7cKSpiSutotoMDkqCWEwq60iaB3WLMPVMhgDecQKBgQD6vPHmv9MTpObhVE3I\njDNlPRnXynJdrTY2MG6BG8QCyai8dEj8BJlb4Lyd2FtOexcKBp00f6UcJa78NzVv\nlPdFsyqRIsZ1Y4WFa30/ewewV27d5rGzM8ppmnmAkKyHynkwF7lyUvka4a/jT6wD\nkAhoE++ONEwFHMLoZzTWFgZNUQKBgQDEiwE91Het3dWy/euybBtCHg4cI2h85eda\nAfSe1R+xdud/OB4eT1IpMGm5NIHfA1R304vbA+/amwOfnVp9j0c3pEHgBuKcbrmc\nwcboxg4OJKvFrcmYipOp6aE7gsbYvZ82P1r4dJX5suDz7Izsxgm938a7q59738Cy\ngVXKer+hfwKBgD8jiyqXDVj6AmWla/zfSSXqL/LF+Oyb7HXS1lDOpBorm8Dw61wC\n8HdRbU22KK/nkRKmPbn1lqcy2hCK+nrBoU684jAv+Jeg2wOQ4LY2jeYa7kEUkZTV\nqtfS3VvBkqCTHNc+ciVWvYHGaRstedxfza4frwg5JRd4eaA6NPTgEPAxAoGBAKSt\nD1I99jTAfPAnHtf1CnXAdvQOmtqjSs+4ebynN5Ha3aZTX7DnpyCJxtt96h7wTFLF\n9hWA2/PfFA8lqY8wgGxXfTZ2rmKBx5VXKxEX+OjSwvWzYgkkewrPjN8u+OrbHk42\nkUNBc/OudBsMpRsx5zGnEH1oFA2XcX5fLYGkjXGDAoGAY/XWxfkVATxB4wTGEnx2\nGE6TABztdlQIMv6HIm0sfxFT2zqYYsffY+qAcKcV1xYnnZaRHV+MGVSxhVWeeIXF\ncCrZRkPKxxyrBtszYvqWMWEic5WzSXtAQVmOQixrplNhou6fb66TdjVQHdLO30BU\nk62CnXwbZyA/IRK2ARSw5AY=\n-----END PRIVATE KEY-----\n"
+};
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://careerlens-ai-37c8b.firebaseio.com"
+});
+
+const db = admin.firestore();
+const now = admin.firestore.Timestamp.now();
+
+// Quick data to add
+const quickData = {
+  internships: [
+    {
+      id: 'quick_intern_1',
+      title: 'One Day Internship with Ankit',
+      company: 'with Ankit',
+      description: 'Quick internship to learn from industry expert',
+      location: 'Remote',
+      duration: '1 day',
+      stipend: 'Certificate',
+      deadline: '2024-03-30',
+      type: 'quick',
+      featured: true,
+      badge: 'One Day',
+      createdAt: now
+    }
+  ],
+  jobs: [
+    {
+      id: 'quick_job_1',
+      title: 'Frontend Developer',
+      company: 'Google',
+      location: 'Mountain View, CA',
+      salary: '$150,000 - $200,000',
+      experience: '3+ years',
+      type: 'Full-time',
+      featured: true,
+      createdAt: now
+    }
+  ]
+};
+
+async function quickSeed() {
+  console.log('🚀 Quick seeding Firebase...');
+  
+  try {
+    // Add internships
+    for (const intern of quickData.internships) {
+      await db.collection('internships').doc(intern.id).set(intern);
+      console.log(`✅ Added internship: ${intern.title}`);
+    }
+    
+    // Add jobs
+    for (const job of quickData.jobs) {
+      await db.collection('jobs').doc(job.id).set(job);
+      console.log(`✅ Added job: ${job.title}`);
+    }
+    
+    console.log('🎉 Quick seed completed!');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Quick seed failed:', error);
+    process.exit(1);
+  }
+}
+
+quickSeed();

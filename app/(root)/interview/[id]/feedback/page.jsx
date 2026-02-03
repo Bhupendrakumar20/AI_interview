@@ -103,7 +103,7 @@ export default async function Feedback({ params }) {
         </ul>
       </div>
 
-      {/* ✅ NEW: Transcript section */}
+      {/* . NEW: Transcript section */}
       <div className="flex flex-col gap-3">
         <h3>Interview Transcript</h3>
         {transcript.length === 0 ? (

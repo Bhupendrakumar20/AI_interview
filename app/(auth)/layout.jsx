@@ -1,11 +1,18 @@
+// app/(auth)/layout.jsx
+import { getCurrentUser } from "@/lib/actions/auth.action";
 import { redirect } from "next/navigation";
-import { isAuthenticated } from "@/lib/actions/auth.action";
 
-const AuthLayout = async ({ children }) => {
-  const isUserAuthenticated = await isAuthenticated();
-  if (isUserAuthenticated) redirect("/");
+export default async function AuthLayout({ children }) {
+  const user = await getCurrentUser();
+  
+  // If user is already logged in, redirect to home
+  if (user) {
+    redirect("/");
+  }
 
-  return <div className="auth-layout">{children}</div>;
-};
-
-export default AuthLayout;
+  return (
+    <div className="auth-layout">
+      {children}
+    </div>
+  );
+}

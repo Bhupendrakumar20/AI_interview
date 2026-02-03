@@ -7,6 +7,8 @@ import {
 } from "@/lib/actions/general.action";
 import InterviewRunner from "@/components/InterviewRunner";
 
+export const revalidate = 60; // Cache for 60 seconds
+
 export default async function InterviewDetails({ params }) {
   const { id } = await params;
 

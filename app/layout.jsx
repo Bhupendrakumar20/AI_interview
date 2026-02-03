@@ -1,24 +1,21 @@
-import { Toaster } from "sonner";
-import { Mona_Sans } from "next/font/google";
-
+// app/layout.jsx
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/ToastProvider";
 
-const monaSans = Mona_Sans({
-  variable: "--font-mona-sans",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "PrepWise",
-  description: "An AI-powered platform for preparing for mock interviews",
+  title: "CareerLens AI - Internships",
+  description: "Find your dream internship",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${monaSans.className} antialiased pattern`}>
+    <html lang="en">
+      <body className={inter.className}>
         {children}
-        <Toaster />
+        <ToastProvider />
       </body>
     </html>
   );

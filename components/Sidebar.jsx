@@ -16,7 +16,7 @@ const Sidebar = ({ user }) => {
     { label: "Internships", href: "/internships", icon: "💼" },
     { label: "Jobs", href: "/jobs", icon: "💰" },
     { label: "Competitions", href: "/competitions", icon: "🏆" },
-    { label: "Mock Tests", href: "/mock-tests", icon: "📝" },
+    { label: "Mock Tests", href: "/mock-test", icon: "📝" },
     { label: "Mock Interviews", href: "/interview", icon: "🎤" },
     { label: "Mentorship", href: "/mentorship", icon: "👥" },
     { label: "100 Days to Code", href: "/100-days-code", icon: "👨‍💻" },

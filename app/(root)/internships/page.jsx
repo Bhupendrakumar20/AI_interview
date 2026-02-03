@@ -92,9 +92,9 @@ export default function InternshipsPage() {
       setInternships(sortedData);
 
       // Load filter options if not loaded
-      if (countData === null) {
-        const counts = await getInternshipCounts();
-        setCounts(counts);
+      if (Object.keys(counts).length === 0) {
+        const countsData = await getInternshipCounts();
+        setCounts(countsData);
       }
     } catch (error) {
       console.error("Error loading internships:", error);

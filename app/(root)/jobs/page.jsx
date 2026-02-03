@@ -1,64 +1,46 @@
-// app/(root)/jobs/page.jsx
+"use client";
+
+import { useEffect, useState } from "react";
 import JobCard from "@/components/JobCard";
+import { fetchJobs } from "@/lib/actions/jobs.action";
 
 export default function JobsPage() {
-  const jobs = [
-    {
-      id: 1,
-      title: "Senior Frontend Engineer",
-      company: "Netflix",
-      location: "Los Gatos, CA",
-      salary: "$180,000 - $250,000",
-      experience: "5+ years",
-      type: "Full-time",
-      posted: "2 days ago",
-      skills: ["React", "TypeScript", "Next.js", "GraphQL"],
-    },
-    {
-      id: 2,
-      title: "Backend Developer",
-      company: "Stripe",
-      location: "San Francisco, CA",
-      salary: "$160,000 - $220,000",
-      experience: "3+ years",
-      type: "Full-time",
-      posted: "1 week ago",
-      skills: ["Node.js", "Python", "AWS", "PostgreSQL"],
-    },
-    {
-      id: 3,
-      title: "Machine Learning Engineer",
-      company: "OpenAI",
-      location: "Remote",
-      salary: "$200,000 - $300,000",
-      experience: "4+ years",
-      type: "Full-time",
-      posted: "3 days ago",
-      skills: ["Python", "PyTorch", "TensorFlow", "MLOps"],
-    },
-    {
-      id: 4,
-      title: "DevOps Engineer",
-      company: "GitHub",
-      location: "Remote",
-      salary: "$150,000 - $200,000",
-      experience: "3+ years",
-      type: "Full-time",
-      posted: "1 day ago",
-      skills: ["Kubernetes", "Docker", "AWS", "CI/CD"],
-    },
-    {
-      id: 5,
-      title: "Product Designer",
-      company: "Figma",
-      location: "San Francisco, CA",
-      salary: "$140,000 - $190,000",
-      experience: "4+ years",
-      type: "Full-time",
-      posted: "5 days ago",
-      skills: ["Figma", "UI/UX", "Prototyping", "Design Systems"],
-    },
-  ];
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [source, setSource] = useState(""); // Track if data is from API or fallback
+
+  useEffect(() => {
+    async function loadJobs() {
+      try {
+        setLoading(true);
+        const result = await fetchJobs("developer jobs", {
+          page: 1,
+          country: "us",
+          date_posted: "all",
+          useFallback: true,
+        });
+
+        if (result.success) {
+          setJobs(result.jobs);
+          setSource(result.source);
+          if (result.error) {
+            console.warn("Jobs API warning:", result.error);
+          }
+        } else {
+          setError(result.error);
+          setJobs([]);
+        }
+      } catch (err) {
+        console.error("Failed to load jobs:", err);
+        setError("Failed to load jobs. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadJobs();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -67,13 +49,35 @@ export default function JobsPage() {
         <p className="text-light-100">
           Find your dream job from top tech companies
         </p>
+        {source === "fallback" && (
+          <p className="text-sm text-yellow-500 mt-2">
+            📌 Showing sample jobs (API temporarily unavailable)
+          </p>
+        )}
+        {source === "api" && (
+          <p className="text-sm text-green-500 mt-2">✅ Live job listings</p>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {jobs.map((job) => (
-          <JobCard key={job.id} job={job} />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-200"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-500/10 border border-red-500 text-red-300 p-4 rounded-lg">
+          {error}
+        </div>
+      ) : jobs.length === 0 ? (
+        <div className="bg-dark-200 border border-dark-300 p-8 rounded-lg text-center text-light-100">
+          No jobs found. Please try again later.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {jobs.map((job) => (
+            <JobCard key={job.id} job={job} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

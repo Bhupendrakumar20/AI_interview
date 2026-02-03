@@ -2,6 +2,17 @@
 import { Button } from "@/components/ui/button";
 
 const JobCard = ({ job }) => {
+  const handleApplyNow = () => {
+    if (job.url && job.url !== "#") {
+      window.open(job.url, "_blank");
+    }
+  };
+
+  const handleSave = () => {
+    // TODO: Add save functionality
+    console.log("Saved job:", job.id);
+  };
+
   return (
     <div className="card-border">
       <div className="card p-5">
@@ -42,23 +53,31 @@ const JobCard = ({ job }) => {
         {/* Skills */}
         <div className="mb-6">
           <div className="flex flex-wrap gap-2">
-            {job.skills.map((skill, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 bg-dark-200 text-xs rounded-full"
-              >
-                {skill}
-              </span>
-            ))}
+            {Array.isArray(job.skills) && job.skills.length > 0 ? (
+              job.skills.map((skill, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 bg-dark-200 text-xs rounded-full"
+                >
+                  {skill}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-light-100/50">No skills listed</span>
+            )}
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex gap-3">
-          <Button className="btn-primary flex-1">
+          <Button
+            onClick={handleApplyNow}
+            disabled={!job.url || job.url === "#"}
+            className="btn-primary flex-1"
+          >
             Apply Now
           </Button>
-          <Button className="btn-secondary">
+          <Button onClick={handleSave} className="btn-secondary">
             Save
           </Button>
         </div>

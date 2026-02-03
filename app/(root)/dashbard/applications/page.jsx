@@ -1,6 +1,4 @@
 // app/(root)/dashboard/applications/page.jsx
-import ApplicationCard from "@/components/ApplicationCard";
-import ApplicationStats from "@/components/ApplicationStats";
 import { Button } from "@/components/ui/button";
 
 export default function ApplicationsPage() {
@@ -143,7 +141,12 @@ export default function ApplicationsPage() {
       {/* Applications List */}
       <div className="space-y-4">
         {applications.map((application) => (
-          <ApplicationCard key={application.id} application={application} />
+          <div key={application.id} className="card-border">
+            <div className="card p-4">
+              <h4 className="font-bold text-lg mb-2">{application.title} at {application.company}</h4>
+              <p className="text-sm text-light-100 mb-2">Status: {application.status}</p>
+            </div>
+          </div>
         ))}
       </div>
 

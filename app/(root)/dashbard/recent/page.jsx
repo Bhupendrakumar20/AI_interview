@@ -1,5 +1,4 @@
 // app/(root)/dashboard/recent/page.jsx
-import RecentItemCard from "@/components/RecentItemCard";
 import { Button } from "@/components/ui/button";
 
 export default function RecentPage() {
@@ -109,7 +108,12 @@ export default function RecentPage() {
       {/* Recent Items Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {recentItems.map((item) => (
-          <RecentItemCard key={item.id} item={item} />
+          <div key={item.id} className="card-border">
+            <div className="card p-4">
+              <h4 className="font-bold text-lg mb-2">{item.title}</h4>
+              <p className="text-sm text-light-100 mb-2">Viewed {item.viewedAt}</p>
+            </div>
+          </div>
         ))}
       </div>
 

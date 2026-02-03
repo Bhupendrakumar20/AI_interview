@@ -1,5 +1,4 @@
 // app/(root)/dashboard/courses/page.jsx
-import CourseCard from "@/components/CourseCard";
 import { Button } from "@/components/ui/button";
 
 export default function CoursesPage() {
@@ -153,7 +152,12 @@ export default function CoursesPage() {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {enrolledCourses.map((course) => (
-            <CourseCard key={course.id} course={course} enrolled={true} />
+            <div key={course.id} className="card-border">
+              <div className="card p-4">
+                <h4 className="font-bold text-lg mb-2">{course.title}</h4>
+                <p className="text-sm text-light-100 mb-2">Progress: {course.progress}%</p>
+              </div>
+            </div>
           ))}
         </div>
       </section>
@@ -168,7 +172,12 @@ export default function CoursesPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {recommendedCourses.map((course) => (
-            <CourseCard key={course.id} course={course} enrolled={false} />
+            <div key={course.id} className="card-border">
+              <div className="card p-4">
+                <h4 className="font-bold text-lg mb-2">{course.title}</h4>
+                <p className="text-sm text-light-100 mb-2">Rating: {course.rating}/5</p>
+              </div>
+            </div>
           ))}
         </div>
       </section>

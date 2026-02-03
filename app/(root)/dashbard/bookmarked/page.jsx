@@ -1,5 +1,4 @@
 // app/(root)/dashboard/bookmarked/page.jsx
-import BookmarkCard from "@/components/BookmarkCard";
 import { Button } from "@/components/ui/button";
 
 export default function BookmarkedPage() {
@@ -142,7 +141,12 @@ export default function BookmarkedPage() {
       {/* Questions Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {bookmarkedQuestions.map((question) => (
-          <BookmarkCard key={question.id} question={question} />
+          <div key={question.id} className="card-border">
+            <div className="card p-4">
+              <h4 className="font-bold text-lg mb-2">{question.question}</h4>
+              <p className="text-sm text-light-100 mb-2">Category: {question.category}</p>
+            </div>
+          </div>
         ))}
       </div>
 

@@ -1,5 +1,4 @@
 // app/(root)/dashboard/watchlist/page.jsx
-import WatchlistCard from "@/components/WatchlistCard";
 import { Button } from "@/components/ui/button";
 
 export default function WatchlistPage() {
@@ -140,7 +139,12 @@ export default function WatchlistPage() {
       {/* Watchlist Items */}
       <div className="space-y-4">
         {watchlistItems.map((item) => (
-          <WatchlistCard key={item.id} item={item} />
+          <div key={item.id} className="card-border">
+            <div className="card p-4">
+              <h4 className="font-bold text-lg mb-2">{item.title}</h4>
+              <p className="text-sm text-light-100 mb-2">Status: {item.status}</p>
+            </div>
+          </div>
         ))}
       </div>
 

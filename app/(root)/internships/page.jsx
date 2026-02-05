@@ -10,6 +10,7 @@ import ApplicationModal from "@/components/ApplicationModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { searchInternships, getInternshipCounts } from "@/lib/actions/general.action";
+import { fetchInternshipsFromAPI } from "@/lib/actions/jobs.action";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { toast } from "sonner";
 
@@ -63,16 +64,46 @@ export default function InternshipsPage() {
   const loadInternships = useCallback(async () => {
     setLoading(true);
     try {
-      // Load internships with filters
-      const data = await searchInternships({
-        type: filters.type === "all" ? null : filters.type,
-        location: filters.location === "all" ? null : filters.location,
-        search: filters.search,
-        limit: 50,
-      });
+      // Fetch from RapidAPI
+      const apiResult = await fetchInternshipsFromAPI();
+      let allInternships = apiResult.internships || [];
+
+      // Also try to get from Firebase if API returns empty or fails
+      if (allInternships.length === 0) {
+        const firebaseData = await searchInternships({
+          type: filters.type === "all" ? null : filters.type,
+          location: filters.location === "all" ? null : filters.location,
+          search: filters.search,
+          limit: 50,
+        });
+        allInternships = firebaseData || [];
+      } else {
+        // If API has data, still apply filters locally
+        if (filters.search) {
+          const searchLower = filters.search.toLowerCase();
+          allInternships = allInternships.filter(
+            (item) =>
+              item.title?.toLowerCase().includes(searchLower) ||
+              item.company?.toLowerCase().includes(searchLower) ||
+              item.description?.toLowerCase().includes(searchLower) ||
+              item.skills?.some((skill) =>
+                skill.toLowerCase().includes(searchLower)
+              )
+          );
+        }
+
+        if (filters.location !== "all") {
+          allInternships = allInternships.filter((item) => {
+            if (filters.location === "remote") {
+              return item.isRemote;
+            }
+            return item.location?.toLowerCase().includes(filters.location.toLowerCase());
+          });
+        }
+      }
 
       // Apply sorting
-      let sortedData = [...data];
+      let sortedData = [...allInternships];
       switch (filters.sort) {
         case "stipend":
           sortedData.sort((a, b) => {
@@ -85,7 +116,11 @@ export default function InternshipsPage() {
           sortedData.sort((a, b) => (b.applicants || 0) - (a.applicants || 0));
           break;
         default: // deadline
-          sortedData.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+          sortedData.sort((a, b) => {
+            const aDate = new Date(a.deadline || a.postedAt || 0);
+            const bDate = new Date(b.deadline || b.postedAt || 0);
+            return aDate - bDate;
+          });
           break;
       }
 
@@ -103,7 +138,7 @@ export default function InternshipsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, filterOptions]);
+  }, [filters, counts]);
 
   // Load data when filters change
   useEffect(() => {

@@ -1,6 +1,6 @@
 // firebase/client.js
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, inMemoryPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Firebase config from environment variables
@@ -18,4 +18,12 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
+
+// 🔒 Use in-memory persistence only (no browser localStorage or indexedDB)
+// This ensures authentication state is NOT persisted in browser
+// Session validation will be done via secure httpOnly cookies on the server
+setPersistence(auth, inMemoryPersistence).catch((error) => {
+  console.warn("Firebase persistence mode set to in-memory:", error);
+});
+
 export const db = getFirestore(app);

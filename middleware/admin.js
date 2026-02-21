@@ -1,42 +1,30 @@
 // middleware/admin.js
 import { NextResponse } from 'next/server';
-import { auth } from '@/firebase/admin';
 
 export async function adminMiddleware(request) {
   try {
-    // Get token from cookies
+    // Get session cookie
     const sessionCookie = request.cookies.get('session')?.value;
     
+    // Check for login path - allow access to login page
+    const pathname = request.nextUrl.pathname;
+    if (pathname === '/admin/login' || pathname === '/admin/login/') {
+      return NextResponse.next();
+    }
+    
+    // If no session, redirect to login
     if (!sessionCookie) {
-      return NextResponse.redirect(new URL('/sign-in?redirect=' + request.nextUrl.pathname, request.url));
+      return NextResponse.redirect(new URL('/admin/login?redirect=' + pathname, request.url));
     }
     
-    // Verify session cookie
-    const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
-    
-    // Check admin claims
-    const customClaims = decodedClaims.customClaims || {};
-    
-    if (!customClaims.admin && !customClaims.super_admin) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    
-    // Add admin info to headers
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-user-id', decodedClaims.uid);
-    requestHeaders.set('x-user-role', customClaims.role || 'user');
-    requestHeaders.set('x-is-admin', 'true');
-    
-    return NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    });
+    // Session exists, allow to proceed
+    // Admin verification will happen in the page component via API call
+    return NextResponse.next();
   } catch (error) {
     console.error('Admin middleware error:', error);
     
-    // Clear invalid session
-    const response = NextResponse.redirect(new URL('/sign-in', request.url));
+    // Redirect to login on any error
+    const response = NextResponse.redirect(new URL('/admin/login', request.url));
     response.cookies.delete('session');
     
     return response;

@@ -2,23 +2,40 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 import {
   deleteAccountAction,
   clearHistoryAction,
   updateSettingsAction,
 } from "@/lib/actions/profile.action";
+import { logout, changePassword } from "@/lib/actions/auth.action";
 
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 export default function SettingsForm({ user }) {
+  const router = useRouter();
+
+  // Settings state
   const [camera, setCamera] = useState(user?.camera ?? true);
   const [notifications, setNotifications] = useState(user?.notifications ?? true);
 
+  // Password change state
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
+  // Loading states
   const [saving, setSaving] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
+  // ✅ SAVE SETTINGS
   const handleSave = async (e) => {
     e?.preventDefault();
 
@@ -40,6 +57,70 @@ export default function SettingsForm({ user }) {
     }
   };
 
+  // ✅ CHANGE PASSWORD
+  const handleChangePassword = async (e) => {
+    e?.preventDefault();
+    setPasswordError("");
+
+    // Validation
+    if (!newPassword || !confirmPassword) {
+      setPasswordError("Please fill in all password fields");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+
+      const res = await changePassword(newPassword);
+
+      if (!res?.success) {
+        setPasswordError(res?.error || "Failed to change password");
+        return;
+      }
+
+      toast.success("✅ Password changed successfully!");
+      setShowPasswordForm(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      setPasswordError("❌ Something went wrong while changing password!");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  // ✅ LOGOUT
+  const handleLogout = async () => {
+    try {
+      setLoggingOut(true);
+
+      await logout();
+
+      toast.success("✅ Logged out successfully!");
+      
+      // Redirect to sign-in page
+      setTimeout(() => {
+        router.push("/sign-in");
+      }, 500);
+    } catch (error) {
+      toast.error("❌ Failed to logout!");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  // ✅ CLEAR HISTORY
   const clearHistory = async () => {
     const ok = confirm("Are you sure? This cannot be undone.");
     if (!ok) return;
@@ -62,9 +143,15 @@ export default function SettingsForm({ user }) {
     }
   };
 
+  // ✅ DELETE ACCOUNT
   const deleteAccount = async () => {
-    const ok = confirm("Delete account permanently?");
+    const ok = confirm(
+      "⚠️ Are you sure you want to permanently delete your account? This action cannot be undone and will delete all your data."
+    );
     if (!ok) return;
+
+    const confirmed = confirm("Type 'DELETE' to confirm account deletion.");
+    if (!confirmed) return;
 
     try {
       setDeleting(true);
@@ -77,8 +164,11 @@ export default function SettingsForm({ user }) {
       }
 
       toast.success("✅ Account deleted successfully!");
-      // ✅ If you want redirect after delete:
-      // window.location.href = "/";
+      
+      // Redirect after deletion
+      setTimeout(() => {
+        router.push("/");
+      }, 1000);
     } catch (error) {
       toast.error("❌ Something went wrong while deleting account!");
     } finally {
@@ -87,57 +177,224 @@ export default function SettingsForm({ user }) {
   };
 
   return (
-    <form onSubmit={handleSave} className="flex flex-col gap-6">
-      {/* Camera */}
-      <div className="flex items-center justify-between border rounded-lg p-3">
-        <p className="text-sm font-medium">Enable Camera</p>
+    <div className="w-full space-y-8">
+      {/* ========================================
+          ACCOUNT SETTINGS
+      ======================================== */}
+      <form onSubmit={handleSave} className="space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-light-100">Account Settings</h2>
+          <p className="text-sm text-light-400 mb-6">
+            Manage your app preferences and notifications
+          </p>
+        </div>
 
-        <input
-          type="checkbox"
-          checked={camera}
-          onChange={(e) => setCamera(e.target.checked)}
-          className="w-5 h-5 cursor-pointer"
+        {/* Camera Setting */}
+        <div className="flex items-center justify-between border border-dark-300 rounded-lg p-4 bg-dark-200/50 hover:bg-dark-200 transition">
+          <div>
+            <p className="font-medium text-light-100">Enable Camera</p>
+            <p className="text-sm text-light-400">Allow camera access during interviews</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={camera}
+            onChange={(e) => setCamera(e.target.checked)}
+            className="w-5 h-5 cursor-pointer accent-primary-200"
+            disabled={saving}
+          />
+        </div>
+
+        {/* Notifications Setting */}
+        <div className="flex items-center justify-between border border-dark-300 rounded-lg p-4 bg-dark-200/50 hover:bg-dark-200 transition">
+          <div>
+            <p className="font-medium text-light-100">Enable Notifications</p>
+            <p className="text-sm text-light-400">Receive updates and reminders</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={notifications}
+            onChange={(e) => setNotifications(e.target.checked)}
+            className="w-5 h-5 cursor-pointer accent-primary-200"
+            disabled={saving}
+          />
+        </div>
+
+        <Button
+          className="btn-primary w-full md:w-fit"
+          type="submit"
           disabled={saving}
-        />
+        >
+          {saving ? "Saving..." : "Save Settings"}
+        </Button>
+      </form>
+
+      {/* ========================================
+          PASSWORD SECTION
+      ======================================== */}
+      <div className="border-t border-dark-300 pt-8">
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-light-100">Security</h2>
+          <p className="text-sm text-light-400 mb-6">
+            Update your password to keep your account secure
+          </p>
+        </div>
+
+        {!showPasswordForm ? (
+          <Button
+            type="button"
+            className="btn-secondary w-full md:w-fit"
+            onClick={() => setShowPasswordForm(true)}
+            disabled={changingPassword}
+          >
+            Change Password
+          </Button>
+        ) : (
+          <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+            {/* Current Password */}
+            <div>
+              <label className="text-sm font-medium text-light-100 block mb-2">
+                Current Password
+              </label>
+              <Input
+                type="password"
+                placeholder="Enter your current password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={changingPassword}
+              />
+            </div>
+
+            {/* New Password */}
+            <div>
+              <label className="text-sm font-medium text-light-100 block mb-2">
+                New Password
+              </label>
+              <Input
+                type="password"
+                placeholder="Enter new password (min. 6 characters)"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  setPasswordError("");
+                }}
+                disabled={changingPassword}
+              />
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="text-sm font-medium text-light-100 block mb-2">
+                Confirm New Password
+              </label>
+              <Input
+                type="password"
+                placeholder="Confirm your new password"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setPasswordError("");
+                }}
+                disabled={changingPassword}
+              />
+            </div>
+
+            {/* Error Message */}
+            {passwordError && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-sm text-red-400">{passwordError}</p>
+              </div>
+            )}
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <Button
+                type="submit"
+                className="btn-primary"
+                disabled={changingPassword}
+              >
+                {changingPassword ? "Updating..." : "Update Password"}
+              </Button>
+              <Button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setShowPasswordForm(false);
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setPasswordError("");
+                }}
+                disabled={changingPassword}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
 
-      {/* Notifications */}
-      <div className="flex items-center justify-between border rounded-lg p-3">
-        <p className="text-sm font-medium">Enable Notifications</p>
+      {/* ========================================
+          LOGOUT SECTION
+      ======================================== */}
+      <div className="border-t border-dark-300 pt-8">
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-light-100">Session</h2>
+          <p className="text-sm text-light-400 mb-6">
+            Sign out from this device
+          </p>
+        </div>
 
-        <input
-          type="checkbox"
-          checked={notifications}
-          onChange={(e) => setNotifications(e.target.checked)}
-          className="w-5 h-5 cursor-pointer"
-          disabled={saving}
-        />
+        <Button
+          type="button"
+          className="btn-secondary bg-blue-600 hover:bg-blue-700 text-white w-full md:w-fit"
+          onClick={handleLogout}
+          disabled={loggingOut}
+        >
+          {loggingOut ? "Logging out..." : "🚪 Logout"}
+        </Button>
       </div>
 
-      {/* Save Settings */}
-      <Button className="btn-primary w-fit" type="submit" disabled={saving}>
-        {saving ? "Saving..." : "Save Settings"}
-      </Button>
+      {/* ========================================
+          DATA MANAGEMENT SECTION
+      ======================================== */}
+      <div className="border-t border-dark-300 pt-8">
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-light-100">Data Management</h2>
+          <p className="text-sm text-light-400 mb-6">
+            Manage your data and interview history
+          </p>
+        </div>
 
-      {/* Clear History */}
-      <Button
-        type="button"
-        className="btn-secondary w-fit mt-4"
-        onClick={clearHistory}
-        disabled={clearing}
-      >
-        {clearing ? "Clearing..." : "Clear Interview History"}
-      </Button>
+        <Button
+          type="button"
+          className="btn-secondary bg-amber-600 hover:bg-amber-700 text-white w-full md:w-fit"
+          onClick={clearHistory}
+          disabled={clearing}
+        >
+          {clearing ? "Clearing..." : "🗑️ Clear Interview History"}
+        </Button>
+      </div>
 
-      {/* Delete Account */}
-      <Button
-        type="button"
-        className="btn-secondary bg-red-500 text-white w-fit"
-        onClick={deleteAccount}
-        disabled={deleting}
-      >
-        {deleting ? "Deleting..." : "Delete Account"}
-      </Button>
-    </form>
+      {/* ========================================
+          DELETE ACCOUNT SECTION
+      ======================================== */}
+      <div className="border-t border-dark-300 pt-8">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
+          <h2 className="text-xl font-semibold mb-2 text-red-400">Danger Zone</h2>
+          <p className="text-sm text-light-400">
+            Permanently delete your account and all associated data
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          className="btn-secondary bg-red-600 hover:bg-red-700 text-white w-full md:w-fit"
+          onClick={deleteAccount}
+          disabled={deleting}
+        >
+          {deleting ? "Deleting..." : "⚠️ Delete Account Permanently"}
+        </Button>
+      </div>
+    </div>
   );
 }

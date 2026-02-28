@@ -2,36 +2,44 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { saveInternship, unsaveInternship, isInternshipSaved } from "@/lib/actions/saved-internships.action";
 
 const InternshipCard = ({ internship }) => {
   const [applying, setApplying] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Check if internship is already saved
+  useEffect(() => {
+    const checkIfSaved = async () => {
+      const result = await isInternshipSaved({ internshipId: internship.id });
+      if (result.success) {
+        setIsSaved(result.isSaved);
+      }
+    };
+    checkIfSaved();
+  }, [internship.id]);
 
   const handleApply = async () => {
     try {
+      // If internship has an apply/registration link, redirect there
+      if (internship.applyLink || internship.url) {
+        window.open(internship.applyLink || internship.url, '_blank');
+        toast.success(`Redirecting to ${internship.company} application page...`);
+        return;
+      }
+
+      // Otherwise, track the application
       setApplying(true);
-
-      // Here you can implement different application logic:
-      // 1. Open application modal/form
-      // 2. Redirect to external application URL
-      // 3. Track application in your database
-      // 4. Show application instructions
-
-      // For now, let's simulate an application process
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      toast.success(`Application submitted for ${internship.title} at ${internship.company}!`);
-
-      // If internship has an external apply link, you could do:
-      // if (internship.applyLink) {
-      //   window.open(internship.applyLink, '_blank');
-      // }
+      toast.success(`Application tracked for ${internship.title} at ${internship.company}!`);
 
     } catch (error) {
-      toast.error("Failed to submit application. Please try again.");
+      toast.error("Failed to process application. Please try again.");
     } finally {
       setApplying(false);
     }
@@ -56,13 +64,28 @@ const InternshipCard = ({ internship }) => {
 
   const applicationStatus = getApplicationStatus();
 
+  const handleCardClick = () => {
+    // If internship is open and has apply link, redirect to it
+    if (applicationStatus.status !== "closed" && internship.applyLink) {
+      window.open(internship.applyLink, '_blank');
+    }
+  };
+
   return (
-    <div className="card-border group hover:border-primary-200/30 transition-all">
+    <div 
+      className={cn(
+        "card-border group hover:border-primary-200/30 transition-all",
+        applicationStatus.status !== "closed" && internship.applyLink && "cursor-pointer"
+      )}
+      onClick={handleCardClick}
+    >
       <div className="card p-5 h-full flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-start mb-3">
           <div className="flex-1">
-            <h3 className="text-xl font-bold line-clamp-1">{internship.title}</h3>
+            <h3 className="text-xl font-bold line-clamp-1 hover:text-primary-100 transition-colors">
+              {internship.title}
+            </h3>
             <p className="text-primary-200 font-medium">{internship.company}</p>
           </div>
           {internship.badge && (
@@ -145,10 +168,11 @@ const InternshipCard = ({ internship }) => {
               "btn-primary w-full",
               applicationStatus.status === "closed" && "opacity-50 cursor-not-allowed"
             )}
-            onClick={() => {
-              if (applicationStatus.status !== "closed" && onApply) {
-                onApply(internship);
-              } else if (applicationStatus.status === "closed") {
+            onClick={(e) => {
+              e.stopPropagation();
+              if (applicationStatus.status !== "closed") {
+                handleApply();
+              } else {
                 toast.error("Applications for this internship are closed");
               }
             }}
@@ -161,22 +185,106 @@ const InternshipCard = ({ internship }) => {
             <Button
               variant="outline"
               className="flex-1 text-sm"
-              onClick={() => {
-                // Add to saved/bookmarks
-                toast.info("Added to saved internships");
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSaving(true);
+                (async () => {
+                  try {
+                    if (isSaved) {
+                      // Unsave
+                      const result = await unsaveInternship({ internshipId: internship.id });
+                      if (result.success) {
+                        setIsSaved(false);
+                        toast.success("Removed from saved internships");
+                      } else {
+                        toast.error(result.error || "Failed to unsave");
+                      }
+                    } else {
+                      // Save
+                      const result = await saveInternship({
+                        internshipId: internship.id,
+                        internshipData: internship,
+                      });
+                      if (result.success) {
+                        setIsSaved(true);
+                        toast.success("Added to saved internships");
+                      } else {
+                        toast.error(result.error || "Failed to save");
+                      }
+                    }
+                  } catch (error) {
+                    toast.error("Something went wrong");
+                    console.error(error);
+                  } finally {
+                    setIsSaving(false);
+                  }
+                })();
               }}
+              disabled={isSaving}
             >
-              Save
+              {isSaving ? "Saving..." : isSaved ? "✓ Saved" : "Save"}
             </Button>
             <Button
               variant="outline"
               className="flex-1 text-sm"
-              onClick={() => {
-                // Share functionality
-                navigator.clipboard.writeText(
-                  `${internship.title} at ${internship.company} - ${window.location.origin}/internships/${internship.id}`
-                );
-                toast.success("Link copied to clipboard!");
+              onClick={(e) => {
+                e.stopPropagation();
+                (async () => {
+                  // Use the apply link for sharing instead of page link
+                  const shareUrl = internship.applyLink || `${typeof window !== "undefined" ? window.location.origin : ""}/internships/${internship.id}`;
+                  const shareText = `${internship.title} at ${internship.company}`;
+
+                  try {
+                    // Try native Web Share API first (better on mobile)
+                    if (typeof navigator !== "undefined" && navigator.share) {
+                      try {
+                        await navigator.share({
+                          title: shareText,
+                          text: `Apply now: ${internship.title} at ${internship.company}`,
+                          url: shareUrl,
+                        });
+                        toast.success("Shared successfully!");
+                        return;
+                      } catch (shareError) {
+                        if (shareError.name !== "AbortError") {
+                          console.error("Web Share failed:", shareError);
+                        }
+                        // User cancelled or error, try fallback
+                      }
+                    }
+
+                    // Fallback: Copy apply link directly to clipboard
+                    if (typeof navigator !== "undefined" && navigator.clipboard) {
+                      try {
+                        await navigator.clipboard.writeText(shareUrl);
+                        toast.success("Apply link copied to clipboard!");
+                        return;
+                      } catch (clipboardError) {
+                        console.error("Clipboard API failed:", clipboardError);
+                      }
+                    }
+
+                    // Legacy fallback: Use textarea method with apply link
+                    const textarea = document.createElement("textarea");
+                    textarea.value = shareUrl;
+                    textarea.style.position = "fixed";
+                    textarea.style.opacity = "0";
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    
+                    const successful = document.execCommand("copy");
+                    document.body.removeChild(textarea);
+                    
+                    if (successful) {
+                      toast.success("Apply link copied to clipboard!");
+                    } else {
+                      toast.error("Failed to copy link");
+                    }
+                  } catch (error) {
+                    console.error("Share error:", error);
+                    toast.error("Failed to share");
+                  }
+                })();
               }}
             >
               Share

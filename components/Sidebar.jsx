@@ -16,7 +16,7 @@ const Sidebar = ({ user }) => {
     { label: "Internships", href: "/internships", icon: "💼" },
     { label: "Jobs", href: "/jobs", icon: "💰" },
     { label: "Competitions", href: "/competitions", icon: "🏆" },
-    { label: "Mock Tests", href: "/mock-test", icon: "📝" },
+    { label: "Mock Tests", href: "/mock-test/companies", icon: "📝" },
     { label: "Mock Interviews", href: "/interview", icon: "🎤" },
     { label: "Mentorship", href: "/mentorship", icon: "👥" },
     { label: "100 Days to Code", href: "/100-days-code", icon: "👨‍💻" },
@@ -39,6 +39,7 @@ const Sidebar = ({ user }) => {
     { label: "Recently Viewed", href: "/dashboard/recent" },
     { label: "Watchlist", href: "/dashboard/watchlist" },
     { label: "Bookmarked Qs", href: "/dashboard/bookmarked" },
+    { label: "Saved Internships", href: "/saved-internships" },
   ];
 
   return (

@@ -119,9 +119,37 @@ export default function UpdateProfileForm({ user }) {
 
   // ✅ Copy User ID
   const copyUserId = async () => {
+    const userIdText = user?.id || "";
+    
     try {
-      await navigator.clipboard.writeText(user?.id || "");
-      toast.success("✅ User ID copied!");
+      // Try modern Clipboard API first
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(userIdText);
+          toast.success("✅ User ID copied!");
+          return;
+        } catch (clipboardError) {
+          console.error("Clipboard API failed:", clipboardError);
+          // Fall through to fallback method
+        }
+      }
+
+      // Fallback: Use deprecated method
+      const textarea = document.createElement("textarea");
+      textarea.value = userIdText;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      
+      if (successful) {
+        toast.success("✅ User ID copied!");
+      } else {
+        toast.error("❌ Failed to copy user ID");
+      }
     } catch {
       toast.error("❌ Failed to copy user ID");
     }

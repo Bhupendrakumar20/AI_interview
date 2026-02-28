@@ -10,7 +10,7 @@ import ApplicationModal from "@/components/ApplicationModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { searchInternships, getInternshipCounts } from "@/lib/actions/general.action";
-import { fetchInternshipsFromAPI } from "@/lib/actions/jobs.action";
+import { searchInternshipsJSearch } from "@/lib/actions/jsearch.action";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { toast } from "sonner";
 
@@ -64,12 +64,22 @@ export default function InternshipsPage() {
   const loadInternships = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch from RapidAPI
-      const apiResult = await fetchInternshipsFromAPI();
+      // Build search query
+      let searchQuery = filters.search || "internship";
+      
+      // Fetch from JSearch API
+      const apiResult = await searchInternshipsJSearch({
+        searchTerm: searchQuery,
+        location: filters.location === "all" ? "" : filters.location,
+        type: filters.type === "all" ? "internship" : filters.type,
+        page: 1,
+      });
+
       let allInternships = apiResult.internships || [];
 
-      // Also try to get from Firebase if API returns empty or fails
+      // Fallback to Firebase if JSearch returns empty
       if (allInternships.length === 0) {
+        console.log("JSearch returned no results, falling back to Firebase");
         const firebaseData = await searchInternships({
           type: filters.type === "all" ? null : filters.type,
           location: filters.location === "all" ? null : filters.location,
@@ -78,7 +88,7 @@ export default function InternshipsPage() {
         });
         allInternships = firebaseData || [];
       } else {
-        // If API has data, still apply filters locally
+        // Apply additional filters locally if JSearch has data
         if (filters.search) {
           const searchLower = filters.search.toLowerCase();
           allInternships = allInternships.filter(
@@ -92,13 +102,12 @@ export default function InternshipsPage() {
           );
         }
 
-        if (filters.location !== "all") {
+        if (filters.location !== "all" && filters.location !== "remote") {
           allInternships = allInternships.filter((item) => {
-            if (filters.location === "remote") {
-              return item.isRemote;
-            }
             return item.location?.toLowerCase().includes(filters.location.toLowerCase());
           });
+        } else if (filters.location === "remote") {
+          allInternships = allInternships.filter((item) => item.isRemote);
         }
       }
 
@@ -117,8 +126,8 @@ export default function InternshipsPage() {
           break;
         default: // deadline
           sortedData.sort((a, b) => {
-            const aDate = new Date(a.deadline || a.postedAt || 0);
-            const bDate = new Date(b.deadline || b.postedAt || 0);
+            const aDate = new Date(a.deadline || a.postedDate || 0);
+            const bDate = new Date(b.deadline || b.postedDate || 0);
             return aDate - bDate;
           });
           break;

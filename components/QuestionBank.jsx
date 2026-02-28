@@ -13,10 +13,31 @@ const QuestionBank = ({ initialCategory = "general" }) => {
 
   const handleCopy = async (q) => {
     try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(q);
-        // optional: simple toast replacement
-        console.log("Copied:", q);
+      // Try modern Clipboard API first
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(q);
+          console.log("Copied:", q);
+          return;
+        } catch (clipboardError) {
+          console.error("Clipboard API failed:", clipboardError);
+          // Fall through to fallback method
+        }
+      }
+
+      // Fallback: Use deprecated method
+      const textarea = document.createElement("textarea");
+      textarea.value = q;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      
+      if (successful) {
+        console.log("Copied (fallback):", q);
       }
     } catch (err) {
       console.error("Copy failed", err);
@@ -26,7 +47,7 @@ const QuestionBank = ({ initialCategory = "general" }) => {
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       {/* Left: Category list */}
-      <aside className="w-full lg:w-72 flex-shrink-0">
+      <aside className="w-full lg:w-72 shrink-0">
         <div className="card-border w-full">
           <div className="card p-4 flex flex-col gap-3">
             <h3 className="text-xl font-semibold mb-1">Categories</h3>

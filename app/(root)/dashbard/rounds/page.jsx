@@ -18,7 +18,7 @@ export default async function RoundsPage() {
       time: "10:00 AM",
       duration: "45 mins",
       status: "upcoming",
-      interviewer: "John Doe (Senior Engineer)",
+      interviewer: "Rohit Sharma  (Senior Engineer)",
       preparation: [
         "Review system design concepts",
         "Practice LeetCode problems",

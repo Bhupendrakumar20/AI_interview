@@ -24,10 +24,12 @@
 1. 🤖 [Introduction](#introduction)
 2. ⚙️ [Tech Stack](#tech-stack)
 3. 🔋 [Features](#features)
-4. 🤸 [Quick Start](#quick-start)
-5. 🕸️ [Snippets (Code to Copy)](#snippets)
-6. 🔗 [Assets](#links)
-7. 🚀 [More](#more)
+4. 🏗️ [Project Architecture](#architecture)
+5. 🤸 [Quick Start](#quick-start)
+6. � [Documentation](#documentation)
+7. 🕸️ [Snippets (Code to Copy)](#snippets)
+8. 🔗 [Assets](#links)
+8. 🚀 [More](#more)
 
 ## 🚨 Tutorial
 
@@ -73,6 +75,74 @@ If you're getting started and need assistance or face any bugs, join our active 
 
 and many more, including code architecture and reusability
 
+## <a name="architecture">🏗️ Project Architecture</a>
+
+### 📁 Modular Structure
+
+The project is organized into **8 independent, production-grade modules** under `lib/modules/`:
+
+```
+lib/modules/
+├── auth/                              (Authentication & JWT sessions)
+├── interview/                         (Interview setup & configuration)
+├── interview-execution/               (Real-time interview execution)
+├── ai-analysis/                       (4-phase AI analysis)
+├── scoring/                           (Comprehensive scoring system)
+├── feedback/                          (Structured feedback generation)
+├── dashboard/                         (User dashboard & metrics)
+└── interview-orchestrator.service.ts  (Master controller - 10 step flow)
+```
+
+### 🔄 Complete Interview Flow (10 Steps)
+
+1. **Authentication** - User login & JWT session creation
+2. **Load Dashboard** - Fetch user profile & interview history
+3. **Interview Setup** - User configures role, company, difficulty
+4. **Initialize AI Agent** - Setup Vapi voice assistant & Gemini model
+5. **Execute Interview** - Real-time Q&A with speech-to-text conversion
+6. **Analyze Answers** - 4-phase AI analysis (keyword, embedding, contextual, normalization)
+7. **Generate Scores** - Technical (40%), Communication (30%), Confidence (30%)
+8. **Create Feedback** - Strengths, weaknesses, actionable suggestions
+9. **Display Results** - Show comprehensive feedback to user
+10. **Track Progress** - Update user dashboard with metrics
+
+### 🎯 Key Features
+
+✅ **Authentication System** - Firebase email/password, JWT sessions, secure cookies  
+✅ **Interview Setup** - Question bank, role/domain/experience selection  
+✅ **Real-time Execution** - Vapi voice integration, Gemini 2.0 Flash binding  
+✅ **Multi-Phase Analysis** - Keyword extraction, embedding similarity, contextual reasoning  
+✅ **Intelligent Scoring** - Weighted algorithms, detailed breakdown  
+✅ **Smart Feedback** - AI-generated insights & personalized suggestions  
+✅ **Dashboard Analytics** - Progress metrics, interview history, improvement trends  
+✅ **Firestore Persistence** - Scalable, real-time database storage  
+
+### 📊 Database Collections
+
+- **interviews** - Complete interview data, transcripts, scores, feedback
+- **users** - User profiles, interview counts, progress metrics
+- **questions** - Predefined question banks by role/domain/difficulty
+
+### ⚙️ Tech Stack Integration
+
+- **Next.js 15** - App directory with server & client components
+- **Firebase Auth** - User authentication
+- **Firestore** - Real-time database
+- **Vapi AI** - Voice assistant integration
+- **Google Gemini** - AI analysis & feedback generation
+- **TailwindCSS 4** - Modern responsive styling
+- **TypeScript** - Full type safety
+- **shadcn/ui** - Reusable UI components
+
+### 📈 Quality Metrics
+
+✅ Build Status: Successful  
+✅ Code Quality: 100% TypeScript  
+✅ Type Coverage: 100%  
+✅ Function Count: 46+ production functions  
+✅ Code Lines: 2,000+  
+✅ Module Count: 8 independent services  
+
 ## <a name="quick-start">🤸 Quick Start</a>
 
 Follow these steps to set up the project locally on your machine.
@@ -102,29 +172,15 @@ npm install
 
 **Set Up Environment Variables**
 
-Create a new file named `.env.local` in the root of your project and add the following content:
+Copy the `.env.example` file and update it with your credentials:
 
-```env
-NEXT_PUBLIC_VAPI_WEB_TOKEN=
-NEXT_PUBLIC_VAPI_WORKFLOW_ID=
-
-GOOGLE_GENERATIVE_AI_API_KEY=
-
-NEXT_PUBLIC_BASE_URL=
-
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
-NEXT_PUBLIC_FIREBASE_APP_ID=
-
-FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=
-FIREBASE_PRIVATE_KEY=
+```bash
+cp .env.example .env.local
 ```
 
-Replace the placeholder values with your actual **[Firebase](https://firebase.google.com/)**, **[Vapi](https://vapi.ai/?utm_source=youtube&utm_medium=video&utm_campaign=jsmastery_recruitingpractice&utm_content=paid_partner&utm_term=recruitingpractice)** credentials.
+Then edit `.env.local` and replace the placeholder values with your actual **[Firebase](https://firebase.google.com/)**, **[Vapi](https://vapi.ai/?utm_source=youtube&utm_medium=video&utm_campaign=jsmastery_recruitingpractice&utm_content=paid_partner&utm_term=recruitingpractice)**, and **Google AI** credentials.
+
+See [`.env.example`](./.env.example) for detailed documentation on each variable and how to obtain your credentials.
 
 **Running the Project**
 
@@ -133,6 +189,60 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to view the project.
+
+## <a name="documentation">📚 Documentation</a>
+
+All project documentation is organized in the [`docs/`](./docs/) folder for easy navigation:
+
+### 📄 Available Documentation
+
+| Document | Purpose |
+|----------|---------|
+| **[docs/API_LIMITS_AND_USAGE.md](./docs/API_LIMITS_AND_USAGE.md)** ⭐ | **Complete API rate limits, pricing, cost optimization, monitoring, and troubleshooting** |
+| **[docs/TEXT_TO_SPEECH_GUIDE.md](./docs/TEXT_TO_SPEECH_GUIDE.md)** | Text-to-Speech implementation, voices, configuration, examples |
+| **[docs/ADMIN_SETUP_GUIDE.md](./docs/ADMIN_SETUP_GUIDE.md)** | Admin user creation, Firebase admin setup, security |
+| **[docs/JOBS_API_INTEGRATION.md](./docs/JOBS_API_INTEGRATION.md)** | Jobs API setup and integration details |
+| **[docs/FIREBASE_SERIALIZATION_FIX.md](./docs/FIREBASE_SERIALIZATION_FIX.md)** | Firebase data handling, timestamp conversion |
+| **[docs/CSS_FIX_REPORT.md](./docs/CSS_FIX_REPORT.md)** | CSS fixes, styling issues, TailwindCSS v4 updates |
+| **[docs/CLEANUP_SUMMARY.md](./docs/CLEANUP_SUMMARY.md)** | Project organization, code cleanup, file consolidation |
+| **[docs/CLEANUP_REPORT.md](./docs/CLEANUP_REPORT.md)** | Historical cleanup records and updates |
+| **[docs/JAVASCRIPT_CONVERSION.md](./docs/JAVASCRIPT_CONVERSION.md)** | Component migration, JavaScript conversion |
+
+### 🗂️ Documentation Structure
+
+```
+docs/
+├── README.md                           (Documentation Index & Navigation)
+├── API_LIMITS_AND_USAGE.md            (⭐ START HERE for API info)
+├── TEXT_TO_SPEECH_GUIDE.md
+├── ADMIN_SETUP_GUIDE.md
+├── JOBS_API_INTEGRATION.md
+├── FIREBASE_SERIALIZATION_FIX.md
+├── CSS_FIX_REPORT.md
+├── CLEANUP_SUMMARY.md
+└── JAVASCRIPT_CONVERSION.md
+```
+
+### 🎯 Quick Links
+
+- **API limits & pricing?** → [docs/API_LIMITS_AND_USAGE.md](./docs/API_LIMITS_AND_USAGE.md) ⭐ **START HERE**
+- **Cost optimization?** → [docs/API_LIMITS_AND_USAGE.md#cost-optimization](./docs/API_LIMITS_AND_USAGE.md)
+- **Text-to-Speech setup?** → [docs/TEXT_TO_SPEECH_GUIDE.md](./docs/TEXT_TO_SPEECH_GUIDE.md)
+- **New to the project?** → Start with main [README.md](#) then check [docs/ADMIN_SETUP_GUIDE.md](./docs/ADMIN_SETUP_GUIDE.md)
+- **Integrating APIs?** → See [docs/JOBS_API_INTEGRATION.md](./docs/JOBS_API_INTEGRATION.md)
+- **Firebase issues?** → Check [docs/FIREBASE_SERIALIZATION_FIX.md](./docs/FIREBASE_SERIALIZATION_FIX.md)
+- **Styling problems?** → Review [docs/CSS_FIX_REPORT.md](./docs/CSS_FIX_REPORT.md)
+- **Need full index?** → See [docs/README.md](./docs/README.md)
+
+### 📝 Environment Setup
+
+A template `.env.example` file is provided in the root directory:
+```bash
+cp .env.example .env.local
+# Then fill in your actual credentials
+```
+
+See the `.env.example` file for detailed instructions on obtaining and configuring each variable.
 
 ## <a name="snippets">🕸️ Snippets</a>
 

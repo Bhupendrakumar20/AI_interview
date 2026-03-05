@@ -19,7 +19,7 @@ const Sidebar = ({ user }) => {
     { label: "Mock Tests", href: "/mock-test/companies", icon: "📝" },
     { label: "Mock Interviews", href: "/interview", icon: "🎤" },
     { label: "Mentorship", href: "/mentorship", icon: "👥" },
-    { label: "100 Days to Code", href: "/100-days-code", icon: "👨‍💻" },
+    { label: "100 Days to Code", href: "/100-days-of-code", icon: "👨‍💻" },
     { label: "Courses", href: "/courses", icon: "📚" },
     { label: "Question Bank", href: "/question-bank", icon: "📖" },
     { label: "Analytics", href: "/analytics", icon: "📊" },

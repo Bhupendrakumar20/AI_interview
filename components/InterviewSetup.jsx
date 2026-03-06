@@ -1,4 +1,6 @@
+
 "use client";
+import React, { useState } from "react";
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -23,6 +25,8 @@ const formSchema = z.object({
 const InterviewSetup = ({ userId }) => {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [lastSubmitTime, setLastSubmitTime] = useState(0);
+  const DEBOUNCE_MS = 3000; // 3 seconds debounce
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -41,6 +45,14 @@ const InterviewSetup = ({ userId }) => {
       return;
     }
 
+    // Debounce: prevent rapid submissions
+    const now = Date.now();
+    if (now - lastSubmitTime < DEBOUNCE_MS) {
+      toast.error("Please wait before submitting again.");
+      return;
+    }
+    setLastSubmitTime(now);
+
     startTransition(async () => {
       const techstack = values.techstack
         ? values.techstack
@@ -57,6 +69,12 @@ const InterviewSetup = ({ userId }) => {
         techstack,
         type: values.type,
       });
+
+      // Handle 429 Too Many Requests
+      if (result?.error && result?.error.includes("429")) {
+        toast.error("API rate limit exceeded. Please wait and try again.");
+        return;
+      }
 
       if (result?.success && result.interviewId) {
         toast.success("Interview created! Starting now...");

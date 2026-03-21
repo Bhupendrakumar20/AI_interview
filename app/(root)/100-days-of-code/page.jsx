@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import { getAllDays, searchQuestions, getQuestionsByTopic, getQuestionsByDifficulty } from "@/constants/hundredDaysOfCode";
 import DayCard from "@/components/DayCard";
+import DailyQuestionSection from "@/components/DailyQuestionSection";
+import SearchUserStatsSection from "@/components/SearchUserStatsSection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Search } from "lucide-react";
@@ -13,9 +15,6 @@ export default function HundredDaysOfCodePage() {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("all");
   const [expandedDays, setExpandedDays] = useState({});
-  const [leetcodeUsername, setLeetcodeUsername] = useState("");
-  const [leetcodeStats, setLeetcodeStats] = useState(null);
-  const [loadingLeetcode, setLoadingLeetcode] = useState(false);
 
   // Filter questions based on search and filters
   const filteredDays = useMemo(() => {
@@ -62,54 +61,6 @@ export default function HundredDaysOfCodePage() {
     return results;
   }, [searchQuery, selectedFilter, selectedDifficulty, allDays]);
 
-  // Fetch LeetCode stats
-  const fetchLeetcodeStats = async () => {
-    if (!leetcodeUsername.trim()) return;
-
-    setLoadingLeetcode(true);
-    try {
-      const response = await fetch("/api/leetcode", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: `query userContestRankingInfo($username: String!) {
-            userContestRanking(username: $username) {
-              attendedContestsCount
-              rating
-              globalRanking
-              totalParticipants
-              topPercentage
-              badge { name }
-            }
-            userContestRankingHistory(username: $username) {
-              attended
-              trendDirection
-              problemsSolved
-              totalProblems
-              finishTimeInSeconds
-              rating
-              ranking
-              contest { title startTime }
-            }
-          }`,
-          variables: {
-            username: leetcodeUsername,
-          },
-          operationName: "userContestRankingInfo",
-        }),
-      });
-
-      const data = await response.json();
-      setLeetcodeStats(data.data);
-    } catch (error) {
-      console.error("Error fetching LeetCode stats:", error);
-    } finally {
-      setLoadingLeetcode(false);
-    }
-  };
-
   const toggleDayExpanded = (dayNumber) => {
     setExpandedDays(prev => ({
       ...prev,
@@ -143,57 +94,11 @@ export default function HundredDaysOfCodePage() {
           </p>
         </div>
 
-        {/* LeetCode Integration */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mb-4">
-            LeetCode Contest Stats
-          </h2>
-          <div className="flex gap-4 flex-wrap">
-            <Input
-              type="text"
-              placeholder="Enter your LeetCode username"
-              value={leetcodeUsername}
-              onChange={(e) => setLeetcodeUsername(e.target.value)}
-              className="flex-1 min-w-[300px]"
-            />
-            <Button
-              onClick={fetchLeetcodeStats}
-              disabled={loadingLeetcode}
-              className="bg-orange-500 hover:bg-orange-600"
-            >
-              {loadingLeetcode ? "Loading..." : "Fetch Stats"}
-            </Button>
-          </div>
+        {/* Daily Challenge Section */}
+        <DailyQuestionSection />
 
-          {leetcodeStats && leetcodeStats.userContestRanking && (
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 rounded-lg p-4">
-                <p className="text-sm text-slate-600 dark:text-slate-300">Contests Attended</p>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {leetcodeStats.userContestRanking.attendedContestsCount}
-                </p>
-              </div>
-              <div className="bg-linear-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 rounded-lg p-4">
-                <p className="text-sm text-slate-600 dark:text-slate-300">Current Rating</p>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {leetcodeStats.userContestRanking.rating}
-                </p>
-              </div>
-              <div className="bg-linear-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 rounded-lg p-4">
-                <p className="text-sm text-slate-600 dark:text-slate-300">Global Ranking</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {leetcodeStats.userContestRanking.globalRanking?.toLocaleString() || "N/A"}
-                </p>
-              </div>
-              <div className="bg-linear-to-br from-orange-50 to-orange-100 dark:from-orange-900 dark:to-orange-800 rounded-lg p-4">
-                <p className="text-sm text-slate-600 dark:text-slate-300">Top Percentile</p>
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {leetcodeStats.userContestRanking.topPercentage?.toFixed(2)}%
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Search User Stats Section */}
+        <SearchUserStatsSection />
 
         {/* Search and Filters */}
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 mb-8">

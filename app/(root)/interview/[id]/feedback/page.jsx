@@ -10,6 +10,27 @@ import {
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 
+// Helper function to ensure categoryScores is an array
+function getCategoryScoresArray(categoryScores) {
+  if (!categoryScores) return [];
+  if (Array.isArray(categoryScores)) return categoryScores;
+  if (typeof categoryScores === "object") {
+    // Convert object to array if it's an object with numeric keys
+    return Object.values(categoryScores).filter(item => item && typeof item === "object");
+  }
+  return [];
+}
+
+// Helper function to ensure array fields are arrays
+function getArrayField(field) {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  if (typeof field === "object") {
+    return Object.values(field).filter(item => typeof item === "string" || typeof item === "object");
+  }
+  return [];
+}
+
 export default async function Feedback({ params }) {
   const { id } = await params;
   const user = await getCurrentUser();
@@ -31,6 +52,9 @@ export default async function Feedback({ params }) {
     : "N/A";
 
   const transcript = feedback.transcript || [];
+  const categoryScoresArray = getCategoryScoresArray(feedback.categoryScores);
+  const strengthsArray = getArrayField(feedback.strengths);
+  const areasArray = getArrayField(feedback.areasForImprovement);
 
   return (
     <section className="section-feedback">
@@ -73,34 +97,46 @@ export default async function Feedback({ params }) {
       {/* Interview Breakdown */}
       <div className="flex flex-col gap-4">
         <h2>Breakdown of the Interview:</h2>
-        {feedback.categoryScores?.map((category, index) => (
-          <div key={index}>
-            <p className="font-bold">
-              {index + 1}. {category.name} ({category.score}/100)
-            </p>
-            <p>{category.comment}</p>
-          </div>
-        ))}
+        {categoryScoresArray && categoryScoresArray.length > 0 ? (
+          categoryScoresArray.map((category, index) => (
+            <div key={index}>
+              <p className="font-bold">
+                {index + 1}. {category.name} ({category.score}/100)
+              </p>
+              <p>{category.comment}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-light-400">No category scores available.</p>
+        )}
       </div>
 
       {/* Strengths */}
       <div className="flex flex-col gap-3">
         <h3>Strengths</h3>
-        <ul>
-          {feedback.strengths?.map((strength, index) => (
-            <li key={index}>{strength}</li>
-          ))}
-        </ul>
+        {strengthsArray && strengthsArray.length > 0 ? (
+          <ul>
+            {strengthsArray.map((strength, index) => (
+              <li key={index}>{strength}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-light-400">No strengths data available.</p>
+        )}
       </div>
 
       {/* Areas for Improvement */}
       <div className="flex flex-col gap-3">
         <h3>Areas for Improvement</h3>
-        <ul>
-          {feedback.areasForImprovement?.map((area, index) => (
-            <li key={index}>{area}</li>
-          ))}
-        </ul>
+        {areasArray && areasArray.length > 0 ? (
+          <ul>
+            {areasArray.map((area, index) => (
+              <li key={index}>{area}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-light-400">No areas for improvement data available.</p>
+        )}
       </div>
 
       {/* . NEW: Transcript section */}

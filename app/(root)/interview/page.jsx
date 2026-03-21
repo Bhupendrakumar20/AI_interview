@@ -64,9 +64,9 @@ async function InterviewPage() {
         <div className="flex flex-row items-center justify-between gap-2">
           <h2>Your Interviews</h2>
           {hasPastInterviews && (
-            <Button asChild className="btn-secondary">
-              <Link href="/">Back to Dashboard</Link>
-            </Button>
+            <Link href="/" className="btn-secondary">
+              Back to Dashboard
+            </Link>
           )}
         </div>
 

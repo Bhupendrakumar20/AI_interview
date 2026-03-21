@@ -73,9 +73,7 @@ const Sidebar = ({ user }) => {
         {/* Logo */}
         <div className="p-4 border-b border-dark-300 bg-dark-150">
           <Link href="/" className="flex items-center gap-3">
-            <div className="bg-linear-to-br from-primary-200 to-primary-300 p-2 rounded-lg">
-              <Image src="/logo.svg" alt="logo" width={24} height={24} />
-            </div>
+            <Image src="/prepwise_logo.png" alt="logo" width={32} height={32} className="rounded-md" />
             {!collapsed && (
               <div>
                 <h2 className="text-primary-100 font-bold text-lg">PrepWise</h2>

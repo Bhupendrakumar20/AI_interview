@@ -88,7 +88,7 @@ async function clearCollection(collectionName) {
 
 // ==================== SEED DATA ====================
 async function seedDatabase() {
-  console.log('🚀 Starting CareerLens AI Database Seeding...');
+  console.log('🚀 Starting prepWise AI Database Seeding...');
   console.log('=============================================');
 
   try {
@@ -751,7 +751,7 @@ async function seedDatabase() {
     console.log(`   Password: ${MAIN_USER.password}`);
     
     console.log('\n✅ All data has been successfully seeded to Firebase!');
-    console.log('🚀 Your CareerLens AI platform is now ready to use!');
+    console.log('🚀 Your PrepWise AI platform is now ready to use!');
 
     process.exit(0);
   } catch (error) {

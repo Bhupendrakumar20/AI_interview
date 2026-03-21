@@ -139,7 +139,7 @@ const AdminSidebar = ({ user }) => {
 
               {!collapsed && (
                 <div>
-                  <h2 className="font-bold text-lg">CareerLens Admin</h2>
+                  <h2 className="font-bold text-lg">PrepWise Admin</h2>
                   <p className="text-xs text-gray-500 dark:text-light-400">
                     Super Admin Panel
                   </p>
@@ -161,7 +161,7 @@ const AdminSidebar = ({ user }) => {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{user?.name || "Admin"}</p>
                   <p className="text-xs text-gray-500 dark:text-light-400 truncate">
-                    {user?.email || "admin@careerlens.ai"}
+                    {user?.email || "admin@prepwise.ai"}
                   </p>
 
                   <span className="inline-block mt-1 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">

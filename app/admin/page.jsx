@@ -114,7 +114,7 @@ export default async function AdminDashboard() {
         <div>
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
           <p className="text-gray-500 dark:text-light-100">
-            Welcome to CareerLens Admin Panel
+            Welcome to Prepwise Admin Panel
           </p>
         </div>
         <div className="flex gap-3">

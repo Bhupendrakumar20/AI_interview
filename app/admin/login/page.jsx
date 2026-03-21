@@ -81,7 +81,7 @@ export default function AdminLoginPage() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="admin@careerlens.ai"
+                    placeholder="admin@prepwise.ai"
                     className="pl-10 bg-dark-200 border-dark-300 text-white"
                     required
                   />

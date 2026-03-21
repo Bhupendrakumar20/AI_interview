@@ -23,7 +23,7 @@ This script will:
 - Configure initial permissions
 
 **Default Admin Credentials:**
-- **Email:** admin@careerlens.ai
+- **Email:** admin@Prepwise.ai
 - **Password:** Admin@1234
 - **Role:** Super Admin (full access)
 
@@ -31,7 +31,7 @@ This script will:
 
 1. Navigate to: `http://localhost:3000/admin/login`
 2. Enter the admin credentials:
-   - Email: `admin@careerlens.ai`
+   - Email: `admin@Prepwise.ai`
    - Password: `Admin@1234`
 3. Click "Sign In"
 4. You'll be redirected to the admin dashboard at `/admin`

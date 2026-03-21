@@ -73,14 +73,27 @@ export default function DayCard({ day, isExpanded, onToggleExpand, getDifficulty
                       variant="ghost"
                       onClick={() => setSelectedQuestion(question)}
                       className="hover:bg-blue-100 dark:hover:bg-blue-900"
+                      title="View solutions"
                     >
                       <Code className="h-4 w-4" />
                     </Button>
+                    {question.geeksforgeeksUrl && (
+                      <a
+                        href={question.geeksforgeeksUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 hover:bg-green-100 dark:hover:bg-green-900 rounded transition-colors"
+                        title="GeeksforGeeks solution"
+                      >
+                        <ExternalLink className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </a>
+                    )}
                     <a
                       href={question.leetcodeUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 hover:bg-slate-200 dark:hover:bg-slate-600 rounded transition-colors"
+                      title="LeetCode problem"
                     >
                       <ExternalLink className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                     </a>

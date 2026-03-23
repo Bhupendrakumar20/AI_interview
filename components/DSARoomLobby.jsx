@@ -22,7 +22,23 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
 
   // Initialize Socket.io connection
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || "http://localhost:3001";
+    // Determine the correct socket URL based on environment
+    let socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL;
+    
+    if (!socketUrl) {
+      // Default based on environment
+      if (typeof window !== 'undefined') {
+        const isProduction = window.location.hostname !== 'localhost';
+        socketUrl = isProduction 
+          ? window.location.origin  // Use same domain in production
+          : "http://localhost:3001";  // Use localhost in development
+      } else {
+        socketUrl = "http://localhost:3001";
+      }
+    }
+    
+    console.log("[DSA Room] Connecting to socket server:", socketUrl);
+    
     const newSocket = io(socketUrl, {
       reconnection: true,
       reconnectionDelay: 1000,

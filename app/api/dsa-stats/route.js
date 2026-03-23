@@ -112,44 +112,4 @@ export async function POST(request) {
   }
 }
 
-export async function POST(request) {
-  try {
-    const { action, userId, data } = await request.json();
 
-    if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
-    }
-
-    if (action === 'update_stats') {
-      // Update user stats after room completion
-      const statsRef = db.collection('user_stats').doc(userId);
-      await statsRef.update({
-        total_rooms: data.total_rooms || 0,
-        total_wins: data.total_wins || 0,
-        total_solved: data.total_solved || 0,
-        avg_points: data.avg_points || 0,
-        updated_at: new Date(),
-      });
-
-      return NextResponse.json({ success: true, message: 'Stats updated' });
-    }
-
-    if (action === 'award_achievement') {
-      // Award achievement/badge
-      const achievementRef = db.collection('achievements');
-      await achievementRef.add({
-        userId,
-        badge_name: data.badge_name,
-        earned_at: new Date(),
-        room_id: data.room_id || null,
-      });
-
-      return NextResponse.json({ success: true, message: 'Achievement awarded' });
-    }
-
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-  } catch (error) {
-    console.error('Stats update error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}

@@ -124,11 +124,21 @@ dsaRoomNamespace.on('connection', (socket) => {
       socket.join(`room_${roomId}`);
 
       console.log(`[create_room] Success: Room ${roomCode} created with ID ${roomId}`);
+      
+      // Send room created response with initial state
       socket.emit('room_created', {
         success: true,
         roomId,
         roomCode,
         message: 'Room created successfully',
+      });
+      
+      // Also immediately send members list with empty pending/approved
+      socket.emit('members_list', {
+        approved: room.approvedMembers,
+        pending: room.pendingRequests,
+        pendingCount: 0,
+        approvedCount: room.approvedMembers.length,
       });
     } catch (error) {
       console.error('[create_room] Error:', error);

@@ -14,6 +14,7 @@ const DSARoomManager = ({
 }) => {
   const [members, setMembers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
   const [questionMode, setQuestionMode] = useState("same"); // same or different
   const [startCountdown, setStartCountdown] = useState(null);
   const [gameStarted, setGameStarted] = useState(false);
@@ -31,6 +32,7 @@ const DSARoomManager = ({
       console.log("[DSA Room] Members list:", data);
       setMembers(data.approved || []);
       setPendingRequests(data.pending || []);
+      setPendingApprovals(data.pending || []);
     });
 
     socket.on("member_joined", (data) => {
@@ -250,11 +252,54 @@ const DSARoomManager = ({
                         </div>
                       </div>
                     </div>
-                    <div className="text-lg font-bold text-emerald-400">
-                      {member.points || 0}
+                    <div className="flex items-center gap-2">
+                      {member.status === 'pending' && (
+                        <span className="px-2 py-1 bg-orange-500/20 text-orange-300 text-xs font-bold rounded">
+                          ⏳ Pending
+                        </span>
+                      )}
+                      <div className="text-lg font-bold text-emerald-400">
+                        {member.points || 0}
+                      </div>
                     </div>
                   </div>
                 ))}
+                
+                {/* Pending Approval Section */}
+                {pendingApprovals && pendingApprovals.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-slate-700">
+                    <div className="text-sm font-bold text-orange-400 mb-3 flex items-center gap-2">
+                      <span>⏳</span> Waiting for Approval ({pendingApprovals.length})
+                    </div>
+                    <div className="space-y-2">
+                      {pendingApprovals.map((user, idx) => (
+                        <div
+                          key={user.userId}
+                          className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-between hover:border-orange-500 transition"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-6 h-6 rounded-full bg-orange-500/30 flex items-center justify-center text-xs">
+                              👤
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-slate-100">
+                                {user.username}
+                              </div>
+                              <div className="text-xs text-slate-400">
+                                {user.requestedAt
+                                  ? new Date(user.requestedAt).toLocaleTimeString()
+                                  : 'Just now'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-orange-300 font-semibold">
+                            PENDING
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

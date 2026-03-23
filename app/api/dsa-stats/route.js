@@ -1,11 +1,25 @@
-import { initializeApp, cert } from 'firebase-admin/app';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { NextResponse } from 'next/server';
 
-// Initialize Firebase Admin
-const serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_KEY || '{}');
-const app = initializeApp({ credential: cert(serviceAccount) });
-const db = getFirestore(app);
+// Lazy initialize Firebase Admin
+let db = null;
+
+function getDb() {
+  if (db) return db;
+  
+  const serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_KEY || '{}');
+  
+  if (!serviceAccount.project_id) {
+    throw new Error('FIREBASE_ADMIN_KEY environment variable is not properly configured');
+  }
+  
+  const apps = getApps();
+  const app = apps.length > 0 ? apps[0] : initializeApp({ credential: cert(serviceAccount) });
+  db = getFirestore(app);
+  
+  return db;
+}
 
 export async function GET(request) {
   try {
@@ -19,8 +33,8 @@ export async function GET(request) {
 
     if (type === 'user') {
       // Get user profile & stats from Firestore
-      const userDoc = await db.collection('users').doc(userId).get();
-      const statsDoc = await db.collection('user_stats').doc(userId).get();
+      const userDoc = await getDb().collection('users').doc(userId).get();
+      const statsDoc = await getDb().collection('user_stats').doc(userId).get();
 
       return NextResponse.json({
         user: userDoc.exists() ? userDoc.data() : null,
@@ -30,7 +44,7 @@ export async function GET(request) {
 
     if (type === 'global') {
       // Get global rankings from Firestore
-      const snapshot = await db
+      const snapshot = await getDb()
         .collection('user_stats')
         .where('total_rooms', '>', 0)
         .orderBy('total_wins', 'desc')
@@ -48,7 +62,7 @@ export async function GET(request) {
 
     if (type === 'rooms') {
       // Get user's recent rooms from Firestore
-      const snapshot = await db
+      const snapshot = await getDb()
         .collection('dsa_rooms')
         .where('participants', 'array-contains', userId)
         .orderBy('created_at', 'desc')
@@ -80,7 +94,7 @@ export async function POST(request) {
 
     if (action === 'update_stats') {
       // Update user stats in Firestore
-      const statsRef = db.collection('user_stats').doc(userId);
+      const statsRef = getDb().collection('user_stats').doc(userId);
       await statsRef.update({
         total_rooms: data.total_rooms || 0,
         total_wins: data.total_wins || 0,
@@ -94,7 +108,7 @@ export async function POST(request) {
 
     if (action === 'award_achievement') {
       // Award achievement/badge in Firestore
-      const achievementRef = db.collection('user_achievements');
+      const achievementRef = getDb().collection('user_achievements');
       await achievementRef.add({
         user_id: userId,
         badge_name: data.badge_name,

@@ -17,6 +17,7 @@
     "@radix-ui/react-slot": "^1.1.2",
     "@uploadthing/react": "^7.3.3",
     "@vapi-ai/web": "^2.2.4",
+    "@vercel/analytics": "^1.0.2",
     "ai": "^6.0.116",
     "axios": "^1.13.6",
     "class-variance-authority": "^0.7.1",

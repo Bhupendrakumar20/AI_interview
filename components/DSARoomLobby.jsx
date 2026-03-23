@@ -70,6 +70,15 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       setApprovedMembers(data.approved || []);
       setPendingRequests(data.pending || []);
       setNotificationBadgeCount(data.pendingCount || 0);
+      
+      // Save pending count to localStorage for TopBar notification badge
+      if (data.pendingCount) {
+        localStorage.setItem('dsaPendingCount', data.pendingCount.toString());
+        window.dispatchEvent(new Event('storage'));
+      } else if (data.pendingCount === 0) {
+        localStorage.removeItem('dsaPendingCount');
+        window.dispatchEvent(new Event('storage'));
+      }
     });
 
     // Listen for member request
@@ -266,23 +275,52 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
   if (joinRequestSent && !roomActive) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md text-center">
-          <div className="text-6xl mb-6 animate-pulse">⏳</div>
-          <h1 className="text-3xl font-bold mb-3">Waiting for Approval</h1>
-          <p className="text-slate-300 mb-3">
-            Your request to join the room has been sent to the room owner.
-          </p>
-          <p className="text-slate-400 text-sm mb-6">
-            Room Code: <span className="font-mono font-bold text-emerald-400">{roomCode}</span>
-          </p>
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-6 animate-pulse">⏳</div>
+            <h1 className="text-3xl font-bold mb-3">Waiting for Approval</h1>
+            <p className="text-slate-300 mb-3">
+              Your request to join the room has been sent to the room owner.
+            </p>
+            <p className="text-slate-400 text-sm mb-8">
+              Room Code: <span className="font-mono font-bold text-emerald-400">{roomCode}</span>
+            </p>
+          </div>
+
+          {/* Show live updates about your approval status */}
+          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <span className="text-lg">ℹ️</span>
+              <div className="text-sm text-slate-300">
+                <p className="font-semibold text-cyan-300 mb-2">What happens next?</p>
+                <ul className="space-y-1 text-slate-400 text-xs">
+                  <li>✓ Room owner receives a notification</li>
+                  <li>✓ You'll receive an email once reviewed</li>
+                  <li>✓ Real-time updates will appear below</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Real-time status indicator */}
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-300">Status</span>
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
+                <span className="text-sm text-orange-400 font-semibold">Pending Review</span>
+              </span>
+            </div>
+          </div>
+
           <button
             onClick={() => {
               setJoinRequestSent(false);
               setRoomCode("");
             }}
-            className="px-4 py-2 text-slate-400 hover:text-slate-200 transition"
+            className="w-full px-4 py-2 text-slate-400 hover:text-slate-200 transition border border-slate-700 rounded-lg"
           >
-            ← Cancel
+            ← Cancel Request
           </button>
         </div>
       </div>

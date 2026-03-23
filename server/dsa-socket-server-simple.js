@@ -195,6 +195,20 @@ dsaRoomNamespace.on('connection', (socket) => {
         message: 'Request sent to room owner',
       });
 
+      // Send email notification to room owner (async, non-blocking)
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/dsa-room/send-notification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'join_request',
+          requesterName: username,
+          requesterEmail: data.userEmail || 'unknown@example.com',
+          roomOwnerName: room.ownerUsername,
+          roomOwnerEmail: data.ownerEmail || 'owner@example.com',
+          roomCode: roomCode,
+        }),
+      }).catch(err => console.error('[request_join_room] Email send failed:', err));
+
       // Notify room owner of pending request with notification badge
       const ownerSocket = dsaRoomNamespace.sockets.get(room.ownerSocketId);
       if (ownerSocket) {
@@ -288,12 +302,34 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       console.log(`[approve_member] ${request.username} approved. Total approved: ${room.approvedMembers.length}`);
 
+      // Send approval email to the user (async, non-blocking)
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/dsa-room/send-notification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'join_approved',
+          requesterName: request.username,
+          requesterEmail: data.userEmail || 'user@example.com',
+          roomOwnerName: room.ownerUsername,
+          roomCode: room.roomCode,
+        }),
+      }).catch(err => console.error('[approve_member] Email send failed:', err));
+
       // Notify all room members
       dsaRoomNamespace.to(`room_${roomId}`).emit('member_joined', {
         userId: request.userId,
         username: request.username,
         joinedAt: new Date(),
       });
+
+      // Notify the approved user via socket
+      const approvedUserSocket = userSockets.get(request.userId);
+      if (approvedUserSocket) {
+        dsaRoomNamespace.to(approvedUserSocket).emit('join_approved', {
+          roomId,
+          message: `You've been approved by ${room.ownerUsername}!`,
+        });
+      }
 
       // Update members list for owner
       const ownerSocket = dsaRoomNamespace.sockets.get(room.ownerSocketId);
@@ -338,6 +374,28 @@ dsaRoomNamespace.on('connection', (socket) => {
       room.pendingRequests.splice(requestIdx, 1);
 
       console.log(`[reject_member] Request from ${request.username} rejected`);
+
+      // Send rejection email to the user (async, non-blocking)
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/dsa-room/send-notification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'join_rejected',
+          requesterName: request.username,
+          requesterEmail: data.userEmail || 'user@example.com',
+          roomOwnerName: room.ownerUsername,
+          roomCode: room.roomCode,
+        }),
+      }).catch(err => console.error('[reject_member] Email send failed:', err));
+
+      // Notify the rejected user via socket
+      const rejectedUserSocket = userSockets.get(request.userId);
+      if (rejectedUserSocket) {
+        dsaRoomNamespace.to(rejectedUserSocket).emit('join_rejected', {
+          roomId,
+          message: `Your request was rejected by ${room.ownerUsername}`,
+        });
+      }
 
       // Update members list for owner
       const ownerSocket = dsaRoomNamespace.sockets.get(room.ownerSocketId);

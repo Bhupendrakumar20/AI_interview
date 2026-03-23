@@ -1,0 +1,72 @@
+// Firestore Security Rules for DSA Room
+// APPEND TO YOUR EXISTING FIRESTORE_RULES.txt
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ─── EXISTING RULES (internships, applications, interview_buddy) ────
+    // [Keep your existing rules here]
+    
+    // ─── DSA ROOM COLLECTIONS ──────────────────────────────────────────
+
+    // dsa_rooms: Room management
+    match /dsa_rooms/{roomId} {
+      // Anyone can read (needed for join functionality)
+      allow read: if request.auth.uid != null;
+      
+      // Creator can create
+      allow create: if request.auth.uid != null &&
+                      request.resource.data.createdBy == request.auth.uid;
+      
+      // Anyone in participants can update (voting, game state)
+      allow update: if request.auth.uid in resource.data.participants;
+      
+      // Only creator can delete
+      allow delete: if resource.data.createdBy == request.auth.uid;
+    }
+
+    // dsa_room_participants: Per-user room state
+    match /dsa_room_participants/{participantId} {
+      // Users can read their own and room's participants
+      allow read: if request.auth.uid != null &&
+                     (request.auth.uid == resource.data.userId ||
+                      request.auth.uid in get(/databases/$(database)/documents/dsa_rooms/$(resource.data.roomId)).data.participants);
+      
+      // Server/backend creates
+      allow create: if get(/databases/$(database)/documents/dsa_rooms/$(resource.data.roomId)).data.createdBy == resource.data.userId ||
+                      request.auth.uid == resource.data.userId;
+      
+      // Participant can update their own stats
+      allow update: if request.auth.uid == resource.data.userId;
+      
+      // No delete (keep history)
+      allow delete: if false;
+    }
+
+    // dsa_room_submissions: Code submissions
+    match /dsa_room_submissions/{submissionId} {
+      // Users can read submissions in their room
+      allow read: if request.auth.uid != null &&
+                     request.auth.uid in get(/databases/$(database)/documents/dsa_rooms/$(resource.data.roomId)).data.participants;
+      
+      // Users can submit their own code
+      allow create: if request.auth.uid == resource.data.userId &&
+                       request.resource.data.roomId != null;
+      
+      // No direct updates (backend handles via server logic)
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // dsa_questions: Read-only question bank
+    match /dsa_questions/{questionId} {
+      // Anyone can read questions (used in room setup)
+      allow read: if true;
+      
+      // Only admins can write (managed separately)
+      allow write: if false;
+    }
+
+  }
+}

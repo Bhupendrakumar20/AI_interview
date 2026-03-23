@@ -23,6 +23,23 @@ async function InterviewPage() {
 
   return (
     <div className="flex flex-col gap-10">
+      {/* Interview Buddy CTA */}
+      <section className="relative overflow-hidden bg-linear-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-8">
+        <div className="absolute inset-0 bg-linear-to-r from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
+        <div className="relative flex items-center justify-between">
+          <div>
+            <h3 className="text-2xl font-bold mb-2">🤝 Interview Buddy</h3>
+            <p className="text-light-100 mb-4 max-w-md">
+              Practice with a human partner or AI interviewer. Get real-time coaching, adaptive questions, and detailed performance reports.
+            </p>
+            <Link href="/interview/buddy" className="inline-flex items-center gap-2 px-6 py-2.5 bg-linear-to-r from-blue-500 to-blue-600 hover:shadow-lg hover:shadow-blue-500/30 rounded-lg font-medium transition">
+              ✦ Try Interview Buddy
+            </Link>
+          </div>
+          <div className="text-6xl">🎯</div>
+        </div>
+      </section>
+
       {/* Setup section */}
       <section className="grid gap-6 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-stretch">
         <div className="card-border w-full">

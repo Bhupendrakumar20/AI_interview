@@ -257,6 +257,18 @@ dsaRoomNamespace.on('connection', (socket) => {
             members: roomData.participants || [],
             status: roomData.status,
           });
+
+          // 🔥 CRITICAL FIX: If game has already started, send game state immediately to late joiners
+          if (roomData.status === 'in-progress' && roomData.questions) {
+            console.log(`[join_room_socket] Game already in progress! Sending game_starting to ${username}`);
+            socket.emit('game_starting', {
+              roomId,
+              questions: roomData.questions,
+              leaderboard: roomData.leaderboard || [],
+              startTime: roomData.serverStartTime?.toMillis?.() || Date.now(),
+              questionMode: roomData.questionMode,
+            });
+          }
         }
       } catch (dbError) {
         console.log('[join_room_socket] Could not fetch room from DB:', dbError.message);

@@ -462,6 +462,19 @@ dsaRoomNamespace.on('connection', (socket) => {
         members: room.approvedMembers,
         pending: room.pendingRequests,
       });
+
+      // 🔥 CRITICAL FIX: If game has already started, send game_starting immediately
+      // This handles the case where member approves -> joins socket room AFTER owner started game
+      if (room.status === 'playing' && room.questions && room.leaderboard) {
+        console.log(`[join_room_socket] Game already in progress! Sending game_starting to ${username}`);
+        socket.emit('game_starting', {
+          roomId,
+          questions: room.questions,
+          leaderboard: room.leaderboard,
+          startTime: room.startTime,
+          questionMode: room.questionMode,
+        });
+      }
     } catch (error) {
       console.error('[join_room_socket] Error:', error);
       socket.emit('error', { message: 'Failed to join room: ' + error.message });
@@ -473,14 +486,17 @@ dsaRoomNamespace.on('connection', (socket) => {
   socket.on('start_game', (data) => {
     try {
       const { roomId, questionMode, startTime, questions: clientQuestions } = data;
-      console.log(`[start_game] Starting game for room ${roomId} with mode: ${questionMode}`);
+      console.log(`[start_game] Owner starting game for room ${roomId}`);
+      console.log(`[start_game] Received ${clientQuestions?.length || 0} questions from client`);
 
       const room = rooms.get(roomId);
       if (!room) {
+        console.error(`[start_game] Room not found: ${roomId}`);
         socket.emit('error', { message: 'Room not found' });
         return;
       }
 
+      // Mark room as playing FIRST
       room.status = 'playing';
       room.questionMode = questionMode;
       room.startTime = startTime;
@@ -507,7 +523,7 @@ dsaRoomNamespace.on('connection', (socket) => {
         },
       ];
 
-      // Build leaderboard with approved members
+      // Build leaderboard with approved members (CRITICAL: include owner + all approved members)
       const leaderboard = [
         {
           userId: room.ownerId,
@@ -527,22 +543,35 @@ dsaRoomNamespace.on('connection', (socket) => {
         })),
       ];
 
-      // Store leaderboard in room for updates
+      // 🔥 CRITICAL: Store questions and leaderboard in room for late joiners
+      room.questions = questions;
       room.leaderboard = leaderboard;
 
+      // Log who should receive the broadcast
+      console.log(`[start_game] Leaderboard has ${leaderboard.length} players: ${leaderboard.map(p => p.username).join(', ')}`);
+      console.log(`[start_game] Approved members in room: ${room.approvedMembers.map(m => m.username).join(', ')}`);
+      
+      // Get all sockets in room before broadcast
+      const roomSockets = dsaRoomNamespace.sockets.adapter.rooms.get(`room_${roomId}`);
+      const socketCount = roomSockets ? roomSockets.size : 0;
+      console.log(`[start_game] Currently in socket room: ${socketCount} members`);
+
       // Broadcast game starting to all in room
-      dsaRoomNamespace.to(`room_${roomId}`).emit('game_starting', {
+      const broadcastData = {
         roomId,
         questions,
         leaderboard,
         startTime,
         questionMode,
-      });
+      };
+      
+      console.log(`[start_game] BROADCASTING game_starting with ${questions.length} questions`);
+      dsaRoomNamespace.to(`room_${roomId}`).emit('game_starting', broadcastData);
 
-      console.log(`[start_game] Game started with ${questions.length} questions and ${leaderboard.length} players`);
+      console.log(`[start_game] ✓ Game started successfully`);
     } catch (error) {
       console.error('[start_game] Error:', error);
-      socket.emit('error', { message: 'Failed to start game' });
+      socket.emit('error', { message: 'Failed to start game: ' + error.message });
     }
   });
 

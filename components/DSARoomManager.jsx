@@ -220,6 +220,7 @@ const DSARoomManager = ({
     const dayQuestions = randomDay.questions.slice(0, Math.min(3, randomDay.questions.length));
 
     // Emit to entire room (both owner and members)
+    // Server will broadcast "game_starting" to all members including owner
     socket.emit("start_game", {
       roomId,
       questionMode,
@@ -227,9 +228,8 @@ const DSARoomManager = ({
       questions: dayQuestions, // Include questions
     });
 
-    // Set countdown for owner too
-    setStartCountdown(5); // 5 second countdown
-    setGameStarted(true); // IMMEDIATELY set gameStarted for owner
+    // Wait for socket event to broadcast to all players
+    // Both owner and members will receive "game_starting" event
   };
 
   const copyCode = async () => {

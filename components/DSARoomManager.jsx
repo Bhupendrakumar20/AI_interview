@@ -176,7 +176,11 @@ const DSARoomManager = ({
 
   const handleStartGame = () => {
     if (!socket || !isOwner) return;
-    if (members.length < 2) {
+    
+    // Count total players: owner + approved members
+    const totalPlayers = members.length + 1; // +1 for owner
+    
+    if (totalPlayers < 2) {
       toast.error("Need at least 2 players to start");
       return;
     }
@@ -533,7 +537,7 @@ const DSARoomManager = ({
             {/* Start Game Button */}
             <button
               onClick={handleStartGame}
-              disabled={members.length < 1}
+              disabled={members.length + 1 < 2}
               className="w-full px-6 py-4 bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-400 hover:via-green-400 hover:to-emerald-500 text-white rounded-xl font-black transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg shadow-2xl shadow-emerald-500/50 hover:shadow-emerald-500/70"
             >
               {startCountdown !== null ? (
@@ -549,9 +553,9 @@ const DSARoomManager = ({
               )}
             </button>
 
-            {members.length < 1 && (
+            {members.length + 1 < 2 && (
               <div className="mt-3 text-xs text-slate-400 text-center font-semibold">
-                ⏳ AWAITING PLAYERS... (Need 1+ member)
+                ⏳ AWAITING PLAYERS... (Need 2+ members)
               </div>
             )}
           </div>

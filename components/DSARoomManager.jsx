@@ -18,6 +18,7 @@ const DSARoomManager = ({
   const [questionMode, setQuestionMode] = useState("same"); // same or different
   const [startCountdown, setStartCountdown] = useState(null);
   const [gameStarted, setGameStarted] = useState(false);
+  const [showLoadingArena, setShowLoadingArena] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [showCopyNotice, setShowCopyNotice] = useState(false);
@@ -137,6 +138,7 @@ const DSARoomManager = ({
     if (startCountdown <= 0) {
       // Countdown complete - fully transition to game
       console.log("[DSA Room] Countdown complete, entering arena");
+      // Make sure gameStarted is true even if socket event hasn't fired
       setStartCountdown(null); // Reset countdown
       return;
     }
@@ -150,6 +152,25 @@ const DSARoomManager = ({
 
     return () => clearTimeout(timer);
   }, [startCountdown]);
+
+  useEffect(() => {
+    if (gameStarted && startCountdown === null) {
+      // Game started and countdown is done - show arena
+      setShowLoadingArena(true);
+    }
+  }, [gameStarted, startCountdown]);
+
+  // Fallback: If countdown reaches 0 but gameStarted hasn't been set, set it now
+  useEffect(() => {
+    if (startCountdown === null && !gameStarted) {
+      // Countdown finished but gameStarted event might not have fired
+      const fallbackTimer = setTimeout(() => {
+        console.log("[DSA Room] Fallback: Forcing game started after countdown");
+        setGameStarted(true);
+      }, 500);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [startCountdown, gameStarted]);
 
   const handleApproveMember = (requestId, memberId, memberUsername) => {
     if (!socket) return;
@@ -230,6 +251,19 @@ const DSARoomManager = ({
               <span>Starting Arena in {startCountdown} seconds...</span>
               <span className="animate-spin">⚡</span>
             </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Loading screen after countdown
+    if (!showLoadingArena) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-6xl mb-6 animate-spin">⚔️</div>
+            <h2 className="text-3xl font-black text-cyan-400 mb-4">ENTERING ARENA...</h2>
+            <p className="text-slate-400">Loading your battle arena...</p>
           </div>
         </div>
       );

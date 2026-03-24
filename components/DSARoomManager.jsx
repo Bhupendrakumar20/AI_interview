@@ -35,6 +35,15 @@ const DSARoomManager = ({
       setPendingApprovals(data.pending || []);
     });
 
+    socket.on("room_state", (data) => {
+      console.log("[DSA Room] Room state:", data);
+      if (data.success) {
+        setMembers(data.members || []);
+        setPendingRequests(data.pending || []);
+        setPendingApprovals(data.pending || []);
+      }
+    });
+
     socket.on("member_joined", (data) => {
       console.log("[DSA Room] New member:", data);
       setMembers((prev) => [...prev, data]);
@@ -110,8 +119,16 @@ const DSARoomManager = ({
       socket.off("game_starting");
       socket.off("leaderboard_update");
       socket.off("submission_notification");
+      socket.off("room_state");
     };
   }, [socket, onGameStart]);
+
+  // Request room state when entering room (for newly approved members)
+  useEffect(() => {
+    if (!socket || !roomId) return;
+    console.log("[DSA Room] Requesting room state for:", roomId);
+    socket.emit("get_room_state", { roomId });
+  }, [socket, roomId]);
 
   // Start countdown when owner initiates
   useEffect(() => {

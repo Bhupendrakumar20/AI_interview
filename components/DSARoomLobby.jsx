@@ -131,6 +131,12 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       setRoomActive(true);
       setCurrentRoomId(data.roomId);
       setIsRoomOwner(false);
+      setApprovedMembers(data.members || []);
+      
+      // Request full room state to get all members
+      setTimeout(() => {
+        newSocket.emit("get_room_state", { roomId: data.roomId });
+      }, 100);
     });
 
     newSocket.on("join_rejected", (data) => {
@@ -138,6 +144,14 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       toast.error("Your join request was rejected by the room owner");
       setJoinRequestSent(false);
       setRoomCode("");
+    });
+
+    // Listen for room state (when joining)
+    newSocket.on("room_state", (data) => {
+      console.log("[DSA Room] Received room state:", data);
+      if (data.success) {
+        setApprovedMembers(data.members || []);
+      }
     });
 
     setSocket(newSocket);

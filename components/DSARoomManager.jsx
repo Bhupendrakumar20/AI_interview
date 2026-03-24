@@ -322,39 +322,42 @@ const DSARoomManager = ({
             {pendingApprovals && pendingApprovals.length > 0 && (
               <div className="mt-6 pt-6 border-t border-slate-700">
                 <div className="text-sm font-bold text-orange-400 mb-3 flex items-center gap-2">
-                      <span>⏳</span> Waiting for Approval ({pendingApprovals.length})
-                    </div>
-                    <div className="space-y-2">
-                      {pendingApprovals.map((user, idx) => (
-                        <div
-                          key={user.userId}
-                          className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-between hover:border-orange-500 transition"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-full bg-orange-500/30 flex items-center justify-center text-xs">
-                              👤
-                            </div>
-                            <div>
-                              <div className="text-sm font-bold text-slate-100">
-                                {user.username}
-                              </div>
-                              <div className="text-xs text-slate-400">
-                                {user.requestedAt
-                                  ? new Date(user.requestedAt).toLocaleTimeString()
-                                  : 'Just now'}
-                              </div>
-                            </div>
+                  <span>⏳</span> Waiting for Approval ({pendingApprovals.length})
+                </div>
+                <div className="space-y-2">
+                  {pendingApprovals.map((user, idx) => (
+                    <div
+                      key={user.userId}
+                      className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-between hover:border-orange-500 transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-orange-500/30 flex items-center justify-center text-xs">
+                          👤
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-100">
+                            {user.username}
                           </div>
-                          <div className="text-xs text-orange-300 font-semibold">
-                            PENDING
+                          <div className="text-xs text-slate-400">
+                            {user.requestedAt
+                              ? new Date(user.requestedAt).toLocaleTimeString()
+                              : 'Just now'}
                           </div>
                         </div>
-                      ))}
+                      </div>
+                      <div className="text-xs text-orange-300 font-semibold">
+                        PENDING
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
             {/* Activity Feed */}
             {gameActivity.length > 0 && (

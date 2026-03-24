@@ -132,14 +132,20 @@ const DSARoomManager = ({
 
   // Start countdown when owner initiates
   useEffect(() => {
-    if (startCountdown === null) return;
-    if (startCountdown === 0) {
-      console.log("[DSA Room] Starting game");
+    if (startCountdown === null || startCountdown === undefined) return;
+    
+    if (startCountdown <= 0) {
+      // Countdown complete - fully transition to game
+      console.log("[DSA Room] Countdown complete, entering arena");
+      setStartCountdown(null); // Reset countdown
       return;
     }
 
     const timer = setTimeout(() => {
-      setStartCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      setStartCountdown((prev) => {
+        if (prev === null || typeof prev !== 'number') return null;
+        return prev - 1;
+      });
     }, 1000);
 
     return () => clearTimeout(timer);
@@ -207,6 +213,29 @@ const DSARoomManager = ({
 
   // Game view
   if (gameStarted) {
+    // Show countdown screen
+    if (startCountdown !== null && startCountdown > 0) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-6xl font-black mb-6 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              ⚔️ BABYLON DSA
+            </h1>
+            <div className="text-9xl font-mono font-black text-cyan-400 mb-8 animate-pulse">
+              {startCountdown}
+            </div>
+            <p className="text-2xl font-bold text-purple-300 mb-4">Get Ready for Battle!</p>
+            <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold">
+              <span className="animate-spin">⚡</span>
+              <span>Starting Arena in {startCountdown} seconds...</span>
+              <span className="animate-spin">⚡</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Actual game arena view
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6">
         {/* Header */}
@@ -219,10 +248,10 @@ const DSARoomManager = ({
               <p className="text-cyan-300/70 text-sm mt-2">Real-time algorithmic combat</p>
             </div>
             <div className="text-right">
-              <div className="text-4xl font-mono font-bold text-cyan-400">
-                {Math.floor(startCountdown / 60)}:{String(startCountdown % 60).padStart(2, '0')}
+              <div className="text-3xl font-mono font-bold text-emerald-400 font-black">
+                22:55
               </div>
-              <div className="text-xs text-purple-300">TIME REMAINING</div>
+              <div className="text-xs text-emerald-300">TIME REMAINING</div>
             </div>
           </div>
         </div>

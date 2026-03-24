@@ -224,6 +224,47 @@ dsaRoomNamespace.on('connection', (socket) => {
     }
   });
 
+  // ─── JOIN ROOM SOCKET (for members to join socket room) ────────────────
+
+  socket.on('join_room_socket', async (data) => {
+    try {
+      const { roomId } = data;
+      const userId = socket.data.userId;
+      const username = socket.data.username;
+
+      if (!roomId || !userId) {
+        console.log('[join_room_socket] Missing roomId or userId');
+        socket.emit('error', { message: 'Missing room or user info' });
+        return;
+      }
+
+      // Join the socket room so they receive game_starting broadcasts
+      socket.join(`room_${roomId}`);
+      console.log(`[join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
+      
+      // Get room data and send current state
+      try {
+        const roomRef = db.collection('dsa_rooms').doc(roomId);
+        const roomData = (await roomRef.get()).data();
+        
+        if (roomData) {
+          socket.emit('room_state', {
+            success: true,
+            roomId,
+            members: roomData.participants || [],
+            status: roomData.status,
+          });
+        }
+      } catch (dbError) {
+        console.log('[join_room_socket] Could not fetch room from DB:', dbError.message);
+        socket.emit('room_state', { success: true, roomId, members: [] });
+      }
+    } catch (error) {
+      console.error('[join_room_socket] Error:', error);
+      socket.emit('error', { message: 'Failed to join room: ' + error.message });
+    }
+  });
+
   // ─── START GAME ────────────────────────────────────────────────────────
 
   socket.on('start_game', async (data) => {

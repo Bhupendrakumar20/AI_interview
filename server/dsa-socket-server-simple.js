@@ -426,11 +426,47 @@ dsaRoomNamespace.on('connection', (socket) => {
     }
   });
 
+  // ─── JOIN ROOM SOCKET (for members to join socket room) ────────────────
+
+  socket.on('join_room_socket', (data) => {
+    try {
+      const { roomId } = data;
+      const userData = socketUsers.get(socket.id);
+      
+      if (!userData) {
+        console.log('[join_room_socket] User socket not found');
+        return;
+      }
+
+      const room = rooms.get(roomId);
+      if (!room) {
+        console.log(`[join_room_socket] Room not found: ${roomId}`);
+        socket.emit('error', { message: 'Room not found' });
+        return;
+      }
+
+      // Join the socket room so they receive game_starting broadcasts
+      socket.join(`room_${roomId}`);
+      console.log(`[join_room_socket] ${userData.username} (${socket.id}) joined socket room for ${roomId}`);
+      
+      // Immediately send them the current room state
+      socket.emit('room_state', {
+        success: true,
+        roomId,
+        members: room.approvedMembers,
+        pending: room.pendingRequests,
+      });
+    } catch (error) {
+      console.error('[join_room_socket] Error:', error);
+      socket.emit('error', { message: 'Failed to join room: ' + error.message });
+    }
+  });
+
   // ─── START GAME ───────────────────────────────────────────────────────
 
   socket.on('start_game', (data) => {
     try {
-      const { roomId, questionMode, startTime } = data;
+      const { roomId, questionMode, startTime, questions: clientQuestions } = data;
       console.log(`[start_game] Starting game for room ${roomId} with mode: ${questionMode}`);
 
       const room = rooms.get(roomId);
@@ -443,8 +479,8 @@ dsaRoomNamespace.on('connection', (socket) => {
       room.questionMode = questionMode;
       room.startTime = startTime;
 
-      // Mock questions for demo
-      const questions = [
+      // Use questions from client (100 DAYS OF CODE) or fallback to mocks
+      let questions = clientQuestions || [
         {
           id: 'q1',
           title: 'Two Sum',

@@ -33,6 +33,10 @@ const DSARoomManager = ({
   useEffect(() => {
     if (!socket) return;
 
+    // Join socket room immediately so all members receive game_starting broadcast
+    console.log("[DSA Room] Joining socket room:", roomId);
+    socket.emit("join_room_socket", { roomId });
+
     socket.on("members_list", (data) => {
       console.log("[DSA Room] Members list:", data);
       setMembers(data.approved || []);

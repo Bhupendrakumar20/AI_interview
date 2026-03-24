@@ -317,27 +317,11 @@ const DSARoomManager = ({
                 ))}
               </div>
             </div>
-                          {member.solved || 0} solved
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {member.status === 'pending' && (
-                        <span className="px-2 py-1 bg-orange-500/20 text-orange-300 text-xs font-bold rounded">
-                          ⏳ Pending
-                        </span>
-                      )}
-                      <div className="text-lg font-bold text-emerald-400">
-                        {member.points || 0}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Pending Approval Section */}
-                {pendingApprovals && pendingApprovals.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-slate-700">
-                    <div className="text-sm font-bold text-orange-400 mb-3 flex items-center gap-2">
+
+            {/* Pending Approval Section */}
+            {pendingApprovals && pendingApprovals.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-slate-700">
+                <div className="text-sm font-bold text-orange-400 mb-3 flex items-center gap-2">
                       <span>⏳</span> Waiting for Approval ({pendingApprovals.length})
                     </div>
                     <div className="space-y-2">

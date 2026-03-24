@@ -62,9 +62,30 @@ const DSARoomManager = ({
     });
 
     socket.on("game_starting", (data) => {
-      console.log("[DSA Room] Game starting:", data);
+      console.log("[DSA Room] Game starting (game_starting event):", data);
+      // Clear fallback timeout if it was set
+      if (socket.timeoutId) {
+        clearTimeout(socket.timeoutId);
+        socket.timeoutId = null;
+      }
       setGameStarted(true);
       setStartCountdown(5); // Start countdown for members too
+      setQuestions(data.questions || []);
+      setLeaderboard(data.leaderboard || []);
+      if (onGameStart) onGameStart(data);
+    });
+
+    // Also listen for 'game_started' event from server (alternative event name)
+    socket.on("game_started", (data) => {
+      console.log("[DSA Room] Game starting (game_started event):", data);
+      // Clear fallback timeout if it was set
+      if (socket.timeoutId) {
+        clearTimeout(socket.timeoutId);
+        socket.timeoutId = null;
+      }
+      setGameStarted(true);
+      setStartCountdown(5); // Start countdown for members too
+      // Note: game_started might not include questions/leaderboard, use default if needed
       setQuestions(data.questions || []);
       setLeaderboard(data.leaderboard || []);
       if (onGameStart) onGameStart(data);
@@ -229,13 +250,46 @@ const DSARoomManager = ({
     const dayQuestions = randomDay.questions.slice(0, Math.min(3, randomDay.questions.length));
 
     // Emit to entire room (both owner and members)
-    // Server will broadcast "game_starting" to all members including owner
+    // Server will broadcast "game_starting" or "game_started" to all members including owner
     socket.emit("start_game", {
       roomId,
       questionMode,
       startTime: Date.now(),
       questions: dayQuestions, // Include questions
     });
+
+    // FALLBACK: If server doesn't respond within 3 seconds, start locally
+    // This ensures game works even if server socket broadcast fails
+    const fallbackTimer = setTimeout(() => {
+      console.log("[DSA Room] Server response timeout - starting game locally as fallback");
+      setGameStarted(true);
+      setStartCountdown(5);
+      setQuestions(dayQuestions);
+      
+      // Build leaderboard from members
+      const localLeaderboard = [
+        {
+          userId: userId,
+          username: username,
+          points: 0,
+          solved: 0,
+          isOwner: true,
+          status: 'idle',
+        },
+        ...members.map((m) => ({
+          userId: m.userId,
+          username: m.username,
+          points: 0,
+          solved: 0,
+          isOwner: false,
+          status: 'idle',
+        })),
+      ];
+      setLeaderboard(localLeaderboard);
+    }, 3000);
+
+    // Store timeout ID so we can clear it if server responds
+    socket.timeoutId = fallbackTimer;
 
     // Wait for socket event to broadcast to all players
     // Both owner and members will receive "game_starting" event

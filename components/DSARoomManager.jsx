@@ -359,44 +359,6 @@ const DSARoomManager = ({
     );
   }
 
-            {/* Activity Feed */}
-            {gameActivity.length > 0 && (
-              <div className="bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-emerald-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-emerald-500/10">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="text-3xl animate-pulse">📡</div>
-                  <div>
-                    <h3 className="text-xl font-black text-emerald-400">LIVE EVENTS</h3>
-                    <div className="text-xs text-emerald-300/50">{gameActivity.length} UPDATES</div>
-                  </div>
-                </div>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/50 scrollbar-track-slate-900/50">
-                  {gameActivity.map((activity, idx) => (
-                    <div
-                      key={activity.id}
-                      className={`p-3 rounded-lg border text-sm transition backdrop-blur-sm ${
-                        activity.type === "success"
-                          ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-200 shadow-lg shadow-emerald-500/10"
-                          : "bg-slate-800/50 border-slate-600/50 text-slate-300 hover:border-slate-500/60"
-                      } flex items-start gap-3`}
-                    >
-                      <span className="text-lg shrink-0 mt-0.5">{activity.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-slate-100">{activity.message}</div>
-                        <div className={`text-xs mt-1 ${activity.type === 'success' ? 'text-emerald-300/70' : 'text-slate-400/70'}`}>
-                          {activity.timestamp.toLocaleTimeString()}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Lobby view
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6">

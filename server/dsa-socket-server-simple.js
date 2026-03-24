@@ -430,11 +430,11 @@ dsaRoomNamespace.on('connection', (socket) => {
 
   socket.on('join_room_socket', (data) => {
     try {
-      const { roomId } = data;
-      const userData = socketUsers.get(socket.id);
+      const { roomId, userId, username } = data;
       
-      if (!userData) {
-        console.log('[join_room_socket] User socket not found');
+      if (!roomId || !userId) {
+        console.log('[join_room_socket] Missing roomId or userId');
+        socket.emit('error', { message: 'Missing room or user info' });
         return;
       }
 
@@ -445,9 +445,15 @@ dsaRoomNamespace.on('connection', (socket) => {
         return;
       }
 
+      // Register this socket with user info if not already registered
+      if (!socketUsers.has(socket.id)) {
+        socketUsers.set(socket.id, { userId, username, roomId });
+        userSockets.set(userId, socket.id);
+      }
+
       // Join the socket room so they receive game_starting broadcasts
       socket.join(`room_${roomId}`);
-      console.log(`[join_room_socket] ${userData.username} (${socket.id}) joined socket room for ${roomId}`);
+      console.log(`[join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
       
       // Immediately send them the current room state
       socket.emit('room_state', {

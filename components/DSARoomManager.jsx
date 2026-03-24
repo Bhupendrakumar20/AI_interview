@@ -34,8 +34,9 @@ const DSARoomManager = ({
     if (!socket) return;
 
     // Join socket room immediately so all members receive game_starting broadcast
-    console.log("[DSA Room] Joining socket room:", roomId);
-    socket.emit("join_room_socket", { roomId });
+    // Pass userId and username since member might not be registered in server's socketUsers map yet
+    console.log("[DSA Room] Joining socket room:", roomId, "as user:", userId);
+    socket.emit("join_room_socket", { roomId, userId, username });
 
     socket.on("members_list", (data) => {
       console.log("[DSA Room] Members list:", data);
@@ -148,11 +149,12 @@ const DSARoomManager = ({
       socket.off("member_joined");
       socket.off("member_request");
       socket.off("game_starting");
+      socket.off("game_started");
       socket.off("leaderboard_update");
       socket.off("submission_notification");
       socket.off("room_state");
     };
-  }, [socket, onGameStart]);
+  }, [socket, roomId, userId, username, onGameStart]);
 
   // Request room state when entering room (for newly approved members)
   useEffect(() => {

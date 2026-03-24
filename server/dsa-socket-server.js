@@ -228,9 +228,7 @@ dsaRoomNamespace.on('connection', (socket) => {
 
   socket.on('join_room_socket', async (data) => {
     try {
-      const { roomId } = data;
-      const userId = socket.data.userId;
-      const username = socket.data.username;
+      const { roomId, userId, username } = data;
 
       if (!roomId || !userId) {
         console.log('[join_room_socket] Missing roomId or userId');
@@ -238,7 +236,12 @@ dsaRoomNamespace.on('connection', (socket) => {
         return;
       }
 
-      // Join the socket room so they receive game_starting broadcasts
+      // Register socket data for this user
+      socket.data.userId = userId;
+      socket.data.username = username;
+      socket.data.roomId = roomId;
+
+      // Join the socket room so they receive broadcasts
       socket.join(`room_${roomId}`);
       console.log(`[join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
       

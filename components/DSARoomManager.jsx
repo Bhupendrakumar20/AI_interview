@@ -67,7 +67,8 @@ const DSARoomManager = ({
     });
 
     socket.on("game_starting", (data) => {
-      console.log("[DSA Room] Game starting (game_starting event):", data);
+      console.log("[DSA Room] ✓ Received game_starting event with", data.questions?.length || 0, "questions");
+      console.log("[DSA Room] Leaderboard has", data.leaderboard?.length || 0, "players");
       // Clear fallback timeout if it was set
       if (socket.timeoutId) {
         clearTimeout(socket.timeoutId);
@@ -82,7 +83,7 @@ const DSARoomManager = ({
 
     // Also listen for 'game_started' event from server (alternative event name)
     socket.on("game_started", (data) => {
-      console.log("[DSA Room] Game starting (game_started event):", data);
+      console.log("[DSA Room] ✓ Received game_started event with", data.questions?.length || 0, "questions");
       // Clear fallback timeout if it was set
       if (socket.timeoutId) {
         clearTimeout(socket.timeoutId);
@@ -257,6 +258,7 @@ const DSARoomManager = ({
 
     // Emit to entire room (both owner and members)
     // Server will broadcast "game_starting" or "game_started" to all members including owner
+    console.log("[DSA Room] Owner emitting start_game with", dayQuestions.length, "questions");
     socket.emit("start_game", {
       roomId,
       questionMode,
@@ -264,10 +266,11 @@ const DSARoomManager = ({
       questions: dayQuestions, // Include questions
     });
 
-    // FALLBACK: If server doesn't respond within 3 seconds, start locally
-    // This ensures game works even if server socket broadcast fails
+    // 🔥 FALLBACK: If server doesn't respond within 7 seconds, start locally
+    // This ensures game works even if server socket broadcast fails or has network delays
     const fallbackTimer = setTimeout(() => {
       console.log("[DSA Room] Server response timeout - starting game locally as fallback");
+      toast.warning("Starting game locally (server delayed)");
       setGameStarted(true);
       setStartCountdown(5);
       setQuestions(dayQuestions);
@@ -292,7 +295,7 @@ const DSARoomManager = ({
         })),
       ];
       setLeaderboard(localLeaderboard);
-    }, 3000);
+    }, 7000);  // 7 second timeout for network delays
 
     // Store timeout ID so we can clear it if server responds
     socket.timeoutId = fallbackTimer;

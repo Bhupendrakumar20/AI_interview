@@ -45,7 +45,12 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
       path: "/socket.io/",
+      // For Vercel: Use polling as fallback, prefer WebSocket for local
       transports: ["websocket", "polling"],
+      // Connection settings for stability
+      pingInterval: 25000,  // Send ping every 25 seconds
+      pingTimeout: 60000,   // Wait 60 seconds before timeout
+      upgradeTimeout: 10000,
     });
 
     newSocket.on("connect", () => {

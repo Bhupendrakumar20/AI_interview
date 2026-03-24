@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { HUNDRED_DAYS_DSA } from "../constants/hundredDaysOfCode";
 
 const DSARoomManager = ({ 
   socket, 
@@ -60,6 +61,7 @@ const DSARoomManager = ({
     socket.on("game_starting", (data) => {
       console.log("[DSA Room] Game starting:", data);
       setGameStarted(true);
+      setStartCountdown(5); // Start countdown for members too
       setQuestions(data.questions || []);
       setLeaderboard(data.leaderboard || []);
       if (onGameStart) onGameStart(data);
@@ -212,13 +214,22 @@ const DSARoomManager = ({
       return;
     }
 
+    // Get random questions from 100 DAYS OF CODE
+    const allDays = Object.values(HUNDRED_DAYS_DSA);
+    const randomDay = allDays[Math.floor(Math.random() * allDays.length)];
+    const dayQuestions = randomDay.questions.slice(0, Math.min(3, randomDay.questions.length));
+
+    // Emit to entire room (both owner and members)
     socket.emit("start_game", {
       roomId,
       questionMode,
       startTime: Date.now(),
+      questions: dayQuestions, // Include questions
     });
 
+    // Set countdown for owner too
     setStartCountdown(5); // 5 second countdown
+    setGameStarted(true); // IMMEDIATELY set gameStarted for owner
   };
 
   const copyCode = async () => {

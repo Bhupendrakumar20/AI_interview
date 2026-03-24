@@ -635,14 +635,36 @@ const DSARoomManager = ({
           </div>
         )}
 
-        {/* Waiting for Owner (Non-Owner) */}
-        {!isOwner && (
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 text-center">
-            <div className="text-4xl mb-3">⏳</div>
-            <h2 className="text-xl font-bold mb-2">Waiting for Room Owner</h2>
-            <p className="text-slate-400 text-sm">
-              The room owner will start the game when ready
-            </p>
+        {/* Waiting for Approval (Non-Owner, Not in Members List) */}
+        {!isOwner && !members.find((m) => m.userId === userId) && (
+          <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-orange-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/10">
+            <div className="text-center">
+              <div className="text-6xl mb-6 animate-bounce">⏳</div>
+              <h2 className="text-3xl font-black text-orange-400 mb-3">Waiting for Approval</h2>
+              <p className="text-orange-300/70 text-sm mb-6">
+                Your request to join has been sent to the room owner. Please wait for approval.
+              </p>
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: '0s' }}></div>
+                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Waiting for Owner to Start Game (After Approval) */}
+        {!isOwner && members.find((m) => m.userId === userId) && !gameStarted && (
+          <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
+            <div className="text-center">
+              <div className="text-6xl mb-6 animate-pulse">✓</div>
+              <h2 className="text-3xl font-black text-cyan-400 mb-3">Approved! Ready for Battle</h2>
+              <p className="text-cyan-300/70 text-sm">
+                You're in the room. Waiting for the owner to start the game...
+              </p>
+            </div>
           </div>
         )}
       </div>

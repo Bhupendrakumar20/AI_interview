@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { HUNDRED_DAYS_DSA } from "../constants/hundredDaysOfCode";
 
@@ -25,6 +25,9 @@ const DSARoomManager = ({
   const [showCopyNotice, setShowCopyNotice] = useState(false);
   const [submissionFeed, setSubmissionFeed] = useState([]);
   const [gameActivity, setGameActivity] = useState([]);
+  
+  // Track if countdown was actually initiated (to avoid false positives on initial null)
+  const countdownStartedRef = useRef(false);
 
   // Listen for member updates
   useEffect(() => {
@@ -137,6 +140,9 @@ const DSARoomManager = ({
   useEffect(() => {
     if (startCountdown === null || startCountdown === undefined) return;
     
+    // Mark that countdown has been initiated
+    countdownStartedRef.current = true;
+    
     if (startCountdown <= 0) {
       // Countdown complete - fully transition to game
       console.log("[DSA Room] Countdown complete, entering arena");
@@ -163,15 +169,18 @@ const DSARoomManager = ({
   }, [gameStarted, startCountdown]);
 
   // Fallback: If countdown reaches 0 but gameStarted hasn't been set, set it now
+  // ONLY triggers if countdown was actually initiated (to avoid firing on initial null value)
   useEffect(() => {
-    if (startCountdown === null && !gameStarted) {
-      // Countdown finished but gameStarted event might not have fired
-      const fallbackTimer = setTimeout(() => {
-        console.log("[DSA Room] Fallback: Forcing game started after countdown");
-        setGameStarted(true);
-      }, 500);
-      return () => clearTimeout(fallbackTimer);
-    }
+    if (!countdownStartedRef.current) return; // Countdown was never started
+    if (startCountdown !== null) return; // Countdown hasn't finished yet
+    if (gameStarted) return; // Game already started
+    
+    // Countdown finished but gameStarted event might not have fired
+    const fallbackTimer = setTimeout(() => {
+      console.log("[DSA Room] Fallback: Forcing game started after countdown");
+      setGameStarted(true);
+    }, 500);
+    return () => clearTimeout(fallbackTimer);
   }, [startCountdown, gameStarted]);
 
   const handleApproveMember = (requestId, memberId, memberUsername) => {

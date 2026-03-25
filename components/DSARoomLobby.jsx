@@ -22,14 +22,35 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
 
   // Initialize Socket.io connection
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || "http://localhost:3001";
+    // Determine the correct socket URL based on environment
+    let socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL;
+    
+    if (!socketUrl) {
+      // Default based on environment
+      if (typeof window !== 'undefined') {
+        const isProduction = window.location.hostname !== 'localhost';
+        socketUrl = isProduction 
+          ? window.location.origin  // Use same domain in production
+          : "http://localhost:3001";  // Use localhost in development
+      } else {
+        socketUrl = "http://localhost:3001";
+      }
+    }
+    
+    console.log("[DSA Room] Connecting to socket server:", socketUrl);
+    
     const newSocket = io(socketUrl, {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
       path: "/socket.io/",
+      // For Vercel: Use polling as fallback, prefer WebSocket for local
       transports: ["websocket", "polling"],
+      // Connection settings for stability
+      pingInterval: 25000,  // Send ping every 25 seconds
+      pingTimeout: 60000,   // Wait 60 seconds before timeout
+      upgradeTimeout: 10000,
     });
 
     newSocket.on("connect", () => {
@@ -50,6 +71,8 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
     newSocket.on("room_notification", (data) => {
       console.log("[DSA Room] Notification:", data);
       if (data.type === "join_request") {
+        // AUTO-SHOW pending panel for join requests
+        setShowPendingPanel(true);
         toast.info(
           `🔔 ${data.message}`,
           {
@@ -71,6 +94,11 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       setPendingRequests(data.pending || []);
       setNotificationBadgeCount(data.pendingCount || 0);
       
+      // AUTO-SHOW pending panel if there are pending requests
+      if (data.pending && data.pending.length > 0) {
+        setShowPendingPanel(true);
+      }
+      
       // Save pending count to localStorage for TopBar notification badge
       if (data.pendingCount) {
         localStorage.setItem('dsaPendingCount', data.pendingCount.toString());
@@ -84,6 +112,8 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
     // Listen for member request
     newSocket.on("member_request", (data) => {
       console.log("[DSA Room] New join request:", data);
+      // AUTO-SHOW pending panel
+      setShowPendingPanel(true);
       toast.info(
         `🔔 ${data.username} wants to join your room`,
         {
@@ -101,6 +131,12 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       setRoomActive(true);
       setCurrentRoomId(data.roomId);
       setIsRoomOwner(false);
+      setApprovedMembers(data.members || []);
+      
+      // Request full room state to get all members
+      setTimeout(() => {
+        newSocket.emit("get_room_state", { roomId: data.roomId });
+      }, 100);
     });
 
     newSocket.on("join_rejected", (data) => {
@@ -108,6 +144,14 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       toast.error("Your join request was rejected by the room owner");
       setJoinRequestSent(false);
       setRoomCode("");
+    });
+
+    // Listen for room state (when joining)
+    newSocket.on("room_state", (data) => {
+      console.log("[DSA Room] Received room state:", data);
+      if (data.success) {
+        setApprovedMembers(data.members || []);
+      }
     });
 
     setSocket(newSocket);
@@ -343,53 +387,55 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
           </p>
         </div>
 
-        {/* Pending Requests Panel - Expanded View (Owner Only) */}
-        {showPendingPanel && isRoomOwner && pendingRequests.length > 0 && (
-          <div className="mb-6 p-6 rounded-2xl border-2 border-orange-700 bg-orange-500/5 animate-in">
+        {/* Pending Requests Panel - AUTO-SHOWS when there are requests */}
+        {isRoomOwner && pendingRequests.length > 0 && (
+          <div className="mb-6 p-6 rounded-2xl border-2 border-orange-700 bg-orange-500/10 animate-in shadow-lg shadow-orange-500/20">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <span>🔔</span> Join Requests ({pendingRequests.length})
+              <h2 className="text-xl font-bold flex items-center gap-2 text-orange-300">
+                <span className="text-2xl animate-bounce">🔔</span> Join Requests ({pendingRequests.length})
               </h2>
               <button
-                onClick={() => setShowPendingPanel(false)}
+                onClick={() => setShowPendingPanel(!showPendingPanel)}
                 className="text-slate-400 hover:text-slate-200 transition text-lg"
               >
-                ✕
+                {showPendingPanel ? '✕' : '↓'}
               </button>
             </div>
 
-            <div className="space-y-3">
-              {pendingRequests.map((request) => (
-                <div
-                  key={request.id}
-                  className="p-4 bg-slate-800 rounded-lg border border-orange-500/30 flex items-center justify-between hover:border-orange-500 transition"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center font-bold">
-                      👤
+            {showPendingPanel && (
+              <div className="space-y-3">
+                {pendingRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    className="p-4 bg-slate-800 rounded-lg border border-orange-500/30 flex items-center justify-between hover:border-orange-500 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center font-bold">
+                        👤
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-100">{request.username}</div>
+                        <div className="text-xs text-slate-400">Waiting for approval</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-bold text-slate-100">{request.username}</div>
-                      <div className="text-xs text-slate-400">Wants to join</div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApproveMember(request.id, request.userId, request.username)}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-bold transition text-white"
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        onClick={() => handleRejectMember(request.id)}
+                        className="px-4 py-2 bg-red-600/30 hover:bg-red-600/40 rounded text-sm font-bold transition text-red-300"
+                      >
+                        ✕ Reject
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApproveMember(request.id, request.userId, request.username)}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-bold transition text-white"
-                    >
-                      ✓ Approve
-                    </button>
-                    <button
-                      onClick={() => handleRejectMember(request.id)}
-                      className="px-4 py-2 bg-red-600/30 hover:bg-red-600/40 rounded text-sm font-bold transition text-red-300"
-                    >
-                      ✕ Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

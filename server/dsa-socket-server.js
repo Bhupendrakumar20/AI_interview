@@ -224,6 +224,62 @@ dsaRoomNamespace.on('connection', (socket) => {
     }
   });
 
+  // ─── JOIN ROOM SOCKET (for members to join socket room) ────────────────
+
+  socket.on('join_room_socket', async (data) => {
+    try {
+      const { roomId, userId, username } = data;
+
+      if (!roomId || !userId) {
+        console.log('[join_room_socket] Missing roomId or userId');
+        socket.emit('error', { message: 'Missing room or user info' });
+        return;
+      }
+
+      // Register socket data for this user
+      socket.data.userId = userId;
+      socket.data.username = username;
+      socket.data.roomId = roomId;
+
+      // Join the socket room so they receive broadcasts
+      socket.join(`room_${roomId}`);
+      console.log(`[join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
+      
+      // Get room data and send current state
+      try {
+        const roomRef = db.collection('dsa_rooms').doc(roomId);
+        const roomData = (await roomRef.get()).data();
+        
+        if (roomData) {
+          socket.emit('room_state', {
+            success: true,
+            roomId,
+            members: roomData.participants || [],
+            status: roomData.status,
+          });
+
+          // 🔥 CRITICAL FIX: If game has already started, send game state immediately to late joiners
+          if (roomData.status === 'in-progress' && roomData.questions) {
+            console.log(`[join_room_socket] Game already in progress! Sending game_starting to ${username}`);
+            socket.emit('game_starting', {
+              roomId,
+              questions: roomData.questions,
+              leaderboard: roomData.leaderboard || [],
+              startTime: roomData.serverStartTime?.toMillis?.() || Date.now(),
+              questionMode: roomData.questionMode,
+            });
+          }
+        }
+      } catch (dbError) {
+        console.log('[join_room_socket] Could not fetch room from DB:', dbError.message);
+        socket.emit('room_state', { success: true, roomId, members: [] });
+      }
+    } catch (error) {
+      console.error('[join_room_socket] Error:', error);
+      socket.emit('error', { message: 'Failed to join room: ' + error.message });
+    }
+  });
+
   // ─── START GAME ────────────────────────────────────────────────────────
 
   socket.on('start_game', async (data) => {

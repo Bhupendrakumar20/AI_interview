@@ -131,12 +131,14 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       setRoomActive(true);
       setCurrentRoomId(data.roomId);
       setIsRoomOwner(false);
-      setApprovedMembers(data.members || []);
       
-      // Request full room state to get all members
-      setTimeout(() => {
-        newSocket.emit("get_room_state", { roomId: data.roomId });
-      }, 100);
+      // 🔥 FIX: Update approved members immediately
+      if (data.members) {
+        setApprovedMembers(data.members);
+      }
+      
+      // 🔥 FIX: Request full room state to get all members right away
+      newSocket.emit("get_room_state", { roomId: data.roomId });
     });
 
     newSocket.on("join_rejected", (data) => {

@@ -227,9 +227,3 @@ const InterviewSetup = ({ userId }) => {
 };
 
 export default InterviewSetup;
-      </form>
-    </Form>
-  );
-};
-
-export default InterviewSetup;

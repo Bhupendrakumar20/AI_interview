@@ -164,5 +164,3 @@ function InterviewPageContent({ user, userInterviews, allInterviews, hasPastInte
 }
 
 export default InterviewPage;
-
-export default InterviewPage;

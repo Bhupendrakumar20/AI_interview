@@ -708,7 +708,7 @@ const DSARoomManager = ({
         )}
 
         {/* Waiting for Approval (Non-Owner, Not in Members List) */}
-        {!isOwner && !members.find((m) => m.userId === userId) && (
+        {!isOwner && !members.find((m) => m.userId === userId) && !gameStarted && (
           <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-orange-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/10">
             <div className="text-center">
               <div className="text-6xl mb-6 animate-bounce">⏳</div>
@@ -735,6 +735,22 @@ const DSARoomManager = ({
               <h2 className="text-3xl font-black text-cyan-400 mb-3">Approved! Ready for Battle</h2>
               <p className="text-cyan-300/70 text-sm">
                 You're in the room. Waiting for the owner to start the game...
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {/* 🔥 FIX: Show approved-but-syncing state - member is approved but members list hasn't updated yet */}
+        {!isOwner && !members.find((m) => m.userId === userId) && !gameStarted && questions.length > 0 && (
+          <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
+            <div className="text-center">
+              <div className="text-6xl mb-6 animate-pulse">✓</div>
+              <h2 className="text-3xl font-black text-cyan-400 mb-3">Approved! Ready for Battle</h2>
+              <p className="text-cyan-300/70 text-sm">
+                You're in the room. Waiting for the owner to start the game...
+              </p>
+              <p className="text-cyan-300/50 text-xs mt-3">
+                (Syncing members list...)
               </p>
             </div>
           </div>

@@ -325,21 +325,25 @@ dsaRoomNamespace.on('connection', (socket) => {
         }),
       }).catch(err => console.error('[approve_member] Email send failed:', err));
 
-      // Notify all room members
+      // 🔥 FIX: Notify the approved user via socket FIRST (if they're online)
+      const approvedUserSocket = userSockets.get(request.userId);
+      if (approvedUserSocket) {
+        console.log(`[approve_member] Member is online, sending join_approved to ${approvedUserSocket}`);
+        dsaRoomNamespace.to(approvedUserSocket).emit('join_approved', {
+          roomId,
+          members: room.approvedMembers,
+          message: `You've been approved by ${room.ownerUsername}!`,
+        });
+      } else {
+        console.log(`[approve_member] Member is offline, will receive update when they reconnect`);
+      }
+
+      // Notify all room members of the new approved member
       dsaRoomNamespace.to(`room_${roomId}`).emit('member_joined', {
         userId: request.userId,
         username: request.username,
         joinedAt: new Date(),
       });
-
-      // Notify the approved user via socket
-      const approvedUserSocket = userSockets.get(request.userId);
-      if (approvedUserSocket) {
-        dsaRoomNamespace.to(approvedUserSocket).emit('join_approved', {
-          roomId,
-          message: `You've been approved by ${room.ownerUsername}!`,
-        });
-      }
 
       // Update members list for owner
       const ownerSocket = dsaRoomNamespace.sockets.get(room.ownerSocketId);
@@ -352,6 +356,39 @@ dsaRoomNamespace.on('connection', (socket) => {
         dsaRoomNamespace.to(room.ownerSocketId).emit('members_list', {
           approved: room.approvedMembers,
           pending: room.pendingRequests,
+        });
+      }
+      
+      // 🔥 FIX: If game is already playing, send game_starting to the newly approved member
+      if (room.status === 'playing' && room.questions && approvedUserSocket) {
+        console.log(`[approve_member] Game is in progress! Sending game_starting to newly approved ${request.username}`);
+        
+        // Rebuild leaderboard to include the newly approved member
+        const updatedLeaderboard = [
+          {
+            userId: room.ownerId,
+            username: room.ownerUsername,
+            points: 0,
+            solved: 0,
+            isOwner: true,
+            status: 'idle',
+          },
+          ...room.approvedMembers.map((m) => ({
+            userId: m.userId,
+            username: m.username,
+            points: (room.leaderboard?.find(p => p.userId === m.userId)?.points) || 0,
+            solved: (room.leaderboard?.find(p => p.userId === m.userId)?.solved) || 0,
+            isOwner: false,
+            status: (room.leaderboard?.find(p => p.userId === m.userId)?.status) || 'idle',
+          })),
+        ];
+        
+        dsaRoomNamespace.to(approvedUserSocket).emit('game_starting', {
+          roomId,
+          questions: room.questions,
+          leaderboard: updatedLeaderboard,
+          startTime: room.startTime,
+          questionMode: room.questionMode,
         });
       }
     } catch (error) {
@@ -465,12 +502,23 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       // 🔥 CRITICAL FIX: If game has already started, send game_starting immediately
       // This handles the case where member approves -> joins socket room AFTER owner started game
-      if (room.status === 'playing' && room.questions && room.leaderboard) {
+      // Check with better reliability - if room.status is playing AND we have questions, send immediately
+      if (room.status === 'playing' && room.questions) {
         console.log(`[join_room_socket] Game already in progress! Sending game_starting to ${username}`);
         socket.emit('game_starting', {
           roomId,
           questions: room.questions,
           leaderboard: room.leaderboard,
+          startTime: room.startTime,
+          questionMode: room.questionMode,
+        });
+      } else if (room.gameStartedAt) {
+        // Fallback: if we have gameStartedAt timestamp but status isn't set correctly, still send the game data
+        console.log(`[join_room_socket] Game was started at ${room.gameStartedAt}, sending game_starting to ${username}`);
+        socket.emit('game_starting', {
+          roomId,
+          questions: room.questions || [],
+          leaderboard: room.leaderboard || [],
           startTime: room.startTime,
           questionMode: room.questionMode,
         });
@@ -495,11 +543,6 @@ dsaRoomNamespace.on('connection', (socket) => {
         socket.emit('error', { message: 'Room not found' });
         return;
       }
-
-      // Mark room as playing FIRST
-      room.status = 'playing';
-      room.questionMode = questionMode;
-      room.startTime = startTime;
 
       // Use questions from client (100 DAYS OF CODE) or fallback to mocks
       let questions = clientQuestions || [
@@ -543,9 +586,13 @@ dsaRoomNamespace.on('connection', (socket) => {
         })),
       ];
 
-      // 🔥 CRITICAL: Store questions and leaderboard in room for late joiners
+      // 🔥 CRITICAL: Store questions and leaderboard BEFORE marking room as playing (prevents race condition)
       room.questions = questions;
       room.leaderboard = leaderboard;
+      room.questionMode = questionMode;
+      room.startTime = startTime;
+      room.status = 'playing';  // Mark as playing AFTER data is ready
+      room.gameStartedAt = new Date();
 
       // Log who should receive the broadcast
       console.log(`[start_game] Leaderboard has ${leaderboard.length} players: ${leaderboard.map(p => p.username).join(', ')}`);
@@ -567,6 +614,16 @@ dsaRoomNamespace.on('connection', (socket) => {
       
       console.log(`[start_game] BROADCASTING game_starting with ${questions.length} questions`);
       dsaRoomNamespace.to(`room_${roomId}`).emit('game_starting', broadcastData);
+      
+      // 🔥 CRITICAL FIX: Also send to approved members directly in case they haven't joined socket room yet
+      // This ensures members who are online but haven't called join_room_socket still get the event
+      room.approvedMembers.forEach((member) => {
+        const memberSocket = userSockets.get(member.userId);
+        if (memberSocket) {
+          console.log(`[start_game] Sending game_starting directly to ${member.username} (socket: ${memberSocket})`);
+          dsaRoomNamespace.to(memberSocket).emit('game_starting', broadcastData);
+        }
+      });
 
       console.log(`[start_game] ✓ Game started successfully`);
     } catch (error) {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import InterviewCard from "@/components/InterviewCard";
 import InterviewSetup from "@/components/InterviewSetup";
+import ResumeRoundSection from "@/components/Resume RoundSection";
 
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import {
@@ -75,6 +76,9 @@ async function InterviewPage() {
           </div>
         </div>
       </section>
+
+      {/* Resume Round Section */}
+      <ResumeRoundSection />
 
       {/* Your Interviews */}
       <section className="flex flex-col gap-4 mt-2">

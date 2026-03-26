@@ -800,6 +800,85 @@ html {
   @apply transition-all duration-300 origin-top;
 }
 
+/* ─── RESUME ROUND ANIMATIONS ─── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.6s ease-out;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.6s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.5s ease-out;
+}
+
+.resume-section {
+  margin-bottom: 3rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.upload-zone {
+  transition: all 0.3s ease;
+}
+
+.upload-zone:hover {
+  border-color: rgba(34, 211, 238, 0.6);
+}
+}
+
 .dropdown-menu[hidden] {
   @apply duration-200;
 }

@@ -266,7 +266,7 @@ const DSARoomManager = ({
       questions: dayQuestions, // Include questions
     });
 
-    // 🔥 FALLBACK: If server doesn't respond within 7 seconds, start locally
+    // FALLBACK: If server doesn't respond within 7 seconds, start locally
     // This ensures game works even if server socket broadcast fails or has network delays
     const fallbackTimer = setTimeout(() => {
       console.log("[DSA Room] Server response timeout - starting game locally as fallback");
@@ -323,16 +323,14 @@ const DSARoomManager = ({
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-6xl font-black mb-6 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              ⚔️ BABYLON DSA
+              BABYLON DSA
             </h1>
             <div className="text-9xl font-mono font-black text-cyan-400 mb-8 animate-pulse">
               {startCountdown}
             </div>
             <p className="text-2xl font-bold text-purple-300 mb-4">Get Ready for Battle!</p>
             <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold">
-              <span className="animate-spin">⚡</span>
               <span>Starting Arena in {startCountdown} seconds...</span>
-              <span className="animate-spin">⚡</span>
             </div>
           </div>
         </div>
@@ -344,7 +342,7 @@ const DSARoomManager = ({
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-6xl mb-6 animate-spin">⚔️</div>
+            <div className="text-6xl mb-6 animate-spin">⟳</div>
             <h2 className="text-3xl font-black text-cyan-400 mb-4">ENTERING ARENA...</h2>
             <p className="text-slate-400">Loading your battle arena...</p>
           </div>
@@ -360,7 +358,7 @@ const DSARoomManager = ({
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-black bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                ⚔️ BABYLON DSA ARENA
+                BABYLON DSA ARENA
               </h1>
               <p className="text-cyan-300/70 text-sm mt-2">Real-time algorithmic combat</p>
             </div>
@@ -377,7 +375,7 @@ const DSARoomManager = ({
           {/* Questions Panel */}
           <div className="flex-1 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
             <div className="flex items-center gap-3 mb-6">
-              <div className="text-3xl">🧩</div>
+              <div className="text-3xl">◆</div>
               <div>
                 <h2 className="text-2xl font-black text-cyan-400">PROBLEMS</h2>
                 <div className="text-xs text-cyan-300/50">{questions.length} CHALLENGES</div>
@@ -423,7 +421,7 @@ const DSARoomManager = ({
             {/* Leaderboard */}
             <div className="bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-pink-500/30 p-6 backdrop-blur-sm sticky top-6 h-fit shadow-2xl shadow-pink-500/10">
               <div className="flex items-center gap-3 mb-6">
-                <div className="text-3xl animate-bounce">🏆</div>
+                <div className="text-3xl animate-bounce">★</div>
                 <div>
                   <h2 className="text-2xl font-black text-pink-400">LEADERBOARD</h2>
                   <div className="text-xs text-pink-300/50">{leaderboard.length} COMPETITORS</div>
@@ -446,12 +444,12 @@ const DSARoomManager = ({
                         idx === 2 ? "bg-gradient-to-br from-orange-400 to-red-500 text-slate-950 shadow-lg shadow-orange-500/50" :
                         "bg-gradient-to-br from-purple-500 to-pink-500 text-white"
                       }`}>
-                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}
+                        {idx === 0 ? "1st" : idx === 1 ? "2nd" : idx === 2 ? "3rd" : `#${idx + 1}`}
                       </div>
                       <div>
                         <div className="text-sm font-bold text-slate-100 group-hover:text-cyan-300 transition">
                           {member.username}
-                          {member.isOwner && <span className="ml-1 text-xs text-purple-300">👑</span>}
+                          {member.isOwner && <span className="ml-1 text-xs text-purple-300">[Owner]</span>}
                           {member.userId === userId && <span className="ml-1 text-xs text-cyan-300">(YOU)</span>}
                         </div>
                         <div className="text-xs text-slate-400">
@@ -482,7 +480,7 @@ const DSARoomManager = ({
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-6 h-6 rounded-full bg-orange-500/30 flex items-center justify-center text-xs">
-                          👤
+                          U
                         </div>
                         <div>
                           <div className="text-sm font-bold text-slate-100">
@@ -517,32 +515,32 @@ const DSARoomManager = ({
         <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-4xl font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">⚔️ BABYLON DSA</h1>
+              <h1 className="text-4xl font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">BABYLON DSA</h1>
               <p className="text-cyan-300/70 text-sm mt-2">Member verification & game lobby</p>
             </div>
             {isOwner && (
               <div className="px-3 py-1 bg-emerald-500/20 border border-emerald-500 rounded-full text-emerald-300 text-xs font-bold">
-                👑 Room Owner
+                Room Owner
               </div>
             )}
           </div>
 
           <div className="flex gap-4 mb-6">
             <div className="flex-1">
-              <div className="text-xs text-cyan-300/70 font-bold mb-2">🔐 ROOM CODE</div>
+              <div className="text-xs text-cyan-300/70 font-bold mb-2">ROOM CODE</div>
               <div className="text-4xl font-mono font-black bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent tracking-wider">{roomCode}</div>
             </div>
             <button
               onClick={copyCode}
               className="px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-lg font-bold text-sm transition h-fit shadow-lg shadow-cyan-500/50 hover:shadow-cyan-500/70"
             >
-              {showCopyNotice ? "✓ COPIED!" : "📋 COPY"}
+              {showCopyNotice ? "✓ COPIED!" : "COPY"}
             </button>
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-cyan-500/20">
             <div className="flex items-center gap-2">
-              <span className="text-lg">👥</span>
+                <span className="text-lg">U</span>
               <div>
                 <div className="text-sm font-bold text-cyan-300">{members.length + 1} MEMBERS</div>
                 {isOwner && pendingRequests.length > 0 && (
@@ -552,7 +550,7 @@ const DSARoomManager = ({
             </div>
             {isOwner && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50 rounded-full">
-                <span>👑</span>
+                <span>Owner</span>
                 <span className="text-xs font-bold text-purple-300">ROOM OWNER</span>
               </div>
             )}
@@ -563,7 +561,7 @@ const DSARoomManager = ({
         {isOwner && pendingRequests.length > 0 && (
           <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-pink-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-pink-500/10">
             <div className="flex items-center gap-3 mb-6">
-              <div className="text-3xl animate-bounce">🔔</div>
+              <div className="text-3xl animate-bounce">●</div>
               <div>
                 <h2 className="text-2xl font-black text-pink-400">PENDING REQUESTS</h2>
                 <div className="text-xs text-pink-300/50">{pendingRequests.length} AWAITING APPROVAL</div>
@@ -586,13 +584,13 @@ const DSARoomManager = ({
                       }
                       className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-medium transition"
                     >
-                      ✓ Approve
+                      Approve
                     </button>
                     <button
                       onClick={() => handleRejectMember(req.id)}
                       className="px-3 py-1.5 bg-red-600/30 hover:bg-red-600/40 rounded text-sm font-medium transition text-red-300"
                     >
-                      ✕ Reject
+                      Reject
                     </button>
                   </div>
                 </div>
@@ -603,13 +601,13 @@ const DSARoomManager = ({
 
         {/* Members List */}
         <div className="mb-8 bg-slate-900 rounded-2xl border border-slate-800 p-6">
-          <h2 className="text-xl font-bold mb-4">👥 Members ({members.length + 1})</h2>
+          <h2 className="text-xl font-bold mb-4">Members ({members.length + 1})</h2>
           <div className="space-y-2 mb-4">
             {/* Room Creator */}
             <div className="p-3 bg-slate-800 rounded-lg border border-emerald-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-sm font-bold">
-                  👑
+                  O
                 </div>
                 <div>
                   <div className="font-bold text-slate-100">{username}</div>
@@ -663,7 +661,7 @@ const DSARoomManager = ({
                       : "border-slate-700/50 bg-slate-800/40 hover:border-cyan-500/60"
                   }`}
                 >
-                  <div className="font-bold text-sm mb-1">📋 SAME</div>
+                  <div className="font-bold text-sm mb-1">SAME QUESTION</div>
                   <div className="text-xs text-slate-400">Everyone solves identical problems</div>
                 </button>
                 <button
@@ -674,7 +672,7 @@ const DSARoomManager = ({
                       : "border-slate-700/50 bg-slate-800/40 hover:border-pink-500/60"
                   }`}
                 >
-                  <div className="font-bold text-sm mb-1">🎲 DIFFERENT</div>
+                  <div className="font-bold text-sm mb-1">DIFFERENT QUESTION</div>
                   <div className="text-xs text-slate-400">Unique problems for each player</div>
                 </button>
               </div>
@@ -688,12 +686,12 @@ const DSARoomManager = ({
             >
               {startCountdown !== null ? (
                 <>
-                  <span className="text-2xl animate-spin">⚡</span>
+                  <span className="text-2xl animate-spin">⟳</span>
                   <span>STARTING IN {startCountdown}S</span>
                 </>
               ) : (
                 <>
-                  <span className="text-2xl">⚔️</span>
+                  <span className="text-2xl">▶</span>
                   <span>START ARENA BATTLE</span>
                 </>
               )}
@@ -740,7 +738,7 @@ const DSARoomManager = ({
           </div>
         )}
         
-        {/* 🔥 FIX: Show approved-but-syncing state - member is approved but members list hasn't updated yet */}
+        {/* FIX: Show approved-but-syncing state - member is approved but members list hasn't updated yet */}
         {!isOwner && !members.find((m) => m.userId === userId) && !gameStarted && questions.length > 0 && (
           <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
             <div className="text-center">

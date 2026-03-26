@@ -342,25 +342,25 @@ export default function InternshipsPage() {
             <h2 className="text-2xl font-bold mb-6 text-center">Internship Application Tips</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="text-center">
-                <div className="text-3xl mb-3">📄</div>
+                <div className="text-3xl mb-3">⮎</div>
                 <h3 className="font-semibold mb-2">Tailored Resume</h3>
                 <p className="text-sm text-light-100">Customize for each application</p>
               </div>
 
               <div className="text-center">
-                <div className="text-3xl mb-3">💡</div>
+                <div className="text-3xl mb-3">⬱</div>
                 <h3 className="font-semibold mb-2">Project Portfolio</h3>
                 <p className="text-sm text-light-100">Showcase relevant projects</p>
               </div>
 
               <div className="text-center">
-                <div className="text-3xl mb-3">📚</div>
+                <div className="text-3xl mb-3">⬴</div>
                 <h3 className="font-semibold mb-2">Skill Development</h3>
                 <p className="text-sm text-light-100">Learn required technologies</p>
               </div>
 
               <div className="text-center">
-                <div className="text-3xl mb-3">👥</div>
+                <div className="text-3xl mb-3">◆</div>
                 <h3 className="font-semibold mb-2">Network</h3>
                 <p className="text-sm text-light-100">Connect with professionals</p>
               </div>

@@ -225,7 +225,7 @@ const AiBuddyInterviewSession = ({
       <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-4 z-50">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">🤖 AI Interview Session</h1>
+            <h1 className="text-2xl font-bold text-white">AI Interview Session</h1>
             <p className="text-slate-400 text-sm">Question {currentQuestionIndex + 1} of {questions.length}</p>
           </div>
 
@@ -284,12 +284,12 @@ const AiBuddyInterviewSession = ({
           >
             {isSpeaking ? (
               <>
-                <span className="inline-block animate-pulse">🔊</span>
+                <span className="inline-block animate-pulse">♪</span>
                 Reading...
               </>
             ) : (
               <>
-                <span>🔊</span>
+                <span>♪</span>
                 Read Question Aloud
               </>
             )}
@@ -391,7 +391,7 @@ const AiBuddyInterviewSession = ({
               onClick={handleSessionEnd}
               className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all"
             >
-              🏁 Finish Interview
+              Finish Interview
             </button>
           )}
         </div>

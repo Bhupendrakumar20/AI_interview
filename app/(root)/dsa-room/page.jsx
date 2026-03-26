@@ -24,7 +24,7 @@ export default function DSARoomPage() {
 
         {!showRoom ? (
           <div className="bg-slate-900 border-2 border-slate-700 rounded-2xl p-12 text-center">
-            <div className="text-6xl mb-6">🎮</div>
+            <div className="text-6xl mb-6">╳</div>
             <h2 className="text-2xl font-bold text-white mb-6">Ready to compete?</h2>
 
             <input
@@ -45,7 +45,7 @@ export default function DSARoomPage() {
               disabled={!tempName.trim()}
               className="w-full px-6 py-3 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Let's Go 🚀
+              Let's Go
             </button>
 
             <div className="mt-8 space-y-3 text-sm text-slate-400">

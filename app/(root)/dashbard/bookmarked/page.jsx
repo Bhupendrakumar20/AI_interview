@@ -184,21 +184,21 @@ export default function BookmarkedPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">📝</div>
+            <div className="text-2xl mb-2">✍</div>
             <h3 className="font-semibold mb-2">Take Notes</h3>
             <p className="text-sm text-light-100">Add personal notes to each question</p>
           </div>
         </div>
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">🔄</div>
+            <div className="text-2xl mb-2">⟳</div>
             <h3 className="font-semibold mb-2">Regular Review</h3>
             <p className="text-sm text-light-100">Review questions weekly</p>
           </div>
         </div>
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">🎯</div>
+            <div className="text-2xl mb-2">▲</div>
             <h3 className="font-semibold mb-2">Focus Areas</h3>
             <p className="text-sm text-light-100">Identify and work on weak areas</p>
           </div>

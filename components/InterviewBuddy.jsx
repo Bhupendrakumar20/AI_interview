@@ -467,7 +467,7 @@ const InterviewBuddy = ({ userId }) => {
           {/* AI Persona */}
           {currentMode === "ai" && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">🎭 AI Persona</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">AI Persona</h3>
               <div className="grid grid-cols-2 gap-3">
                 {personas.map((persona) => (
                   <div
@@ -491,7 +491,7 @@ const InterviewBuddy = ({ userId }) => {
           {/* Human Invite */}
           {currentMode === "human" && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">🔗 Invite a Buddy</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Invite a Buddy</h3>
               <p className="text-sm text-slate-400 mb-4">
                 Generate a unique session code and share it with your interview partner. Once they join, roles are assigned in the lobby.
               </p>
@@ -507,18 +507,18 @@ const InterviewBuddy = ({ userId }) => {
                   onClick={copyCode}
                   className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition"
                 >
-                  📋 Copy
+                  Copy
                 </button>
               </div>
               <button className="w-full mt-3 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition">
-                🔗 Share Link Instead
+                Share Link Instead
               </button>
             </div>
           )}
 
           {/* Topics */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">📂 Topic Focus</h3>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Topic Focus</h3>
             <div className="flex flex-wrap gap-2">
               {topics.map((topic) => (
                 <button
@@ -539,7 +539,7 @@ const InterviewBuddy = ({ userId }) => {
           {/* Difficulty & Duration */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
             <div className="mb-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">⚡ Difficulty</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Difficulty</h3>
               <div className="flex gap-3">
                 {["Easy", "Medium", "Hard"].map((level) => (
                   <button
@@ -562,7 +562,7 @@ const InterviewBuddy = ({ userId }) => {
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">⏱ Session Duration</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">⧖ Session Duration</h3>
               <div className="flex items-center gap-4">
                 <input
                   type="range"
@@ -657,7 +657,7 @@ const InterviewBuddy = ({ userId }) => {
                 </div>
                 <div className="flex gap-2">
                   <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
-                    📊
+                    Stats
                   </button>
                   <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
                     ▶️
@@ -712,7 +712,7 @@ const InterviewBuddy = ({ userId }) => {
                     disabled={!sessionCode || isLoading}
                     className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isLoading ? "⏳" : "📋"} Copy
+                    {isLoading ? "Loading..." : "Copy"}
                   </button>
                 </div>
 
@@ -775,7 +775,7 @@ const InterviewBuddy = ({ userId }) => {
                 </div>
 
                 <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center text-slate-400 text-sm cursor-pointer hover:border-slate-600 transition">
-                  📄 Drop JD here or <span className="text-blue-400">browse</span> &nbsp;·&nbsp; Optional
+                  Drop JD here or <span className="text-blue-400">browse</span> &nbsp;·&nbsp; Optional
                 </div>
 
                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
@@ -806,7 +806,7 @@ const InterviewBuddy = ({ userId }) => {
                 disabled={isLoading}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-blue-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "⏳ Loading..." : currentMode === "human" ? "🚀 Enter Lobby" : "🤖 Start AI Session"}
+                {isLoading ? "Loading..." : currentMode === "human" ? "Enter Lobby" : "Start AI Session"}
               </button>
             </div>
           </div>

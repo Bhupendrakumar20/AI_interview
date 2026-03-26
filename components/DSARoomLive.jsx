@@ -372,7 +372,7 @@ const DSARoomLive = ({
         {/* Right: Leaderboard */}
         <div className="w-80 flex flex-col bg-slate-900 border-l border-slate-800 overflow-hidden">
           <div className="bg-slate-800 px-6 py-4 border-b border-slate-700">
-            <h2 className="text-lg font-bold text-white">🏆 Leaderboard</h2>
+            <h2 className="text-lg font-bold text-white">Rankings</h2>
             <p className="text-xs text-slate-400 mt-1">{leaderboard.length} participants</p>
           </div>
 

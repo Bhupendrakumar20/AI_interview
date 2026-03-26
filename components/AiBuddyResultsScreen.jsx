@@ -239,7 +239,7 @@ const AiBuddyResultsScreen = ({
           <div className="space-y-4">
             {feedback?.clarity < 80 && (
               <div className="flex gap-4">
-                <div className="text-2xl text-blue-400">💡</div>
+                <div className="text-2xl text-blue-400">▲</div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Improve Clarity</h3>
                   <p className="text-slate-400 text-sm">
@@ -251,7 +251,7 @@ const AiBuddyResultsScreen = ({
 
             {feedback?.technicalAccuracy < 80 && (
               <div className="flex gap-4">
-                <div className="text-2xl">🔧</div>
+                <div className="text-2xl">⚙</div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Deepen Technical Knowledge</h3>
                   <p className="text-slate-400 text-sm">
@@ -263,7 +263,7 @@ const AiBuddyResultsScreen = ({
 
             {feedback?.communication < 80 && (
               <div className="flex gap-4">
-                <div className="text-2xl">🗣️</div>
+                <div className="text-2xl">◆</div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Enhance Communication</h3>
                   <p className="text-slate-400 text-sm">
@@ -275,7 +275,7 @@ const AiBuddyResultsScreen = ({
 
             {feedback?.fillerWords > 15 && (
               <div className="flex gap-4">
-                <div className="text-2xl">🎙️</div>
+                <div className="text-2xl">●</div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Reduce Filler Words</h3>
                   <p className="text-slate-400 text-sm">
@@ -286,7 +286,7 @@ const AiBuddyResultsScreen = ({
             )}
 
             <div className="flex gap-4">
-              <div className="text-2xl">⏱️</div>
+              <div className="text-2xl">◐</div>
               <div>
                 <h3 className="font-semibold text-white mb-1">Practice More Sessions</h3>
                 <p className="text-slate-400 text-sm">

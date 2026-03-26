@@ -50,7 +50,7 @@ export default function DSARoomLobby({ userName, onClose }) {
     setIsCreating(true);
     socket.connect();
 
-    socket.emit("room_create", { username: userName, avatar: "👤" }, (response) => {
+    socket.emit("room_create", { username: userName, avatar: "[U]" }, (response) => {
       if (response.success) {
         setRoomCode(response.roomCode);
         setCreatedRoomCode(response.roomCode);
@@ -71,7 +71,7 @@ export default function DSARoomLobby({ userName, onClose }) {
     setIsJoining(true);
     socket.connect();
 
-    socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "👤" }, (response) => {
+    socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "[U]" }, (response) => {
       if (response.success) {
         setRoomCode(joinRoomCode);
         setIsInRoom(true);
@@ -155,7 +155,7 @@ export default function DSARoomLobby({ userName, onClose }) {
 
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-6">
-                  <div className="text-5xl">🆕</div>
+                  <div className="text-5xl">◆</div>
                   <span className="px-3 py-1 text-xs font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 rounded-full">
                     CREATE
                   </span>
@@ -192,11 +192,11 @@ export default function DSARoomLobby({ userName, onClose }) {
                 >
                   {isCreating ? (
                     <>
-                      <span className="animate-spin">⚙️</span> Creating Room...
+                      <span className="animate-spin">⊙</span> Creating Room...
                     </>
                   ) : (
                     <>
-                      <span>👑</span> Create as Owner
+                      <span>Owner</span> Create as Owner
                     </>
                   )}
                 </button>
@@ -209,7 +209,7 @@ export default function DSARoomLobby({ userName, onClose }) {
 
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-6">
-                  <div className="text-5xl">🚪</div>
+                  <div className="text-5xl">✫</div>
                   <span className="px-3 py-1 text-xs font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-500/40 rounded-full">
                     JOIN
                   </span>
@@ -270,7 +270,7 @@ export default function DSARoomLobby({ userName, onClose }) {
                       </>
                     ) : (
                       <>
-                        <span>📨</span> Request to Join
+                        <span>→</span> Request to Join
                       </>
                     )}
                   </button>
@@ -285,10 +285,10 @@ export default function DSARoomLobby({ userName, onClose }) {
 
           {/* Features Overview */}
           <div className="grid md:grid-cols-2 gap-6 mt-12 pt-8 border-t border-slate-700/50">
-            <h3 className="col-span-full text-xl font-bold text-slate-200 mb-2">✨ Platform Features</h3>
+            <h3 className="col-span-full text-xl font-bold text-slate-200 mb-2">Platform Features</h3>
 
             <div className="group p-6 bg-linear-to-br from-purple-950/30 to-slate-900/50 border border-purple-700/30 rounded-2xl hover:border-purple-600 transition-all duration-300">
-              <div className="text-4xl mb-3">👥</div>
+              <div className="text-4xl mb-3">◉</div>
               <div className="text-sm font-bold text-purple-300">Member Verification</div>
               <div className="text-xs text-slate-400 mt-2">
                 Owner verifies and approves joining members
@@ -296,19 +296,19 @@ export default function DSARoomLobby({ userName, onClose }) {
             </div>
 
             <div className="group p-6 bg-linear-to-br from-amber-950/30 to-slate-900/50 border border-amber-700/30 rounded-2xl hover:border-amber-600 transition-all duration-300">
-              <div className="text-4xl mb-3">🔐</div>
+              <div className="text-4xl mb-3">◊</div>
               <div className="text-sm font-bold text-amber-300">Owner Control</div>
               <div className="text-xs text-slate-400 mt-2">Complete room and game settings management</div>
             </div>
 
             <div className="group p-6 bg-linear-to-br from-pink-950/30 to-slate-900/50 border border-pink-700/30 rounded-2xl hover:border-pink-600 transition-all duration-300">
-              <div className="text-4xl mb-3">⏱️</div>
+              <div className="text-4xl mb-3">⧖</div>
               <div className="text-sm font-bold text-pink-300">Server-Synced Timer</div>
               <div className="text-xs text-slate-400 mt-2">Fair play environment with anti-cheat validation</div>
             </div>
 
             <div className="group p-6 bg-linear-to-br from-blue-950/30 to-slate-900/50 border border-blue-700/30 rounded-2xl hover:border-blue-600 transition-all duration-300">
-              <div className="text-4xl mb-3">📊</div>
+              <div className="text-4xl mb-3">≫</div>
               <div className="text-sm font-bold text-blue-300">Live Leaderboard</div>
               <div className="text-xs text-slate-400 mt-2">Real-time rankings and scoring during gameplay</div>
             </div>
@@ -333,17 +333,17 @@ export default function DSARoomLobby({ userName, onClose }) {
     <div className="min-h-screen bg-slate-950 p-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">🗳️ Voting Phase</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Voting Phase</h1>
           <p className="text-slate-400">Room: {roomCode}</p>
         </div>
 
         {/* Players List */}
         <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 mb-6">
-          <h2 className="text-lg font-bold text-white mb-4">👥 Players ({users.length})</h2>
+          <h2 className="text-lg font-bold text-white mb-4">Players ({users.length})</h2>
           <div className="space-y-2">
             {users.map((u) => (
               <div key={u.id} className="flex items-center gap-2 px-3 py-2 bg-slate-800 rounded">
-                <span>{u.id === currentUser?.id ? "👤" : "👨"}</span>
+                <span>{u.id === currentUser?.id ? "[Me]" : "[U]"}</span>
                 <span className="flex-1">{u.username}</span>
                 {u.id === currentUser?.id && <span className="text-xs text-blue-400">YOU</span>}
               </div>
@@ -355,7 +355,7 @@ export default function DSARoomLobby({ userName, onClose }) {
         <div className="space-y-6">
           {/* Question Mode Vote */}
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-white mb-4">📋 Question Mode</h3>
+            <h3 className="text-lg font-bold text-white mb-4">Question Mode</h3>
             <div className="grid grid-cols-2 gap-4">
               {["same", "different"].map((mode) => (
                 <button
@@ -378,7 +378,7 @@ export default function DSARoomLobby({ userName, onClose }) {
 
           {/* Time Limit Vote */}
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-white mb-4">⏱️ Time Limit</h3>
+            <h3 className="text-lg font-bold text-white mb-4">Time Limit</h3>
             <div className="grid grid-cols-3 gap-4">
               {["1800", "2700", "3600"].map((time) => (
                 <button
@@ -404,7 +404,7 @@ export default function DSARoomLobby({ userName, onClose }) {
             onClick={handleStartRoom}
             className="w-full mt-8 px-6 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition"
           >
-            🚀 Start Game
+            Start Game
           </button>
         )}
 

@@ -8,12 +8,12 @@ const StatsOverview = async () => {
   const feedbacks = user ? await getUserFeedbacks(user.id) : [];
 
   const stats = [
-    { label: "Interviews Taken", value: interviews.length, icon: "🎤" },
+    { label: "Interviews Taken", value: interviews.length, icon: "[Interview]" },
     { label: "Avg Score", value: feedbacks.length > 0 
       ? Math.round(feedbacks.reduce((acc, f) => acc + (f.totalScore || 0), 0) / feedbacks.length) 
-      : 0, icon: "⭐" },
-    { label: "Skills Improved", value: 12, icon: "📈" },
-    { label: "Hours Practiced", value: Math.round(interviews.length * 0.5), icon: "⏱️" },
+      : 0, icon: "★" },
+    { label: "Skills Improved", value: 12, icon: "↑" },
+    { label: "Hours Practiced", value: Math.round(interviews.length * 0.5), icon: "⧖" },
   ];
 
   return (

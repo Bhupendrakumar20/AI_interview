@@ -198,21 +198,21 @@ export default function CertificatesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">📄</div>
+            <div className="text-2xl mb-2">⮎</div>
             <h3 className="font-semibold mb-2">Add to Resume</h3>
             <p className="text-sm text-light-100">Include relevant certificates in your resume</p>
           </div>
         </div>
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">🔗</div>
+            <div className="text-2xl mb-2">↗</div>
             <h3 className="font-semibold mb-2">LinkedIn Badges</h3>
             <p className="text-sm text-light-100">Add certification badges to your profile</p>
           </div>
         </div>
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">🎯</div>
+            <div className="text-2xl mb-2">▲</div>
             <h3 className="font-semibold mb-2">Targeted Learning</h3>
             <p className="text-sm text-light-100">Focus on certificates that match your career goals</p>
           </div>

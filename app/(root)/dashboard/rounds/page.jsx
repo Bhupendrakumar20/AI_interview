@@ -78,10 +78,10 @@ export default function RoundsPage() {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Live/Upcoming', value: '2', icon: '🔴' },
-            { label: 'Completed', value: '12', icon: '✅' },
-            { label: 'Pass Rate', value: '85%', icon: '🎯' },
-            { label: 'Avg Score', value: '87', icon: '⭐' }
+            { label: 'Live/Upcoming', value: '2', icon: '●' },
+            { label: 'Completed', value: '12', icon: '✓' },
+            { label: 'Pass Rate', value: '85%', icon: '▲' },
+            { label: 'Avg Score', value: '87', icon: '★' }
           ].map((stat, idx) => (
             <div key={idx} className="bg-gradient-to-br from-slate-800/60 to-slate-700/40 border border-slate-700/50 rounded-lg p-4 animate-slideInUp" style={{animationDelay: `${idx * 0.1}s`}}>
               <div className="flex items-start justify-between">
@@ -148,7 +148,7 @@ export default function RoundsPage() {
 
         {/* Completed */}
         <div>
-          <h2 className="text-lg font-semibold text-white mb-4">📜 Completed Rounds</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Completed Rounds</h2>
           <div className="space-y-3">
             {completedRounds.map((round, idx) => (
               <div 

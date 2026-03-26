@@ -350,7 +350,7 @@ export default function SettingsForm({ user }) {
           onClick={handleLogout}
           disabled={loggingOut}
         >
-          {loggingOut ? "Logging out..." : "🚪 Logout"}
+          {loggingOut ? "Logging out..." : "Logout"}
         </Button>
       </div>
 
@@ -371,7 +371,7 @@ export default function SettingsForm({ user }) {
           onClick={clearHistory}
           disabled={clearing}
         >
-          {clearing ? "Clearing..." : "🗑️ Clear Interview History"}
+          {clearing ? "Clearing..." : "Clear Interview History"}
         </Button>
       </div>
 

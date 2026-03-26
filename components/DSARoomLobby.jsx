@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 import { toast } from "sonner";
+import { Bell, User, Copy, DoorOpen, Clock, Lock, Send, Trophy } from "lucide-react";
 import DSARoomManager from "./DSARoomManager";
 
 const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
@@ -74,7 +75,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
         // AUTO-SHOW pending panel for join requests
         setShowPendingPanel(true);
         toast.info(
-          `🔔 ${data.message}`,
+          `${data.message}`,
           {
             duration: 5000,
             action: {
@@ -115,7 +116,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       // AUTO-SHOW pending panel
       setShowPendingPanel(true);
       toast.info(
-        `🔔 ${data.username} wants to join your room`,
+        `${data.username} wants to join your room`,
         {
           duration: 6000,
           action: {
@@ -127,7 +128,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
     });
     newSocket.on("join_approved", (data) => {
       console.log("[DSA Room] Join approved:", data);
-      toast.success("✓ You've been approved! Entering room...");
+      toast.success("You've been approved! Entering room...");
       setRoomActive(true);
       setCurrentRoomId(data.roomId);
       setIsRoomOwner(false);
@@ -278,7 +279,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
       roomId: currentRoomId,
     });
 
-    toast.success(`✓ ${memberUsername} approved!`);
+    toast.success(`${memberUsername} approved!`);
   };
 
   const handleRejectMember = (requestId) => {
@@ -340,9 +341,9 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
               <div className="text-sm text-slate-300">
                 <p className="font-semibold text-cyan-300 mb-2">What happens next?</p>
                 <ul className="space-y-1 text-slate-400 text-xs">
-                  <li>✓ Room owner receives a notification</li>
-                  <li>✓ You'll receive an email once reviewed</li>
-                  <li>✓ Real-time updates will appear below</li>
+                  <li>• Room owner receives a notification</li>
+                  <li>• You'll receive an email once reviewed</li>
+                  <li>• Real-time updates will appear below</li>
                 </ul>
               </div>
             </div>
@@ -379,7 +380,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-black mb-3">
-            🏆 DSA<br />
+            DSA<br />
             <span className="bg-linear-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
               Room
             </span>
@@ -394,7 +395,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
           <div className="mb-6 p-6 rounded-2xl border-2 border-orange-700 bg-orange-500/10 animate-in shadow-lg shadow-orange-500/20">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold flex items-center gap-2 text-orange-300">
-                <span className="text-2xl animate-bounce">🔔</span> Join Requests ({pendingRequests.length})
+                <Bell size={24} className="animate-bounce" /> Join Requests ({pendingRequests.length})
               </h2>
               <button
                 onClick={() => setShowPendingPanel(!showPendingPanel)}
@@ -413,7 +414,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center font-bold">
-                        👤
+                        <User size={20} className="text-slate-300" />
                       </div>
                       <div>
                         <div className="font-bold text-slate-100">{request.username}</div>
@@ -425,7 +426,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
                         onClick={() => handleApproveMember(request.id, request.userId, request.username)}
                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-bold transition text-white"
                       >
-                        ✓ Approve
+                        Approve
                       </button>
                       <button
                         onClick={() => handleRejectMember(request.id)}
@@ -445,7 +446,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
         {isRoomOwner && createdRoomCode && (
           <div className="mb-6 p-6 rounded-2xl border-2 border-cyan-700 bg-cyan-500/5">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <span>👥</span> Room Status
+              <span>Users</span> Room Status
             </h2>
 
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -467,7 +468,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
             <div className="space-y-2">
               <div className="p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/30 flex items-center justify-center text-xs font-bold">👑</div>
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/30 flex items-center justify-center text-xs font-bold">O</div>
                   <div>
                     <div className="font-bold text-slate-100">{username || "You"}</div>
                     <div className="text-xs text-slate-400">Owner</div>
@@ -482,7 +483,9 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
                   className="p-3 bg-slate-800 rounded-lg border border-emerald-500/20 flex items-center justify-between hover:border-emerald-500 transition"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-xs font-bold">✓</div>
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                      <div className="text-emerald-400 text-lg">•</div>
+                    </div>
                     <div>
                       <div className="font-bold text-slate-100">{member.username}</div>
                       <div className="text-xs text-slate-400">Ready to play</div>
@@ -500,7 +503,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
                   onClick={() => setShowPendingPanel(true)}
                   className="w-full text-orange-400 hover:text-orange-300 font-bold transition flex items-center justify-center gap-2"
                 >
-                  <span className="text-lg animate-pulse">🔔</span>
+                  <Bell size={20} className="text-lg animate-pulse" />
                   {pendingRequests.length} pending request{pendingRequests.length !== 1 ? 's' : ''} - Click to review
                 </button>
               </div>
@@ -517,7 +520,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
             
             <div className="relative z-10">
               <div className="flex items-start justify-between mb-6">
-                <div className="text-5xl">🆕</div>
+                <div className="text-5xl">◆</div>
                 <span className="px-3 py-1 text-xs font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 rounded-full">NEW</span>
               </div>
 
@@ -565,11 +568,11 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
                   >
                     {showCopyNotice ? (
                       <>
-                        <span>✓</span> Copied!
+                        <span>•</span> Copied!
                       </>
                     ) : (
                       <>
-                        <span>📋</span> Copy Code
+                        <Copy size={18} /> Copy Code
                       </>
                     )}
                   </button>
@@ -581,7 +584,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
                     className="w-full px-5 py-4 bg-linear-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-bold rounded-xl transition-all duration-300 flex items-center justify-between animate-pulse shadow-lg shadow-orange-500/20"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">🔔</span>
+                        <Bell size={24} />
                         <div className="text-left">
                           <div>{notificationBadgeCount} Join Request{notificationBadgeCount !== 1 ? 's' : ''}</div>
                           <div className="text-xs text-orange-100">Click to review</div>
@@ -595,7 +598,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
 
                   {/* Info Text */}
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs text-emerald-300 text-center">
-                    👥 Total members: <span className="font-bold">{approvedMembers.length + 1}</span> {approvedMembers.length === 0 ? '(just you!)' : ''}
+                    Users Total members: <span className="font-bold">{approvedMembers.length + 1}</span> {approvedMembers.length === 0 ? '(just you!)' : ''}
                   </div>
                 </div>
               ) : (
@@ -606,11 +609,11 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
                 >
                   {isCreating ? (
                     <>
-                      <span className="animate-spin">⚙️</span> Creating Room...
+                      <span className="animate-spin">⊙</span> Creating Room...
                     </>
                   ) : (
                     <>
-                      <span>👑</span> Create as Owner
+                      <span>Owner</span> Create as Owner
                     </>
                   )}
                 </button>
@@ -625,7 +628,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
             
             <div className="relative z-10">
               <div className="flex items-start justify-between mb-6">
-                <div className="text-5xl">🚪</div>
+                <DoorOpen size={64} className="text-slate-300" />
                 <span className="px-3 py-1 text-xs font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-500/40 rounded-full">JOIN</span>
               </div>
 
@@ -685,7 +688,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
                     </>
                   ) : (
                     <>
-                      <span>📨</span> Request to Join
+                      <span>→</span> Request to Join
                     </>
                   )}
                 </button>
@@ -704,19 +707,19 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
           <h3 className="col-span-full text-xl font-bold text-slate-200 mb-2">Platform Features</h3>
           
           <div className="group p-6 bg-linear-to-br from-purple-950/30 to-slate-900/50 border border-purple-700/30 rounded-2xl hover:border-purple-600 transition-all duration-300">
-            <div className="text-4xl mb-3">👥</div>
+            <div className="text-4xl mb-3">◆</div>
             <div className="text-sm font-bold text-purple-300">Member Verification</div>
             <div className="text-xs text-slate-400 mt-2">Owner verifies and approves joining members</div>
           </div>
 
           <div className="group p-6 bg-linear-to-br from-amber-950/30 to-slate-900/50 border border-amber-700/30 rounded-2xl hover:border-amber-600 transition-all duration-300">
-            <div className="text-4xl mb-3">🔐</div>
+            <div className="text-4xl mb-3">◉</div>
             <div className="text-sm font-bold text-amber-300">Owner Control</div>
             <div className="text-xs text-slate-400 mt-2">Complete room and game settings management</div>
           </div>
 
           <div className="group p-6 bg-linear-to-br from-pink-950/30 to-slate-900/50 border border-pink-700/30 rounded-2xl hover:border-pink-600 transition-all duration-300">
-            <div className="text-4xl mb-3">⏱️</div>
+            <div className="text-4xl mb-3">⧖</div>
             <div className="text-sm font-bold text-pink-300">Server-Synced Timer</div>
             <div className="text-xs text-slate-400 mt-2">Fair play environment with anti-cheat validation</div>
           </div>

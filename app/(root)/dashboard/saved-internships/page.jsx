@@ -55,7 +55,7 @@ export default function SavedInternshipsPage() {
       deadline: 'Apr 5, 2024',
       daysLeft: 21,
       tags: ['AWS', 'Docker', 'Kubernetes'],
-      logo: '🚀'
+      logo: 'StartUp'
     },
   ];
 

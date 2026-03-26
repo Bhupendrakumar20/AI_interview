@@ -51,7 +51,7 @@ export default function JobsPage() {
         </p>
         {source === "fallback" && (
           <p className="text-sm text-yellow-500 mt-2">
-            📌 Showing sample jobs (API temporarily unavailable)
+            Showing sample jobs (API temporarily unavailable)
           </p>
         )}
         {source === "api" && (

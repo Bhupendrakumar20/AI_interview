@@ -71,10 +71,10 @@ export default function CertificatesPage() {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Certificates', value: '6', icon: '🏆' },
-            { label: 'Skills Verified', value: '8', icon: '✅' },
-            { label: 'Completion', value: '100%', icon: '🎯' },
-            { label: 'Valid Until', value: '2.5y', icon: '⏰' }
+            { label: 'Certificates', value: '6', icon: '★' },
+            { label: 'Skills Verified', value: '8', icon: '✓' },
+            { label: 'Completion', value: '100%', icon: '▲' },
+            { label: 'Valid Until', value: '2.5y', icon: '⧖' }
           ].map((stat, idx) => (
             <div key={idx} className="bg-gradient-to-br from-slate-800/60 to-slate-700/40 border border-slate-700/50 rounded-lg p-4 animate-slideInUp" style={{animationDelay: `${idx * 0.1}s`}}>
               <div className="flex items-start justify-between">

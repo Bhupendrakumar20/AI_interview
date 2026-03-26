@@ -81,7 +81,7 @@ export default function CoursesPage() {
           {[
             { label: 'In Progress', value: '3', icon: '⏳' },
             { label: 'Completed', value: '6', icon: '✅' },
-            { label: 'Learning Time', value: '23h', icon: '⏱️' },
+            { label: 'Learning Time', value: '23h', icon: '⌛' },
             { label: 'Avg Score', value: '92%', icon: '⭐' }
           ].map((stat, idx) => (
             <div key={idx} className="bg-gradient-to-br from-slate-800/60 to-slate-700/40 border border-slate-700/50 rounded-lg p-4 animate-slideInUp" style={{animationDelay: `${idx * 0.1}s`}}>

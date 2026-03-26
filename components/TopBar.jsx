@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Bell, User, LogOut, Settings } from "lucide-react";
 import { logout } from "@/lib/actions/auth.action";
 
 export default function TopBar({ user }) {
@@ -72,7 +73,7 @@ export default function TopBar({ user }) {
               className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all hover:shadow-lg hover:shadow-orange-500/20"
               title="Pending DSA Room approvals"
             >
-              <span className="text-lg">🔔</span>
+              <Bell size={20} className="text-orange-400" />
               <span className="absolute top-0 right-0 w-5 h-5 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center transform translate-x-1 -translate-y-1">
                 {pendingApprovalsCount > 9 ? '9+' : pendingApprovalsCount}
               </span>
@@ -88,7 +89,7 @@ export default function TopBar({ user }) {
                 : "bg-dark-300 text-light-100 hover:bg-dark-300/80 hover:text-primary-200"
             }`}
           >
-            <span className="text-lg">⚙️</span>
+            <Settings size={18} />
             <span className="hidden md:inline text-sm font-medium">Settings</span>
           </Link>
 
@@ -118,7 +119,7 @@ export default function TopBar({ user }) {
                   onClick={() => setShowDropdown(false)}
                   className="flex items-center gap-2 px-4 py-2 text-sm text-light-100 hover:bg-dark-200 transition"
                 >
-                  <span>👤</span>
+                  <User size={18} />
                   <span>View Profile</span>
                 </Link>
 
@@ -127,7 +128,7 @@ export default function TopBar({ user }) {
                   onClick={() => setShowDropdown(false)}
                   className="flex items-center gap-2 px-4 py-2 text-sm text-light-100 hover:bg-dark-200 transition"
                 >
-                  <span>⚙️</span>
+                  <Settings size={18} />
                   <span>Settings</span>
                 </Link>
 
@@ -137,7 +138,7 @@ export default function TopBar({ user }) {
                   disabled={loggingOut}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition border-t border-dark-200 disabled:opacity-50"
                 >
-                  <span>🚪</span>
+                  <LogOut size={18} />
                   <span>{loggingOut ? "Logging out..." : "Logout"}</span>
                 </button>
               </div>

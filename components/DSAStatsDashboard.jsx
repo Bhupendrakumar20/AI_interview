@@ -246,7 +246,7 @@ function DSAStatsDashboard({ userId }) {
                 key={achievement.id}
                 className="flex flex-col items-center justify-center p-4 bg-slate-800 rounded-lg border border-slate-700"
               >
-                <span className="text-3xl mb-2">🏆</span>
+                <span className="text-3xl mb-2">⭐</span>
                 <p className="text-sm font-semibold text-white text-center">{achievement.badge_name}</p>
               </div>
             ))}

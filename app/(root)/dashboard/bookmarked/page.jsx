@@ -186,19 +186,3 @@ export default function BookmarkedPage() {
     </div>
   );
 }
-              <div className="ml-4">
-                {q.solved ? (
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-600/20 text-green-400">
-                    ✓
-                  </span>
-                ) : (
-                  <span className="text-slate-500 text-sm">Unsolved</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -877,8 +877,7 @@ html {
 .upload-zone:hover {
   border-color: rgba(34, 211, 238, 0.6);
 }
-}
 
 .dropdown-menu[hidden] {
-  @apply duration-200;
+  @apply hidden;
 }

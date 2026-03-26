@@ -1,3 +1,4 @@
+// Mock Test Page - PrepWise
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -128,11 +129,11 @@ export default function MockTestPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-dark-100 to-dark-200">
+    <div className="min-h-screen bg-linear-to-b from-dark-100 to-dark-200">
       {/* HERO SECTION */}
       <section className="relative pt-12 pb-8 px-8 border-b border-dark-300/50">
         <div className="max-w-7xl mx-auto">
-          <div className="relative backdrop-blur-sm rounded-2xl border border-primary-200/20 bg-gradient-to-br from-dark-150/50 via-dark-200/50 to-dark-250/50 p-8 overflow-hidden">
+          <div className="relative backdrop-blur-sm rounded-2xl border border-primary-200/20 bg-linear-to-br from-dark-150/50 via-dark-200/50 to-dark-250/50 p-8 overflow-hidden">
             {/* Decorative orbs */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-primary-200/10 rounded-full filter blur-3xl -z-10 opacity-20" />
             <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-500/10 rounded-full filter blur-3xl -z-10 opacity-15" />
@@ -145,7 +146,7 @@ export default function MockTestPage() {
 
                 <h1 className="text-4xl md:text-5xl font-bold mb-3">
                   Mock Interview Tests
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-200 to-teal-400 ml-2">For PrepWise</span>
+                  <span className="text-transparent bg-clip-text bg-linear-to-r from-primary-200 to-teal-400 ml-2">For PrepWise</span>
                 </h1>
 
                 <p className="text-light-100 text-lg max-w-md mb-6">
@@ -155,7 +156,7 @@ export default function MockTestPage() {
                 <div className="flex flex-wrap gap-4">
                   <Button 
                     onClick={handleStartTest}
-                    className="bg-gradient-to-r from-primary-200 to-primary-300 hover:shadow-lg hover:shadow-primary-200/20 text-dark-100 font-bold px-6 py-2.5 rounded-xl transition-all"
+                    className="bg-linear-to-r from-primary-200 to-primary-300 hover:shadow-lg hover:shadow-primary-200/20 text-dark-100 font-bold px-6 py-2.5 rounded-xl transition-all"
                   >
                     ▶ Quick Start Test
                   </Button>
@@ -307,7 +308,7 @@ export default function MockTestPage() {
 
                 <button
                   onClick={handleStartTest}
-                  className="w-full bg-gradient-to-r from-primary-200 to-primary-300 hover:shadow-lg hover:shadow-primary-200/30 text-dark-100 font-bold py-3 px-4 rounded-lg transition-all mt-4"
+                  className="w-full bg-linear-to-r from-primary-200 to-primary-300 hover:shadow-lg hover:shadow-primary-200/30 text-dark-100 font-bold py-3 px-4 rounded-lg transition-all mt-4"
                 >
                   🚀 Start Test Now
                 </button>

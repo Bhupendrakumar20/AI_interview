@@ -701,7 +701,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
 
         {/* Features Overview */}
         <div className="grid md:grid-cols-2 gap-6 mt-12 pt-8 border-t border-slate-700/50">
-          <h3 className="col-span-full text-xl font-bold text-slate-200 mb-2">✨ Platform Features</h3>
+          <h3 className="col-span-full text-xl font-bold text-slate-200 mb-2">Platform Features</h3>
           
           <div className="group p-6 bg-linear-to-br from-purple-950/30 to-slate-900/50 border border-purple-700/30 rounded-2xl hover:border-purple-600 transition-all duration-300">
             <div className="text-4xl mb-3">👥</div>
@@ -722,7 +722,7 @@ const DSARoomLobby = ({ userId, username, onRoomJoined, onClose }) => {
           </div>
 
           <div className="group p-6 bg-linear-to-br from-blue-950/30 to-slate-900/50 border border-blue-700/30 rounded-2xl hover:border-blue-600 transition-all duration-300">
-            <div className="text-4xl mb-3">📊</div>
+            <div className="text-4xl mb-3 text-blue-300">●</div>
             <div className="text-sm font-bold text-blue-300">Live Leaderboard</div>
             <div className="text-xs text-slate-400 mt-2">Real-time rankings and scoring during gameplay</div>
           </div>

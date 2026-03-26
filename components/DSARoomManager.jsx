@@ -107,7 +107,7 @@ const DSARoomManager = ({
         if (data.updatedPlayer) {
           const player = data.updatedPlayer;
           if (player.status === "completed") {
-            toast.success(`🎉 ${player.username} solved! +${player.points} pts`, {
+            toast.success(`${player.username} solved! +${player.points} pts`, {
               duration: 3000,
             });
           }
@@ -455,7 +455,7 @@ const DSARoomManager = ({
                           {member.userId === userId && <span className="ml-1 text-xs text-cyan-300">(YOU)</span>}
                         </div>
                         <div className="text-xs text-slate-400">
-                          {member.status === "completed" ? "🎯 COMPLETED" : "⏳ IN PROGRESS"}
+                          {member.status === "completed" ? "COMPLETED" : "IN PROGRESS"}
                         </div>
                       </div>
                     </div>
@@ -653,7 +653,7 @@ const DSARoomManager = ({
 
             {/* Question Mode Selection */}
             <div className="mb-6">
-              <h3 className="text-xs font-black text-purple-300 mb-3 tracking-wider">🎯 QUESTION MODE</h3>
+              <h3 className="text-xs font-black text-purple-300 mb-3 tracking-wider">QUESTION MODE</h3>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setQuestionMode("same")}

@@ -437,7 +437,7 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
       setQuestion(q);
       setTimerTotal(config.timeLimitSecs);
       setTimerRemaining(config.timeLimitSecs);
-      addEvent("🚀 Room started! Good luck.");
+      addEvent("Room started! Good luck.");
     });
 
     socket.on("timer_tick", ({ remaining }) => {

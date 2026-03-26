@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Brain, Radio, BarChart3, Code, Video, FileJson, Film, Trophy, Cpu } from "lucide-react";
 import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
 import DSARoomLobby from "./DSARoomLobby";
@@ -128,10 +129,10 @@ const InterviewBuddy = ({ userId }) => {
   };
 
   const personas = [
-    { id: "hiring-manager", emoji: "💼", name: "Hiring Manager", style: "Technical depth" },
-    { id: "hr-partner", emoji: "🧑‍💼", name: "HR Partner", style: "Behavioral focus" },
-    { id: "startup-founder", emoji: "🚀", name: "Startup Founder", style: "Culture & vision" },
-    { id: "drill-sergeant", emoji: "🎖️", name: "Drill Sergeant", style: "High pressure" },
+    { id: "hiring-manager", icon: Briefcase, name: "Hiring Manager", style: "Technical depth" },
+    { id: "hr-partner", icon: Users, name: "HR Partner", style: "Behavioral focus" },
+    { id: "startup-founder", icon: Rocket, name: "Startup Founder", style: "Culture & vision" },
+    { id: "drill-sergeant", icon: Award, name: "Drill Sergeant", style: "High pressure" },
   ];
 
   const topics = [
@@ -178,55 +179,55 @@ const InterviewBuddy = ({ userId }) => {
   const features = [
     {
       type: "human",
-      icon: "🗂️",
+      icon: FolderOpen,
       title: "Co-Pilot Question Queue",
       desc: "Interviewer drags questions into a live queue. Tag-team mode lets partners pass the mic for panel simulation.",
     },
     {
       type: "human",
-      icon: "🟡",
+      icon: AlertCircle,
       title: "Signal Cards",
       desc: "Non-verbal cues: Yellow (off-topic), Red (move on), Green (excellent — elaborate). Non-disruptive to the flow.",
     },
     {
       type: "human",
-      icon: "📝",
+      icon: FileText,
       title: "Shared Live Notes",
       desc: "A mini-realtime doc both users type in during the session. Auto-formats into a structured Recap PDF at the end.",
     },
     {
       type: "ai",
-      icon: "🧠",
+      icon: Brain,
       title: "Adaptive AI Questioning",
       desc: "If your answer is weak, the AI re-prompts with a follow-up. 'Safe to fail' — retry your answer immediately.",
     },
     {
       type: "ai",
-      icon: "📡",
+      icon: Radio,
       title: "Live Sentiment Analysis",
       desc: "Real-time gauges for Confidence, Pacing, and Filler Words. On-screen STAR method nudges appear contextually.",
     },
     {
       type: "ai",
-      icon: "📊",
+      icon: BarChart3,
       title: "Radar Chart Report",
       desc: "Post-session breakdown: Clarity, Technical Accuracy, Behavioral Storytelling, Confidence. Color-coded transcript.",
     },
     {
       type: "shared",
-      icon: "💻",
+      icon: Code,
       title: "Integrated Code Editor",
       desc: "Full syntax-highlighted editor for coding rounds. Live or AI-observed. Supports multiple languages.",
     },
     {
       type: "shared",
-      icon: "🎬",
+      icon: Film,
       title: "Bookmarked Recording",
       desc: "Session recordings with automatic bookmarks at signal card moments, feedback events, and key question timestamps.",
     },
     {
       type: "shared",
-      icon: "📄",
+      icon: FileJson,
       title: "JD-Based Questions",
       desc: "Upload a job description. AI generates role-specific questions tailored to the exact requirements and company culture.",
     },
@@ -344,14 +345,14 @@ const InterviewBuddy = ({ userId }) => {
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
-            <button className="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition">
-              📋 View Past Reports
+            <button className="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition hover:shadow-md hover:shadow-slate-700/50">
+              View Past Reports
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-blue-500/30 transition"
+              className="px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-blue-500/40 hover:scale-105 transition"
             >
-              ✦ New Session
+              New Session
             </button>
           </div>
         </div>
@@ -372,7 +373,7 @@ const InterviewBuddy = ({ userId }) => {
 
       {/* MODE SELECTOR */}
       <div className="px-10 mb-8">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">🎯 Choose Your Mode</h2>
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">Choose Your Mode</h2>
         <div className="grid md:grid-cols-3 gap-4">
           {/* Human Mode Card */}
           <div
@@ -386,7 +387,9 @@ const InterviewBuddy = ({ userId }) => {
             <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
               {currentMode === "human" ? "✓" : ""}
             </div>
-            <div className="text-3xl mb-3">👥</div>
+            <div className="mb-3 text-blue-400">
+              <Users size={32} />
+            </div>
             <h3 className="text-lg font-bold mb-2">Human Buddy Mode</h3>
             <p className="text-sm text-slate-300 mb-3">
               Connect with a peer via video call. One plays Interviewer, one plays Candidate. Real pressure, real collaboration, shared notes.
@@ -412,7 +415,9 @@ const InterviewBuddy = ({ userId }) => {
             <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
               {currentMode === "ai" ? "✓" : ""}
             </div>
-            <div className="text-3xl mb-3">🤖</div>
+            <div className="mb-3 text-purple-400">
+              <Cpu size={32} />
+            </div>
             <h3 className="text-lg font-bold mb-2">AI Buddy Mode</h3>
             <p className="text-sm text-slate-300 mb-3">
               Your always-available AI interviewer. Adaptive questions, live sentiment analysis, on-screen coaching, and a granular performance report.
@@ -438,7 +443,9 @@ const InterviewBuddy = ({ userId }) => {
             <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
               {dsaRoomActive ? "✓" : ""}
             </div>
-            <div className="text-3xl mb-3">🏆</div>
+            <div className="mb-3 text-emerald-400">
+              <Trophy size={32} />
+            </div>
             <h3 className="text-lg font-bold mb-2">DSA Room Mode</h3>
             <p className="text-sm text-slate-300 mb-3">
               Multiplayer competitive coding. Solve problems in real-time, compete on live leaderboards, and earn speed bonuses with up to 10 players.
@@ -577,7 +584,7 @@ const InterviewBuddy = ({ userId }) => {
 
       {/* FEATURES GRID */}
       <div className="px-10 mb-8">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">✨ Key Features</h2>
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">Key Features</h2>
         <div className="grid md:grid-cols-3 gap-4">
           {features.map((feature, idx) => (
             <div
@@ -590,7 +597,9 @@ const InterviewBuddy = ({ userId }) => {
                   : "border-emerald-500/30 bg-emerald-500/5"
               }`}
             >
-              <div className="text-2xl mb-2">{feature.icon}</div>
+              <div className="text-2xl mb-2 text-slate-400">
+                <feature.icon size={24} />
+              </div>
               <h4 className="font-bold text-sm mb-1">{feature.title}</h4>
               <p className="text-xs text-slate-400 mb-3 leading-relaxed">{feature.desc}</p>
               <span
@@ -614,7 +623,7 @@ const InterviewBuddy = ({ userId }) => {
       {/* RECENT SESSIONS */}
       <div className="px-10 pb-12">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold flex items-center gap-2">🕘 Recent Sessions</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2">Recent Sessions</h2>
           <button className="px-4 py-2 text-sm font-medium hover:text-blue-400 transition">
             View All →
           </button>

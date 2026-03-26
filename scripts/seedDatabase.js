@@ -88,16 +88,16 @@ async function clearCollection(collectionName) {
 
 // ==================== SEED DATA ====================
 async function seedDatabase() {
-  console.log('🚀 Starting prepWise AI Database Seeding...');
+  console.log('Starting prepWise AI Database Seeding...');
   console.log('=============================================');
 
   try {
     // 1. Create main user
-    console.log('\n📝 Step 1: Creating main user...');
+    console.log('\nStep 1: Creating main user...');
     const userId = await createUser();
 
     // 2. Clear existing data (optional - comment out if you want to keep existing data)
-    console.log('\n🗑️ Step 2: Clearing existing data...');
+    console.log('\nStep 2: Clearing existing data...');
     const collections = [
       'interviews', 'feedback', 'internships', 'jobs', 'competitions',
       'mentors', 'courses', 'user_applications', 'user_certificates',
@@ -110,7 +110,7 @@ async function seedDatabase() {
     }
 
     // 3. Seed interviews
-    console.log('\n🎤 Step 3: Seeding interviews...');
+    console.log('\nStep 3: Seeding interviews...');
     const interviews = [
       {
         id: 'interview_1',
@@ -171,10 +171,10 @@ async function seedDatabase() {
     for (const interview of interviews) {
       await db.collection('interviews').doc(interview.id).set(interview);
     }
-    console.log(`✅ Added ${interviews.length} interviews`);
+    console.log(`Added ${interviews.length} interviews`);
 
     // 4. Seed feedback
-    console.log('\n📊 Step 4: Seeding feedback...');
+    console.log('\nStep 4: Seeding feedback...');
     const feedbacks = [
       {
         id: 'feedback_1',
@@ -726,7 +726,7 @@ async function seedDatabase() {
     console.log('✅ Added user settings');
 
     console.log('\n=============================================');
-    console.log('🎉 DATABASE SEEDING COMPLETED SUCCESSFULLY!');
+    console.log('DATABASE SEEDING COMPLETED SUCCESSFULLY!');
     console.log('=============================================');
     console.log('\n📊 SUMMARY OF DATA ADDED:');
     console.log('   👤 User: 1 (Bhupendra Kumar)');

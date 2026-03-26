@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { Target, MessageCircle, Brain } from 'lucide-react';
 
 const AiBuddyResultsScreen = ({
   sessionId,
@@ -213,8 +214,14 @@ const AiBuddyResultsScreen = ({
           {/* Strengths */}
           <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
             <h3 className="font-semibold text-white mb-4">Key Strength</h3>
-            <div className="text-3xl mb-2">
-              {feedback?.clarity >= 85 ? '🎯' : feedback?.communication >= 85 ? '💬' : '🧠'}
+            <div className="text-3xl mb-2 text-lime-400">
+              {feedback?.clarity >= 85 ? (
+                <Target size={32} />
+              ) : feedback?.communication >= 85 ? (
+                <MessageCircle size={32} />
+              ) : (
+                <Brain size={32} />
+              )}
             </div>
             <p className="text-sm text-slate-300">
               {feedback?.clarity >= 85

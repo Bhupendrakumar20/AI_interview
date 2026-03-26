@@ -168,7 +168,7 @@ function CodeReviewPanel({ submissions, question }) {
 
                   {submission.first_blood && (
                     <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">
-                      🔥 FIRST BLOOD
+                      FIRST BLOOD
                     </span>
                   )}
                 </div>

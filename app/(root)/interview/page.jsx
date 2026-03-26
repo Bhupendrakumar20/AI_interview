@@ -33,6 +33,8 @@ async function InterviewPage() {
   );
 }
 
+"use client";
+
 function InterviewPageContent({ user, userInterviews, allInterviews, hasPastInterviews, hasUpcomingInterviews }) {
   const [activeMode, setActiveMode] = React.useState("mock-interview");
 

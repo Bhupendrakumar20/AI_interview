@@ -58,7 +58,7 @@ const AiBuddyResultsScreen = ({
       <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-6 z-50">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-black text-white">🎉 Interview Complete!</h1>
+            <h1 className="text-3xl font-black text-white">Interview Complete</h1>
             <p className="text-slate-400 text-sm mt-2">Here's your detailed performance report</p>
           </div>
           <button
@@ -84,12 +84,12 @@ const AiBuddyResultsScreen = ({
                 </div>
                 <p className="text-slate-300 text-lg">
                   {feedback?.overallScore >= 80
-                    ? '🌟 Excellent Performance!'
+                    ? 'Excellent Performance!'
                     : feedback?.overallScore >= 70
-                    ? '👍 Good Job!'
+                    ? 'Good Job!'
                     : feedback?.overallScore >= 60
-                    ? '📈 Fair Performance'
-                    : '💪 Keep Practicing'}
+                    ? 'Fair Performance'
+                    : 'Keep Practicing'}
                 </p>
 
                 {/* Questions Summary */}
@@ -203,10 +203,10 @@ const AiBuddyResultsScreen = ({
             </div>
             <p className="text-sm text-slate-400 mb-4">
               {feedback?.fillerWords < 5
-                ? '✅ Excellent control of filler words'
+                ? 'Excellent control of filler words'
                 : feedback?.fillerWords < 15
-                ? '👍 Good - could reduce slightly'
-                : '📈 Work on reducing filler words'}
+                ? 'Good - could reduce slightly'
+                : 'Work on reducing filler words'}
             </p>
             <div className="text-xs text-slate-500">Lower is better</div>
           </div>
@@ -235,11 +235,11 @@ const AiBuddyResultsScreen = ({
 
         {/* Recommendations */}
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
-          <h2 className="text-xl font-bold text-white mb-6">📋 Recommendations for Improvement</h2>
+          <h2 className="text-xl font-bold text-white mb-6">Recommendations for Improvement</h2>
           <div className="space-y-4">
             {feedback?.clarity < 80 && (
               <div className="flex gap-4">
-                <div className="text-2xl">💡</div>
+                <div className="text-2xl text-blue-400">💡</div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Improve Clarity</h3>
                   <p className="text-slate-400 text-sm">
@@ -301,15 +301,15 @@ const AiBuddyResultsScreen = ({
         <div className="flex gap-4 justify-center mb-12">
           <button
             onClick={onRetry}
-            className="px-8 py-3 bg-linear-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/30 text-white font-semibold rounded-lg transition-all flex items-center gap-2"
+            className="px-8 py-3 bg-linear-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/30 hover:scale-105 active:scale-95 text-white font-semibold rounded-lg transition-all duration-300 flex items-center gap-2"
           >
-            🔄 Practice Again
+            Practice Again
           </button>
           <button
             onClick={onClose}
-            className="px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg transition-all"
+            className="px-8 py-3 bg-slate-800 hover:bg-slate-700 hover:scale-105 active:scale-95 text-white font-semibold rounded-lg transition-all duration-300"
           >
-            ← Back to Dashboard
+            Back to Dashboard
           </button>
         </div>
       </div>

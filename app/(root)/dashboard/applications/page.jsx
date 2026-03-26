@@ -1,24 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, MapPin, Briefcase, MessageSquare, FileText, Trash2, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, Briefcase, MessageSquare, FileText, Trash2, ExternalLink, Search, Code, Zap, ClipboardList, Clock, Sparkles, Star } from 'lucide-react';
 
 export default function ApplicationsPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [toast, setToast] = useState(null);
 
   const applications = [
-    { id: 1, company: 'Google', role: 'Senior Software Engineer', status: 'Interview', appliedDate: '2024-03-15', logo: '🔍' },
-    { id: 2, company: 'Microsoft', role: 'Full Stack Developer', status: 'Screening', appliedDate: '2024-03-12', logo: '💻' },
-    { id: 3, company: 'Amazon', role: 'Backend Engineer', status: 'Rejected', appliedDate: '2024-03-10', logo: '🚀' },
-    { id: 4, company: 'Meta', role: 'Frontend Engineer', status: 'Offer', appliedDate: '2024-03-08', logo: 'f' },
+    { id: 1, company: 'Google', role: 'Senior Software Engineer', status: 'Interview', appliedDate: '2024-03-15', logo: Search },
+    { id: 2, company: 'Microsoft', role: 'Full Stack Developer', status: 'Screening', appliedDate: '2024-03-12', logo: Code },
+    { id: 3, company: 'Amazon', role: 'Backend Engineer', status: 'Rejected', appliedDate: '2024-03-10', logo: Zap },
+    { id: 4, company: 'Meta', role: 'Frontend Engineer', status: 'Offer', appliedDate: '2024-03-08', logo: Code },
   ];
 
   const stats = [
-    { label: 'Total Applications', value: '24', icon: '📋' },
-    { label: 'In Progress', value: '8', icon: '⏳' },
-    { label: 'Offers Received', value: '2', icon: '🎉' },
-    { label: 'Success Rate', value: '33%', icon: '⭐' },
+    { label: 'Total Applications', value: '24', icon: ClipboardList },
+    { label: 'In Progress', value: '8', icon: Clock },
+    { label: 'Offers Received', value: '2', icon: Sparkles },
+    { label: 'Success Rate', value: '33%', icon: Star },
   ];
 
   const statusColors = {
@@ -93,7 +93,7 @@ export default function ApplicationsPage() {
                   <div className="text-2xl font-bold text-white">{stat.value}</div>
                   <div className="text-sm text-slate-400 mt-1">{stat.label}</div>
                 </div>
-                <div className="text-2xl">{stat.icon}</div>
+                <div className="text-2xl"><stat.icon size={24} className="text-white" /></div>
               </div>
             </div>
           ))}
@@ -130,7 +130,7 @@ export default function ApplicationsPage() {
               <div className="relative z-10">
                 <div className="flex items-start gap-4 mb-4">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-slate-700/50 to-slate-600/30 flex items-center justify-center text-lg font-bold flex-shrink-0 transition-all duration-300 group-hover:from-blue-600/30 group-hover:to-blue-500/20 group-hover:scale-110">
-                    {app.logo}
+                    <app.logo size={20} className="text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-white group-hover:text-blue-300 transition-colors">{app.role}</h3>

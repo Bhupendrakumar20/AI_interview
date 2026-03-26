@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, Clock, Zap, CheckCircle, AlertCircle, Edit2, Share2 } from 'lucide-react';
+import { Calendar, Clock, Zap, CheckCircle, AlertCircle, Edit2, Share2, Target, MessageCircle } from 'lucide-react';
 
 export default function RoundsPage() {
   const [toast, setToast] = useState(null);
 
   const liveRounds = [
-    { id: 1, company: 'Google', round: 'Round 1', type: 'Technical', date: 'Today at 2 PM', icon: '🎯', priority: 'urgent' },
-    { id: 2, company: 'Microsoft', round: 'Round 2', type: 'HR', date: 'Tomorrow at 10 AM', icon: '💬', priority: 'high' },
+    { id: 1, company: 'Google', round: 'Round 1', type: 'Technical', date: 'Today at 2 PM', icon: Target, priority: 'urgent' },
+    { id: 2, company: 'Microsoft', round: 'Round 2', type: 'HR', date: 'Tomorrow at 10 AM', icon: MessageCircle, priority: 'high' },
   ];
 
   const completedRounds = [
@@ -113,7 +113,7 @@ export default function RoundsPage() {
 
                 <div className="relative z-10 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-lg bg-red-600/20 flex items-center justify-center text-lg flex-shrink-0 transition-all duration-300 group-hover:bg-red-600/30 group-hover:scale-110">
-                    {round.icon}
+                    <round.icon size={20} className="text-white" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-white group-hover:text-red-300 transition-colors">{round.company}</h3>

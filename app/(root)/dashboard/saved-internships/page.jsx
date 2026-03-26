@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, MapPin, Briefcase, Share2, Trash2, Eye, Bookmark } from 'lucide-react';
+import { Clock, MapPin, Briefcase, Share2, Trash2, Eye, Bookmark, Search, Code } from 'lucide-react';
 
 export default function SavedInternshipsPage() {
   const [activeFilter, setActiveFilter] = useState('all');
@@ -19,7 +19,7 @@ export default function SavedInternshipsPage() {
       deadline: 'Mar 20, 2024',
       daysLeft: 5,
       tags: ['Backend', 'Python', 'Competitive'],
-      logo: '🔍'
+      logo: Search
     },
     { 
       id: 2, 
@@ -31,7 +31,7 @@ export default function SavedInternshipsPage() {
       deadline: 'Apr 10, 2024',
       daysLeft: 26,
       tags: ['Frontend', 'React', 'Node.js'],
-      logo: '💻'
+      logo: Code
     },
     { 
       id: 3, 
@@ -43,7 +43,7 @@ export default function SavedInternshipsPage() {
       deadline: 'Mar 28, 2024',
       daysLeft: 13,
       tags: ['React', 'UI/UX', 'JavaScript'],
-      logo: 'f'
+      logo: Code
     },
     { 
       id: 4, 
@@ -222,7 +222,7 @@ export default function SavedInternshipsPage() {
                 <div className="relative z-10">
                   <div className="flex items-start gap-4 mb-4">
                     <div className="w-12 h-12 rounded-lg bg-slate-700/50 flex items-center justify-center text-lg font-bold flex-shrink-0 transition-all duration-300 group-hover:bg-blue-600/30 group-hover:scale-110">
-                      {internship.logo}
+                      <internship.logo size={20} className="text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-semibold text-white group-hover:text-blue-300 transition-colors">{internship.role}</h3>

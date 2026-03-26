@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, DollarSign, Bookmark, Share2, Heart, ExternalLink } from 'lucide-react';
+import { MapPin, DollarSign, Bookmark, Share2, Heart, ExternalLink, Eye, Sparkles } from 'lucide-react';
 
 export default function WatchlistPage() {
   const [activeFilter, setActiveFilter] = useState('all');
@@ -17,9 +17,9 @@ export default function WatchlistPage() {
   ];
 
   const stats = [
-    { label: 'Total Watchlist', value: '24', icon: '👁️' },
-    { label: 'High Salary', value: '8', icon: '💰' },
-    { label: 'New This Week', value: '4', icon: '✨' },
+    { label: 'Total Watchlist', value: '24', icon: Eye },
+    { label: 'High Salary', value: '8', icon: DollarSign },
+    { label: 'New This Week', value: '4', icon: Sparkles },
   ];
 
   const filteredItems = activeFilter === 'all' ? watchlistItems : watchlistItems.filter(item => item.company.toLowerCase().includes(activeFilter));
@@ -86,7 +86,7 @@ export default function WatchlistPage() {
                   <div className="text-2xl font-bold text-white">{stat.value}</div>
                   <div className="text-sm text-slate-400 mt-1">{stat.label}</div>
                 </div>
-                <div className="text-2xl">{stat.icon}</div>
+                <div className="text-2xl"><stat.icon size={24} className="text-white" /></div>
               </div>
             </div>
           ))}

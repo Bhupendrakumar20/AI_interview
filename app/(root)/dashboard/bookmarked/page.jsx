@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, Check, Bookmark, Share2, Trash2 } from 'lucide-react';
+import { Play, Check, Bookmark, Share2, Trash2, Pin, Clock } from 'lucide-react';
 
 export default function BookmarkedPage() {
   const [activeFilter, setActiveFilter] = useState('all');
@@ -19,9 +19,9 @@ export default function BookmarkedPage() {
   ];
 
   const stats = [
-    { label: 'Bookmarked', value: '8', icon: '📌' },
-    { label: 'Solved', value: '5', icon: '✅' },
-    { label: 'Remaining', value: '3', icon: '⏳' },
+    { label: 'Bookmarked', value: '8', icon: Pin },
+    { label: 'Solved', value: '5', icon: Check },
+    { label: 'Remaining', value: '3', icon: Clock },
   ];
 
   const difficultyColors = {
@@ -96,7 +96,7 @@ export default function BookmarkedPage() {
                   <div className="text-2xl font-bold text-white">{stat.value}</div>
                   <div className="text-sm text-slate-400 mt-1">{stat.label}</div>
                 </div>
-                <div className="text-2xl">{stat.icon}</div>
+                <div className="text-2xl"><stat.icon size={24} className="text-white" /></div>
               </div>
             </div>
           ))}

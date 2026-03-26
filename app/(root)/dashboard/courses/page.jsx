@@ -1,22 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, Award, BookOpen, BarChart3, Share2, Bookmark } from 'lucide-react';
+import { Play, Award, BookOpen, BarChart3, Share2, Bookmark, Code, Globe, Zap, Database } from 'lucide-react';
 
 export default function CoursesPage() {
   const [toast, setToast] = useState(null);
   const [hoveredCourse, setHoveredCourse] = useState(null);
 
   const inProgressCourses = [
-    { id: 1, title: 'Python Mastery', instructor: 'Alex Kumar', progress: 65, icon: '🐍', duration: '12 weeks' },
-    { id: 2, title: 'DSA Complete', instructor: 'Raj Singh', progress: 45, icon: '📊', duration: '15 weeks' },
-    { id: 3, title: 'Web Dev Pro', instructor: 'Emma Wilson', progress: 78, icon: '🌐', duration: '10 weeks' },
+    { id: 1, title: 'Python Mastery', instructor: 'Alex Kumar', progress: 65, icon: Code, duration: '12 weeks' },
+    { id: 2, title: 'DSA Complete', instructor: 'Raj Singh', progress: 45, icon: BarChart3, duration: '15 weeks' },
+    { id: 3, title: 'Web Dev Pro', instructor: 'Emma Wilson', progress: 78, icon: Globe, duration: '10 weeks' },
   ];
 
   const completedCourses = [
-    { id: 4, title: 'JavaScript Fundamentals', instructor: 'John Doe', icon: '⚡', date: 'Mar 2024' },
-    { id: 5, title: 'React Advanced', instructor: 'Sarah Chen', icon: '⚛️', date: 'Feb 2024' },
-    { id: 6, title: 'SQL Mastery', instructor: 'Mike Johnson', icon: '🗄️', date: 'Jan 2024' },
+    { id: 4, title: 'JavaScript Fundamentals', instructor: 'John Doe', icon: Zap, date: 'Mar 2024' },
+    { id: 5, title: 'React Advanced', instructor: 'Sarah Chen', icon: Zap, date: 'Feb 2024' },
+    { id: 6, title: 'SQL Mastery', instructor: 'Mike Johnson', icon: Database, date: 'Jan 2024' },
   ];
 
   const showToast = (msg) => {
@@ -116,7 +116,7 @@ export default function CoursesPage() {
 
                 <div className="relative z-10">
                   <div className="h-24 bg-gradient-to-br from-slate-700/50 to-slate-800/50 flex items-center justify-center text-4xl group-hover:from-slate-600/60 group-hover:to-slate-700/60 transition-all">
-                    {course.icon}
+                    <course.icon size={40} className="text-white" />
                   </div>
                   <div className="p-4">
                     <h3 className="font-semibold text-white text-sm line-clamp-2 group-hover:text-blue-300 transition-colors">{course.title}</h3>
@@ -169,7 +169,7 @@ export default function CoursesPage() {
 
                 <div className="relative z-10">
                   <div className="h-24 bg-gradient-to-br from-green-600/20 to-emerald-600/20 flex items-center justify-center text-4xl relative group-hover:from-green-600/30 group-hover:to-emerald-600/30 transition-all">
-                    {course.icon}
+                    <course.icon size={40} className="text-white" />
                     <div className="absolute top-2 right-2 w-6 h-6 bg-green-500/80 rounded-full flex items-center justify-center text-white text-xs transition-all group-hover:scale-110">✓</div>
                   </div>
                   <div className="p-4">

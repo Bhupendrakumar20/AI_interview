@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Filter, Download, Share2, Archive, Eye, ChevronRight } from 'lucide-react';
+import { Filter, Download, Share2, Archive, Eye, ChevronRight, Mic, Code, BookOpen, Trophy, ClipboardList, BarChart3, Target, Sparkles, Award } from 'lucide-react';
 
 export default function ActivityPage() {
   const [activeFilter, setActiveFilter] = useState('all');
@@ -9,19 +9,19 @@ export default function ActivityPage() {
   const [hoveredId, setHoveredId] = useState(null);
 
   const activityData = [
-    { id: 1, type: 'interview', title: 'Completed Google Interview', category: 'Interview', time: '2 hours ago', icon: '🎤' },
-    { id: 2, type: 'question', title: 'Solved: Two Sum Problem', category: 'DSA', time: '4 hours ago', icon: '💻' },
-    { id: 3, type: 'course', title: 'Completed Section 3 of Python Mastery', category: 'Course', time: '1 day ago', icon: '📚' },
-    { id: 4, type: 'certificate', title: 'Earned Professional Interview Certificate', category: 'Certificate', time: '2 days ago', icon: '🏆' },
-    { id: 5, type: 'application', title: 'Applied to Senior Developer at Microsoft', category: 'Application', time: '3 days ago', icon: '📋' },
-    { id: 6, type: 'question', title: 'Solved: Merge K Sorted Lists', category: 'DSA', time: '4 days ago', icon: '💻' },
+    { id: 1, type: 'interview', title: 'Completed Google Interview', category: 'Interview', time: '2 hours ago', icon: Mic },
+    { id: 2, type: 'question', title: 'Solved: Two Sum Problem', category: 'DSA', time: '4 hours ago', icon: Code },
+    { id: 3, type: 'course', title: 'Completed Section 3 of Python Mastery', category: 'Course', time: '1 day ago', icon: BookOpen },
+    { id: 4, type: 'certificate', title: 'Earned Professional Interview Certificate', category: 'Certificate', time: '2 days ago', icon: Trophy },
+    { id: 5, type: 'application', title: 'Applied to Senior Developer at Microsoft', category: 'Application', time: '3 days ago', icon: ClipboardList },
+    { id: 6, type: 'question', title: 'Solved: Merge K Sorted Lists', category: 'DSA', time: '4 days ago', icon: Code },
   ];
 
   const stats = [
-    { label: 'Actions This Week', value: '47', dot: '#34d399', icon: '📊' },
-    { label: 'Interviews Completed', value: '8', dot: '#4e7fff', icon: '🎯' },
-    { label: 'Problems Solved', value: '156', dot: '#a78bfa', icon: '✨' },
-    { label: 'Certificates Earned', value: '3', dot: '#f59e0b', icon: '🏅' },
+    { label: 'Actions This Week', value: '47', dot: '#34d399', icon: BarChart3 },
+    { label: 'Interviews Completed', value: '8', dot: '#4e7fff', icon: Target },
+    { label: 'Problems Solved', value: '156', dot: '#a78bfa', icon: Sparkles },
+    { label: 'Certificates Earned', value: '3', dot: '#f59e0b', icon: Award },
   ];
 
   const filteredData = activeFilter === 'all' ? activityData : activityData.filter(item => item.type === activeFilter);
@@ -118,7 +118,9 @@ export default function ActivityPage() {
               className="stat-card flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-slate-800/50 to-slate-700/30 border border-slate-600/50 rounded-lg"
               style={{animation: `slideInUp 0.4s ease-out ${idx * 0.1}s both`}}
             >
-              <div className="text-xl">{stat.icon}</div>
+              <div className="text-xl">
+                <stat.icon size={24} className="text-white" />
+              </div>
               <div>
                 <span className="font-semibold text-white text-lg">{stat.value}</span>
                 <span className="text-slate-400 text-sm block">{stat.label}</span>
@@ -157,7 +159,7 @@ export default function ActivityPage() {
               >
                 <div className="flex items-start gap-4">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700/50 to-slate-600/30 flex items-center justify-center text-lg flex-shrink-0 group-hover:from-blue-600/30 group-hover:to-blue-500/20 transition-all duration-300 group-hover:scale-110">
-                    {activity.icon}
+                    <activity.icon size={18} className="text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors">{activity.title}</h3>

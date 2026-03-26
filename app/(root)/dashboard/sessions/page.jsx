@@ -1,26 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { TrendingUp, Share2, Download, Eye, Play } from 'lucide-react';
+import { TrendingUp, Share2, Download, Eye, Play, Cpu, Code, Users, Building, BarChart3, Star, Clock, Zap } from 'lucide-react';
 
 export default function SessionsPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [toast, setToast] = useState(null);
 
   const sessions = [
-    { id: 1, mode: 'AI Mock Interview', date: 'Today at 2 PM', score: 87, accuracy: 92, duration: '45 min', icon: '🤖' },
-    { id: 2, mode: 'DSA Practice', date: 'Yesterday', score: 92, accuracy: 98, duration: '60 min', icon: '💻' },
-    { id: 3, mode: 'Group Discussion', date: 'Mar 24', score: 78, accuracy: 85, duration: '30 min', icon: '👥' },
-    { id: 4, mode: 'AI Mock Interview', date: 'Mar 23', score: 91, accuracy: 95, duration: '50 min', icon: '🤖' },
-    { id: 5, mode: 'System Design', date: 'Mar 22', score: 85, accuracy: 88, duration: '90 min', icon: '🏗️' },
-    { id: 6, mode: 'DSA Practice', date: 'Mar 21', score: 88, accuracy: 94, duration: '55 min', icon: '💻' },
+    { id: 1, mode: 'AI Mock Interview', date: 'Today at 2 PM', score: 87, accuracy: 92, duration: '45 min', icon: Cpu },
+    { id: 2, mode: 'DSA Practice', date: 'Yesterday', score: 92, accuracy: 98, duration: '60 min', icon: Code },
+    { id: 3, mode: 'Group Discussion', date: 'Mar 24', score: 78, accuracy: 85, duration: '30 min', icon: Users },
+    { id: 4, mode: 'AI Mock Interview', date: 'Mar 23', score: 91, accuracy: 95, duration: '50 min', icon: Cpu },
+    { id: 5, mode: 'System Design', date: 'Mar 22', score: 85, accuracy: 88, duration: '90 min', icon: Building },
+    { id: 6, mode: 'DSA Practice', date: 'Mar 21', score: 88, accuracy: 94, duration: '55 min', icon: Code },
   ];
 
   const stats = [
-    { label: 'Total Sessions', value: '24', icon: '📊' },
-    { label: 'Avg Score', value: '87', icon: '⭐' },
-    { label: 'Total Duration', value: '48h', icon: '⏱️' },
-    { label: 'Current Streak', value: '7 days', icon: '🔥' },
+    { label: 'Total Sessions', value: '24', icon: BarChart3 },
+    { label: 'Avg Score', value: '87', icon: Star },
+    { label: 'Total Duration', value: '48h', icon: Clock },
+    { label: 'Current Streak', value: '7 days', icon: Zap },
   ];
 
   const filteredSessions = activeFilter === 'all' ? sessions : sessions.filter(s => s.mode.toLowerCase().includes(activeFilter));
@@ -89,7 +89,7 @@ export default function SessionsPage() {
                   <div className="text-2xl font-bold text-white">{stat.value}</div>
                   <div className="text-sm text-slate-400 mt-1">{stat.label}</div>
                 </div>
-                <div className="text-2xl">{stat.icon}</div>
+                <div className="text-2xl"><stat.icon size={24} className="text-white" /></div>
               </div>
             </div>
           ))}
@@ -125,7 +125,7 @@ export default function SessionsPage() {
 
               <div className="relative z-10 flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-slate-700/50 flex items-center justify-center text-lg flex-shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-600/30">
-                  {session.icon}
+                  <session.icon size={20} className="text-white" />
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-white group-hover:text-blue-300 transition-colors">{session.mode}</h3>

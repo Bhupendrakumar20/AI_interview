@@ -1,21 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { Eye, BookmarkPlus, Share2, Trash2 } from 'lucide-react';
+import { Eye, BookmarkPlus, Share2, Trash2, Code, BookOpen, Briefcase, HelpCircle, Monitor, Mic, Database } from 'lucide-react';
 
 export default function RecentlyViewedPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [toast, setToast] = useState(null);
 
   const recentItems = [
-    { id: 1, title: 'Two Sum LeetCode Problem', type: 'Question', date: '2 hours ago', icon: '💻' },
-    { id: 2, title: 'Google Interview Guide', type: 'Article', date: '4 hours ago', icon: '📖' },
-    { id: 3, title: 'System Design Masterclass', type: 'Course', date: '1 day ago', icon: '📚' },
-    { id: 4, title: 'Senior Developer at Microsoft', type: 'Job', date: '2 days ago', icon: '💼' },
-    { id: 5, title: 'Behavioral Questions Collection', type: 'Question', date: '3 days ago', icon: '❓' },
-    { id: 6, title: 'Operating Systems Tutorial', type: 'Course', date: '4 days ago', icon: '🖥️' },
-    { id: 7, title: 'Mock Interview Practice', type: 'Session', date: '5 days ago', icon: '🎤' },
-    { id: 8, title: 'Database Design Patterns', type: 'Article', date: '1 week ago', icon: '🗄️' },
+    { id: 1, title: 'Two Sum LeetCode Problem', type: 'Question', date: '2 hours ago', icon: Code },
+    { id: 2, title: 'Google Interview Guide', type: 'Article', date: '4 hours ago', icon: BookOpen },
+    { id: 3, title: 'System Design Masterclass', type: 'Course', date: '1 day ago', icon: BookOpen },
+    { id: 4, title: 'Senior Developer at Microsoft', type: 'Job', date: '2 days ago', icon: Briefcase },
+    { id: 5, title: 'Behavioral Questions Collection', type: 'Question', date: '3 days ago', icon: HelpCircle },
+    { id: 6, title: 'Operating Systems Tutorial', type: 'Course', date: '4 days ago', icon: Monitor },
+    { id: 7, title: 'Mock Interview Practice', type: 'Session', date: '5 days ago', icon: Mic },
+    { id: 8, title: 'Database Design Patterns', type: 'Article', date: '1 week ago', icon: Database },
   ];
 
   const filteredItems = activeFilter === 'all' 
@@ -104,7 +104,7 @@ export default function RecentlyViewedPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700/50 to-slate-600/30 flex items-center justify-center text-lg flex-shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:from-blue-600/30 group-hover:to-blue-500/20">
-                    {item.icon}
+                    <item.icon size={18} className="text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors">{item.title}</h3>

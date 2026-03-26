@@ -1,18 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, Share2, ExternalLink, Zap } from 'lucide-react';
+import { Download, Share2, ExternalLink, Zap, Trophy, Award, Star, Cpu, Sparkles } from 'lucide-react';
 
 export default function CertificatesPage() {
   const [toast, setToast] = useState(null);
 
   const certificates = [
-    { id: 1, title: 'Professional Interview Master', issuer: 'InterviewBuddy', date: 'Mar 2024', icon: '🏆', color: 'from-amber-600/20' },
-    { id: 2, title: 'DSA Excellence', issuer: 'Coding Academy', date: 'Feb 2024', icon: '🎖️', color: 'from-blue-600/20' },
-    { id: 3, title: 'System Design Expert', issuer: 'TechMasters', date: 'Jan 2024', icon: '⭐', color: 'from-purple-600/20' },
-    { id: 4, title: 'Full Stack Developer', issuer: 'DevPath', date: 'Dec 2023', icon: '🚀', color: 'from-green-600/20' },
-    { id: 5, title: 'AI Interview Ready', issuer: 'InterviewBuddy', date: 'Nov 2023', icon: '🤖', color: 'from-pink-600/20' },
-    { id: 6, title: 'Code Quality Master', issuer: 'CodeSchool', date: 'Oct 2023', icon: '✨', color: 'from-cyan-600/20' },
+    { id: 1, title: 'Professional Interview Master', issuer: 'InterviewBuddy', date: 'Mar 2024', icon: Trophy, color: 'from-amber-600/20' },
+    { id: 2, title: 'DSA Excellence', issuer: 'Coding Academy', date: 'Feb 2024', icon: Award, color: 'from-blue-600/20' },
+    { id: 3, title: 'System Design Expert', issuer: 'TechMasters', date: 'Jan 2024', icon: Star, color: 'from-purple-600/20' },
+    { id: 4, title: 'Full Stack Developer', issuer: 'DevPath', date: 'Dec 2023', icon: Zap, color: 'from-green-600/20' },
+    { id: 5, title: 'AI Interview Ready', issuer: 'InterviewBuddy', date: 'Nov 2023', icon: Cpu, color: 'from-pink-600/20' },
+    { id: 6, title: 'Code Quality Master', issuer: 'CodeSchool', date: 'Oct 2023', icon: Sparkles, color: 'from-cyan-600/20' },
   ];
 
   const showToast = (msg) => {
@@ -100,7 +100,7 @@ export default function CertificatesPage() {
               <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/0 via-yellow-500/0 to-amber-500/0 group-hover:from-yellow-500/10 group-hover:via-yellow-500/5 group-hover:to-amber-500/10 pointer-events-none transition-all duration-500"></div>
 
               <div className={`bg-gradient-to-br ${cert.color} to-slate-800/50 h-32 flex flex-col items-center justify-center relative group-hover:to-slate-700/60 transition-all`}>
-                <div className="text-5xl mb-2 transition-all group-hover:scale-110 group-hover:rotate-12">{cert.icon}</div>
+                <div className="transition-all group-hover:scale-110 group-hover:rotate-12"><cert.icon size={40} className="text-white" /></div>
                 <div className="text-xs font-semibold text-slate-300 opacity-70 group-hover:opacity-100 transition-opacity">{cert.issuer}</div>
               </div>
 

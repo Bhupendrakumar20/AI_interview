@@ -38,7 +38,7 @@ const Sidebar = ({ user }) => {
     { label: "Internships", href: "/internships", icon: "briefcase" },
     { label: "Jobs", href: "/jobs", icon: "briefcase" },
     { label: "Competitions", href: "/competitions", icon: "trophy" },
-    { label: "Mock Tests", href: "/mock-test/companies", icon: "clipboard" },
+    { label: "Mock Tests", href: "/mock-test", icon: "clipboard" },
     { label: "Mock Interviews", href: "/interview", icon: "phone" },
     { label: "Mentorship", href: "/mentorship", icon: "users" },
     { label: "100 Days to Code", href: "/100-days-of-code", icon: "zap" },

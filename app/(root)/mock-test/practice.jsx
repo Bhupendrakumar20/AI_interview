@@ -72,7 +72,7 @@ export default function PracticePage() {
     <div className="space-y-8">
       {/* Back Button */}
       <div className="flex items-center gap-2">
-        <Link href="/mock-test/companies">
+        <Link href="/mock-test">
           <Button className="flex items-center gap-2 bg-light-400 hover:bg-light-300 text-light-900">
             <ChevronLeft size={18} />
             Back to Companies

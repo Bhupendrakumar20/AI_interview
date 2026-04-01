@@ -22,6 +22,8 @@ const InterviewBuddy = ({ userId }) => {
   const [showResults, setShowResults] = useState(false);
   const [sessionResults, setSessionResults] = useState(null);
   const [dsaRoomActive, setDsaRoomActive] = useState(false);
+  const [modalTab, setModalTab] = useState("create"); // "create" or "join"
+  const [joinCode, setJoinCode] = useState("");
   const [stats, setStats] = useState({
     totalSessions: 0,
     completedSessions: 0,
@@ -699,139 +701,242 @@ const InterviewBuddy = ({ userId }) => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg mx-4 p-8 relative animate-in fade-in zoom-in-95">
             <button
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => {
+                setIsModalOpen(false);
+                setModalTab("create");
+                setJoinCode("");
+              }}
               className="absolute top-5 right-5 w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition text-slate-400"
             >
               ✕
             </button>
 
-            <h2 className="text-2xl font-black mb-2">Start New Session</h2>
+            <h2 className="text-2xl font-black mb-2">
+              {currentMode === "human" ? "Human Buddy Session" : "Start New Session"}
+            </h2>
+
+            {/* TABS FOR HUMAN MODE */}
+            {currentMode === "human" && (
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => {
+                    setModalTab("create");
+                    setJoinCode("");
+                  }}
+                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                    modalTab === "create"
+                      ? "bg-blue-500/30 border border-blue-500 text-blue-300"
+                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                  }`}
+                >
+                  Create Session
+                </button>
+                <button
+                  onClick={() => setModalTab("join")}
+                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                    modalTab === "join"
+                      ? "bg-purple-500/30 border border-purple-500 text-purple-300"
+                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                  }`}
+                >
+                  Join Session
+                </button>
+              </div>
+            )}
+
             <p className="text-sm text-slate-400 mb-6">
-              {currentMode === "human"
+              {currentMode === "ai"
+                ? "Your AI interviewer is ready. Confirm settings and go live instantly."
+                : modalTab === "create"
                 ? "Setting up a Human Buddy session. Share the code with your interview partner."
-                : "Your AI interviewer is ready. Confirm settings and go live instantly."}
+                : "Have an invite code or link? Paste it below to join your buddy's session."}
             </p>
 
-            {currentMode === "human" ? (
+            {/* CREATE SESSION TAB */}
+            {(currentMode === "ai" || modalTab === "create") && (
               <div className="space-y-4">
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      1
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">Share your session code</div>
-                      <div className="text-xs text-slate-400">
-                        Send this code or link to your buddy. They enter it on their PrepPath dashboard.
+                {currentMode === "human" && (
+                  <>
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          1
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Share your session code</div>
+                          <div className="text-xs text-slate-400">
+                            Send this code to your buddy. They enter it to join.
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
-                  <div className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 font-bold text-blue-400 text-center tracking-widest">
-                    {sessionCode || "IB-XXXXX"}
-                  </div>
-                  <button
-                    onClick={copyCode}
-                    disabled={!sessionCode || isLoading}
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? "Loading..." : "Copy"}
-                  </button>
-                </div>
-
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      2
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 font-bold text-blue-400 text-center tracking-widest">
+                        {sessionCode || "IB-XXXXX"}
+                      </div>
+                      <button
+                        onClick={copyCode}
+                        disabled={!sessionCode || isLoading}
+                        className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? "Loading..." : "Copy"}
+                      </button>
                     </div>
-                    <div>
-                      <div className="text-sm font-bold">Assign roles in the Lobby</div>
-                      <div className="text-xs text-slate-400">
-                        Once both join, choose who is Interviewer and who is Candidate. The Interviewer gets the Co-Pilot panel.
+
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          2
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Assign roles in the Lobby</div>
+                          <div className="text-xs text-slate-400">
+                            Once both join, choose who is Interviewer and who is Candidate.
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      3
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">Go live</div>
-                      <div className="text-xs text-slate-400">
-                        Video, shared editor, signal cards, and live notes all activate when both participants are ready.
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          3
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Go live</div>
+                          <div className="text-xs text-slate-400">
+                            Video, camera, mic, screen share, and shared notes all activate.
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
+
+                {currentMode === "ai" && (
+                  <>
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          1
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Confirm your persona & topic</div>
+                          <div className="text-xs text-slate-400">
+                            Selected: {personas.find((p) => p.id === selectedPersona)?.name} · {selectedTopics[0]} · {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} · {sessionDuration} min
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          2
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Optional: Upload a Job Description</div>
+                          <div className="text-xs text-slate-400">
+                            Drop a JD and AI generates tailored questions.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center text-slate-400 text-sm cursor-pointer hover:border-slate-600 transition">
+                      Drop JD here or <span className="text-blue-400">browse</span> &nbsp;·&nbsp; Optional
+                    </div>
+
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          3
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Allow microphone access</div>
+                          <div className="text-xs text-slate-400">
+                            Required for speech-to-text analysis.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-            ) : (
+            )}
+
+            {/* JOIN SESSION TAB */}
+            {currentMode === "human" && modalTab === "join" && (
               <div className="space-y-4">
                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      1
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">Confirm your persona & topic</div>
-                      <div className="text-xs text-slate-400">
-                        Selected: {personas.find((p) => p.id === selectedPersona)?.name} · {selectedTopics[0]} · {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} · {sessionDuration} min
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      2
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">Optional: Upload a Job Description</div>
-                      <div className="text-xs text-slate-400">
-                        Drop a JD and the AI generates questions tailored to that exact role and company.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center text-slate-400 text-sm cursor-pointer hover:border-slate-600 transition">
-                  Drop JD here or <span className="text-blue-400">browse</span> &nbsp;·&nbsp; Optional
-                </div>
-
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                   <div className="flex gap-3">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      3
+                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-purple-400 to-pink-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                      📋
                     </div>
                     <div>
-                      <div className="text-sm font-bold">Allow microphone access</div>
+                      <div className="text-sm font-bold">Paste the session code</div>
                       <div className="text-xs text-slate-400">
-                        Required for speech-to-text analysis and live sentiment feedback.
+                        Your buddy will share a code like "IB-7X4K9". Paste it below to join their session.
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Enter session code (e.g., IB-7X4K9)"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-center text-lg tracking-widest"
+                />
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-xs text-blue-300">
+                    ✓ Once you join, the session creator will assign your role (Interviewer or Interviewee).
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-xs text-blue-300">
+                    ✓ Video, camera, mic, and screen sharing will be available once both of you connect.
+                  </p>
                 </div>
               </div>
             )}
 
             <div className="flex gap-3 mt-8">
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setModalTab("create");
+                  setJoinCode("");
+                }}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition"
               >
                 Cancel
               </button>
               <button
-                onClick={handleStartSession}
-                disabled={isLoading}
+                onClick={() => {
+                  if (currentMode === "human" && modalTab === "join") {
+                    handleJoinSession(joinCode);
+                  } else {
+                    handleStartSession();
+                  }
+                }}
+                disabled={
+                  isLoading ||
+                  (currentMode === "human" && modalTab === "join" && !joinCode.trim())
+                }
                 className="flex-1 px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-blue-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "Loading..." : currentMode === "human" ? "Enter Lobby" : "Start AI Session"}
+                {isLoading
+                  ? "Loading..."
+                  : currentMode === "human"
+                  ? modalTab === "create"
+                    ? "Enter Lobby"
+                    : `Join Session`
+                  : "Start AI Session"}
               </button>
             </div>
           </div>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { 
-  Mic, MicOff, Video, VideoOff, Share2, Share2Off, 
+  Mic, MicOff, Video, VideoOff, Share2, StopCircle, 
   Phone, Settings, Users, Copy, Check, AlertCircle,
   Monitor, X, Send, Clock
 } from 'lucide-react';
@@ -655,7 +655,7 @@ const HumanBuddySession = ({
                     : 'bg-slate-700 hover:bg-slate-600 text-white'
                 }`}
               >
-                {isScreenSharing ? <Share2Off className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
+                {isScreenSharing ? <StopCircle className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
                 {isScreenSharing ? 'Stop Share' : 'Screen Share'}
               </button>
 

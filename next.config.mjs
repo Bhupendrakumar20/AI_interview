@@ -13,10 +13,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  webpack: (config) => {
-    config.experiments = { ...config.experiments, layers: true };
-    return config;
-  },
+  turbopack: {},
 };
 
 export default nextConfig;

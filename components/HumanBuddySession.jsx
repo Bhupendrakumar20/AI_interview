@@ -52,11 +52,15 @@ const HumanBuddySession = ({
   // Connect to socket
   useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4001';
-    const newSocket = io(socketUrl, {
+    console.log('[HumanBuddy] Socket URL:', socketUrl);
+    
+    const newSocket = io(`${socketUrl}/interview-buddy`, {
       path: '/socket.io/',
       transports: ['websocket', 'polling'],
       reconnect: true,
     });
+
+    console.log('[HumanBuddy] Connecting to /interview-buddy namespace...');
 
     // Join session
     newSocket.emit('join_session', {
@@ -66,9 +70,12 @@ const HumanBuddySession = ({
       isCreator: isOwner,
     });
 
+    console.log('[HumanBuddy] Emitted join_session:', { userId, username, sessionCode, isCreator: isOwner });
+
     // Listen for session joined
     newSocket.on('session_joined', (data) => {
-      console.log('[Buddy] Session joined:', data);
+      console.log('[HumanBuddy] Session joined event received:', data);
+      console.log('[HumanBuddy] Current sessionId:', sessionId, 'Server sessionId:', data.sessionId);
       setParticipants(data.participants);
       setUserRole(data.role);
       
@@ -79,9 +86,24 @@ const HumanBuddySession = ({
 
     // Listen for user joining
     newSocket.on('user_joined_session', (data) => {
-      console.log('[Buddy] User joined:', data);
+      console.log('[HumanBuddy] Another user joined:', data);
       toast.success(`${data.username} joined the session`);
       setParticipants(data.participantCount);
+    });
+
+    // Error handling
+    newSocket.on('error', (data) => {
+      console.error('[HumanBuddy] Socket error:', data);
+      toast.error(data.message || 'Socket connection error');
+    });
+
+    // Connection events
+    newSocket.on('connect', () => {
+      console.log('[HumanBuddy] Socket connected:', newSocket.id);
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('[HumanBuddy] Socket disconnected');
     });
 
     // Listen for role assignments

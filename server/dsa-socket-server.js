@@ -12,6 +12,7 @@ dotenv.config({ path: '.env.local' });
 
 // Import handlers (Firebase will be initialized when handlers are called)
 import { initializeDSARoomHandlers } from '../lib/socket-handlers/dsa-room-handlers.js';
+import { initializeHumanBuddyHandlers } from '../lib/socket-handlers/human-buddy-handlers.js';
 
 // Lazy-load Firebase only when needed
 let db;
@@ -429,6 +430,13 @@ dsaRoomNamespace.on('connection', (socket) => {
     }
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────
+// HUMAN BUDDY MODE NAMESPACE (Isolated from DSA Room)
+// ──────────────────────────────────────────────────────────────────────────
+// Uses separate /interview-buddy namespace to ensure complete socket isolation
+
+initializeHumanBuddyHandlers(io);
 
 // ─── HELPER FUNCTIONS ──────────────────────────────────────────────────────
 

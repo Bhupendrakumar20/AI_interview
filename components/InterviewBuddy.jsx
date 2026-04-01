@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Brain, Radio, BarChart3, Code, Video, FileJson, Film, Trophy, Cpu } from "lucide-react";
 import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
+import HumanBuddySession from "./HumanBuddySession";
 import DSARoomLobby from "./DSARoomLobby";
 
 const InterviewBuddy = ({ userId }) => {
@@ -17,6 +18,7 @@ const InterviewBuddy = ({ userId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [isInterviewActive, setIsInterviewActive] = useState(false);
+  const [isHumanBuddyActive, setIsHumanBuddyActive] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [sessionResults, setSessionResults] = useState(null);
   const [dsaRoomActive, setDsaRoomActive] = useState(false);
@@ -82,9 +84,10 @@ const InterviewBuddy = ({ userId }) => {
         setIsInterviewActive(true);
         setIsModalOpen(false);
         toast.success("AI Interview started! Questions are loading...");
-      } else {
-        // If human mode, show session code
-        setIsModalOpen(true);
+      } else if (currentMode === "human") {
+        // If human mode, start human buddy session
+        setIsHumanBuddyActive(true);
+        setIsModalOpen(false);
         toast.success("Session created! Share the code with your buddy.");
       }
     } catch (error) {
@@ -119,7 +122,10 @@ const InterviewBuddy = ({ userId }) => {
 
       const data = await response.json();
       setSessionCode(data.sessionCode);
-      toast.success("Joined session! Waiting for buddy...");
+      setActiveSessionId(data.sessionId);
+      setIsHumanBuddyActive(true);
+      setIsModalOpen(false);
+      toast.success("Joined session! Starting buddy call...");
     } catch (error) {
       console.error("Error joining session:", error);
       toast.error(error.message || "Failed to join session");
@@ -301,6 +307,25 @@ const InterviewBuddy = ({ userId }) => {
             // Room data contains socket connection for further use
           }}
           onClose={() => setDsaRoomActive(false)}
+        />
+      ) : isHumanBuddyActive && sessionCode && activeSessionId ? (
+        <HumanBuddySession
+          sessionId={activeSessionId}
+          sessionCode={sessionCode}
+          userId={userId}
+          username={`User_${userId?.slice(0, 8) || 'Guest'}`}
+          isOwner={true}
+          onSessionEnd={() => {
+            setIsHumanBuddyActive(false);
+            setSessionCode(null);
+            setActiveSessionId(null);
+            fetchStats();
+          }}
+          onClose={() => {
+            setIsHumanBuddyActive(false);
+            setSessionCode(null);
+            setActiveSessionId(null);
+          }}
         />
       ) : showResults && sessionResults ? (
         <AiBuddyResultsScreen

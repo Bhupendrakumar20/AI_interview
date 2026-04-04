@@ -283,8 +283,47 @@ const HumanBuddySession = ({
     }, 2000);
 
     // 🔥 IMPORTANT: Only disconnect on component unmount (not on dependency changes)
+    
+    // 🔄 FALLBACK: Poll Firestore to find other user if socket events fail
+    const pollInterval = setInterval(async () => {
+      try {
+        const { db } = await import('@/firebase/client');
+        const sessionQuery = await db
+          .collection('interview_buddy_sessions')
+          .where('sessionCode', '==', sessionCode)
+          .limit(1)
+          .get();
+
+        if (!sessionQuery.empty && !remoteUser) {
+          const sessionData = sessionQuery.docs[0].data();
+          const allParticipants = sessionData.participants || [];
+          const otherUsers = allParticipants.filter(pid => pid !== userId);
+
+          if (otherUsers.length > 0) {
+            const otherUserId = otherUsers[0];
+            const otherUserData = sessionData[`participants_${otherUserId}`];
+            
+            if (otherUserData) {
+              console.log(`🔄 [FALLBACK] Found other user in Firestore, setting remote user`);
+              const directRemoteUser = {
+                userId: otherUserId,
+                username: otherUserData.name || `User ${otherUserId}`,
+                camera: otherUserData.camera || false,
+                mic: otherUserData.mic || false,
+                screenShare: otherUserData.screenShare || false,
+              };
+              setRemoteUser(directRemoteUser);
+            }
+          }
+        }
+      } catch (error) {
+        // Silent error
+      }
+    }, 3000);
+    
     return () => {
       clearTimeout(debugTimeout);
+      clearInterval(pollInterval);
       console.log(`🧹 [HumanBuddy] Cleaning up socket listeners...`);
       newSocket.off('connect', handleConnect);
       newSocket.off('session_joined', handleSessionJoined);

@@ -62,15 +62,19 @@ const HumanBuddySession = ({
 
     console.log('[HumanBuddy] Connecting to /interview-buddy namespace...');
 
-    // Join session
-    newSocket.emit('join_session', {
-      userId,
-      username,
-      sessionCode,
-      isCreator: isOwner,
+    // Connection events - handle once connected
+    newSocket.on('connect', () => {
+      console.log('[HumanBuddy] ✓ Socket connected:', newSocket.id);
+      
+      // NOW emit join_session - socket is ready
+      newSocket.emit('join_session', {
+        userId,
+        username,
+        sessionCode,
+        isCreator: isOwner,
+      });
+      console.log('[HumanBuddy] ✓ Emitted join_session after connect event');
     });
-
-    console.log('[HumanBuddy] Emitted join_session:', { userId, username, sessionCode, isCreator: isOwner });
 
     // Listen for session joined
     newSocket.on('session_joined', (data) => {
@@ -207,10 +211,17 @@ const HumanBuddySession = ({
 
   // Initialize WebRTC connection
   useEffect(() => {
-    if (!socket || participants.length < 2) return;
+    // ✅ FIX 3: Trigger on remoteUser, not participants.length
+    if (!socket || !remoteUser || !remoteUser.userId) return;
 
     const initializePeerConnection = async () => {
       try {
+        // Avoid reinitializing
+        if (peerConnectionRef.current) {
+          console.log('[HumanBuddy] WebRTC already initialized');
+          return;
+        }
+
         const peerConnection = new RTCPeerConnection({
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -219,17 +230,19 @@ const HumanBuddySession = ({
         });
 
         peerConnectionRef.current = peerConnection;
+        console.log('[HumanBuddy] ✓ Created RTCPeerConnection');
 
         // Add local stream tracks
         if (localStream) {
           localStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, localStream);
+            console.log(`[HumanBuddy] Added local ${track.kind} track`);
           });
         }
 
         // Handle remote stream
         peerConnection.ontrack = (event) => {
-          console.log('Received remote track:', event.track.kind);
+          console.log('[HumanBuddy] ✓ Received remote', event.track.kind, 'track');
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = event.streams[0];
           }
@@ -253,30 +266,28 @@ const HumanBuddySession = ({
           setupDataChannel(event.channel);
         };
 
-        // Create and send offer
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('webrtc_offer', {
-          offer: offer,
-          targetUserId: remoteUser?.userId,
-        });
-
-        console.log('WebRTC offer sent');
+        // ✅ FIX 3: Only owner creates offer; peer waits for it
+        if (isOwner) {
+          console.log('[HumanBuddy] Owner: Creating WebRTC offer...');
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+          socket.emit('webrtc_offer', {
+            offer: offer,
+            targetUserId: remoteUser.userId,
+          });
+          console.log('[HumanBuddy] ✓ WebRTC offer sent');
+        } else {
+          console.log('[HumanBuddy] Peer: Waiting for WebRTC offer from owner...');
+        }
       } catch (error) {
         console.error('Failed to initialize peer connection:', error);
         toast.error('Failed to initialize video call');
       }
     };
 
-    if (isOwner && participants.length === 2) {
-      // Find the other participant
-      const other = participants.find(p => p !== userId);
-      if (other) {
-        setRemoteUser({ userId: other });
-        initializePeerConnection();
-      }
-    }
-  }, [socket, participants, localStream, isOwner, userId]);
+    // ✅ FIX 3: Initialize for both owner and peer when remoteUser is set
+    initializePeerConnection();
+  }, [socket, remoteUser, localStream, isOwner, userId]);
 
   // Timer
   useEffect(() => {
@@ -415,8 +426,27 @@ const HumanBuddySession = ({
           audio: false,
         });
 
+        const screenVideoTrack = screenStream.getVideoTracks()[0];
+        
+        // Display on local screen share element
         if (screenShareRef.current) {
           screenShareRef.current.srcObject = screenStream;
+        }
+
+        // ✅ KEY FIX: Replace video track in peer connection so peer sees screen
+        if (peerConnectionRef.current) {
+          try {
+            const sender = peerConnectionRef.current
+              .getSenders()
+              .find(s => s.track?.kind === 'video');
+            
+            if (sender) {
+              await sender.replaceTrack(screenVideoTrack);
+              console.log('[HumanBuddy] ✓ Replaced camera track with screen track in WebRTC');
+            }
+          } catch (err) {
+            console.warn('[HumanBuddy] Could not replace track, peer may not see screen:', err);
+          }
         }
 
         setIsScreenSharing(true);
@@ -425,18 +455,59 @@ const HumanBuddySession = ({
           sessionId,
         });
 
-        // Stop sharing when screen is closed
-        screenStream.getVideoTracks()[0].onended = () => {
+        // Stop sharing when screen is closed by user
+        screenVideoTrack.onended = async () => {
+          console.log('[HumanBuddy] Screen share ended by user');
           setIsScreenSharing(false);
+          
+          if (screenShareRef.current?.srcObject) {
+            screenShareRef.current.srcObject.getTracks().forEach(track => track.stop());
+          }
+
+          // ✅ Switch back to camera
+          if (peerConnectionRef.current && localStream) {
+            try {
+              const cameraVideoTrack = localStream.getVideoTracks()[0];
+              const sender = peerConnectionRef.current
+                .getSenders()
+                .find(s => s.track?.kind === 'video');
+              
+              if (sender && cameraVideoTrack) {
+                await sender.replaceTrack(cameraVideoTrack);
+                console.log('[HumanBuddy] ✓ Switched back to camera');
+              }
+            } catch (err) {
+              console.warn('[HumanBuddy] Could not switch back to camera:', err);
+            }
+          }
+
           socket.emit('stop_screenshare', {
             userId,
             sessionId,
           });
         };
       } else {
+        // Stop screen sharing manually
         setIsScreenSharing(false);
         if (screenShareRef.current?.srcObject) {
           screenShareRef.current.srcObject.getTracks().forEach(track => track.stop());
+        }
+
+        // Switch back to camera if available
+        if (peerConnectionRef.current && localStream) {
+          try {
+            const cameraVideoTrack = localStream.getVideoTracks()[0];
+            const sender = peerConnectionRef.current
+              .getSenders()
+              .find(s => s.track?.kind === 'video');
+            
+            if (sender && cameraVideoTrack) {
+              await sender.replaceTrack(cameraVideoTrack);
+              console.log('[HumanBuddy] ✓ Switched back to camera');
+            }
+          } catch (err) {
+            console.warn('[HumanBuddy] Could not switch back to camera:', err);
+          }
         }
 
         socket.emit('stop_screenshare', {

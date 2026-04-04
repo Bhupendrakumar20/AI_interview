@@ -15,6 +15,37 @@ function generateSessionCode() {
   return code;
 }
 
+/**
+ * Ensures session code is unique in database
+ * Generates new codes until finding one that doesn't exist
+ */
+async function generateUniqueSessionCode() {
+  let code;
+  let isUnique = false;
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (!isUnique && attempts < maxAttempts) {
+    code = generateSessionCode();
+    
+    // Check if code already exists
+    const existingSession = await db
+      .collection("interview_buddy_sessions")
+      .where("sessionCode", "==", code)
+      .limit(1)
+      .get();
+    
+    isUnique = existingSession.empty;
+    attempts++;
+  }
+
+  if (!isUnique) {
+    throw new Error("Failed to generate unique session code after multiple attempts");
+  }
+
+  return code;
+}
+
 export async function POST(request) {
   try {
     const {
@@ -31,7 +62,10 @@ export async function POST(request) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
-    const sessionCode = mode === "human" ? generateSessionCode() : null;
+    // 🔥 Generate UNIQUE session code - ensures no two sessions have same code
+    const sessionCode = mode === "human" ? await generateUniqueSessionCode() : null;
+
+    console.log(`[create-session] Generated unique session code: ${sessionCode} for user ${userId}`);
 
     const sessionRef = await db.collection("interview_buddy_sessions").add({
       createdBy: userId,

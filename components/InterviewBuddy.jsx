@@ -19,6 +19,7 @@ const InterviewBuddy = ({ userId }) => {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [isHumanBuddyActive, setIsHumanBuddyActive] = useState(false);
+  const [isSessionOwner, setIsSessionOwner] = useState(false); // 🔥 NEW: Track if user created or joined
   const [showResults, setShowResults] = useState(false);
   const [sessionResults, setSessionResults] = useState(null);
   const [dsaRoomActive, setDsaRoomActive] = useState(false);
@@ -88,6 +89,7 @@ const InterviewBuddy = ({ userId }) => {
         toast.success("AI Interview started! Questions are loading...");
       } else if (currentMode === "human") {
         // If human mode, start human buddy session
+        setIsSessionOwner(true); // 🔥 User created the session, they are the owner
         setIsHumanBuddyActive(true);
         setIsModalOpen(false);
         toast.success("Session created! Share the code with your buddy.");
@@ -125,6 +127,7 @@ const InterviewBuddy = ({ userId }) => {
       const data = await response.json();
       setSessionCode(data.sessionCode);
       setActiveSessionId(data.sessionId);
+      setIsSessionOwner(false); // 🔥 User joined an existing session, they are NOT the owner
       setIsHumanBuddyActive(true);
       setIsModalOpen(false);
       toast.success("Joined session! Starting buddy call...");
@@ -316,17 +319,19 @@ const InterviewBuddy = ({ userId }) => {
           sessionCode={sessionCode}
           userId={userId}
           username={`User_${userId?.slice(0, 8) || 'Guest'}`}
-          isOwner={true}
+          isOwner={isSessionOwner} // 🔥 Fixed: Use actual owner flag, not hardcoded true
           onSessionEnd={() => {
             setIsHumanBuddyActive(false);
             setSessionCode(null);
             setActiveSessionId(null);
+            setIsSessionOwner(false);
             fetchStats();
           }}
           onClose={() => {
             setIsHumanBuddyActive(false);
             setSessionCode(null);
             setActiveSessionId(null);
+            setIsSessionOwner(false);
           }}
         />
       ) : showResults && sessionResults ? (

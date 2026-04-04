@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import HumanBuddySession from '@/components/HumanBuddySession';
 import { Loader2 } from 'lucide-react';
@@ -15,7 +14,6 @@ import { Loader2 } from 'lucide-react';
 export default function BuddyInvitePage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
   
   const inviteCode = params.inviteCode;
   
@@ -23,21 +21,38 @@ export default function BuddyInvitePage() {
   const [sessionData, setSessionData] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [error, setError] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [username, setUsername] = useState(null);
 
   useEffect(() => {
     const joinSessionViaInvite = async () => {
-      if (!user?.uid) {
-        toast.error('Please log in first');
-        router.push('/auth/login');
-        return;
-      }
-
-      if (!inviteCode) {
-        setError('Invalid invite code');
-        return;
-      }
-
       try {
+        // First check if user is authenticated
+        const userResponse = await fetch('/api/auth/current-user');
+        
+        if (!userResponse.ok) {
+          // User not logged in, redirect to login
+          toast.error('Please log in first');
+          router.push('/auth/login');
+          return;
+        }
+
+        const userData = await userResponse.json();
+        
+        if (!userData?.id) {
+          toast.error('Authentication failed');
+          router.push('/auth/login');
+          return;
+        }
+
+        setUserId(userData.id);
+        setUsername(userData.displayName || `User_${userData.id?.slice(0, 8)}`);
+
+        if (!inviteCode) {
+          setError('Invalid invite code');
+          return;
+        }
+
         console.log(`🔗 [BuddyInvite] Joining session with invite code: ${inviteCode}`);
         
         // Call API to join session via invite code
@@ -45,7 +60,7 @@ export default function BuddyInvitePage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: user.uid,
+            userId: userData.id,
             inviteCode: inviteCode,
           }),
         });
@@ -75,7 +90,7 @@ export default function BuddyInvitePage() {
     };
 
     joinSessionViaInvite();
-  }, [user, inviteCode, router]);
+  }, [inviteCode, router]);
 
   // Loading state
   if (isLoading) {
@@ -107,13 +122,13 @@ export default function BuddyInvitePage() {
   }
 
   // Session component
-  if (sessionData) {
+  if (sessionData && userId && username) {
     return (
       <HumanBuddySession
         sessionId={sessionData.sessionId}
         sessionCode={sessionData.sessionCode}
-        userId={user.uid}
-        username={user.displayName || `User_${user.uid?.slice(0, 8)}`}
+        userId={userId}
+        username={username}
         isOwner={isOwner}
         onSessionEnd={() => {
           router.push('/');

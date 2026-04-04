@@ -96,14 +96,26 @@ const HumanBuddySession = ({
 
     // Listen for session joined
     const handleSessionJoined = (data) => {
-      console.log(`✅ [HumanBuddy] session_joined received:`, data);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`✅ [HumanBuddy] SESSION_JOINED received`);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`📊 Full data:`, JSON.stringify(data, null, 2));
+      console.log(`📍 Participants:`, data.participants);
+      console.log(`👥 Remote Users Count:`, data.remoteUsers?.length || 0);
+      console.log(`👤 My Role:`, data.role);
+      console.log(``) ;
+      
       setParticipants(data.participants || []);
       setUserRole(data.role);
       
       // Set remote users if available
       if (data.remoteUsers && data.remoteUsers.length > 0) {
-        console.log(`✅ Setting remote user:`, data.remoteUsers[0]);
+        console.log(`\n🎯 [ACTION] Setting remote user from session_joined`);
+        console.log(`   User: ${data.remoteUsers[0].username} (${data.remoteUsers[0].userId})`);
         setRemoteUser(data.remoteUsers[0]);
+        toast.success(`${data.remoteUsers[0].username} is in the session`);
+      } else {
+        console.warn(`⚠️ [WARNING] No remote users in session_joined response`);
       }
       
       if (data.role === 'waiting' && !data.isCreator) {
@@ -113,31 +125,58 @@ const HumanBuddySession = ({
 
     // Listen for user joining
     const handleUserJoined = (data) => {
-      console.log(`✅ Another user joined:`, data);
-      toast.success(`${data.username} joined the session`);
-      setParticipants(data.participants || [data.participantCount]);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`✅ [HumanBuddy] USER_JOINED_SESSION received`);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`📊 Full data:`, JSON.stringify(data, null, 2));
+      console.log(`👤 Joining User: ${data.username} (${data.userId})`);
+      console.log(`🔌 User Object Available:`, !!data.user);
+      console.log(``);
       
-      // Set remote user
       if (data.user && data.user.userId !== userId) {
-        console.log(`✅ Setting remote user from user_joined:`, data.user);
+        console.log(`\n🎯 [ACTION] Setting remote user from user_joined_session`);
+        console.log(`   User: ${data.user.username} (${data.user.userId})`);
+        console.log(`   Camera: ${data.user.camera}, Mic: ${data.user.mic}, Screen: ${data.user.screenShare}`);
         setRemoteUser(data.user);
+        toast.success(`${data.username} joined the session!`);
+      } else {
+        console.warn(`⚠️ [WARNING] No user object or is same user in user_joined_session`);
       }
+      
+      setParticipants(data.participants || []);
     };
 
     const handleError = (data) => {
-      console.error(`❌ Socket error:`, data);
+      console.error(`${'═'.repeat(60)}`);
+      console.error(`❌ [HumanBuddy] SOCKET ERROR`);
+      console.error(`${'═'.repeat(60)}`);
+      console.error(`📊 Error data:`, JSON.stringify(data, null, 2));
+      console.error(``);
       toast.error(data.message || 'Socket connection error');
     };
 
     const handleDisconnect = () => {
-      console.log(`❌ [HumanBuddy] Socket disconnected`);
+      console.log(`${'═'.repeat(60)}`);
+      console.error(`❌ [HumanBuddy] SOCKET DISCONNECTED`);
+      console.error(`${'═'.repeat(60)}`);
+      console.log(``);
     };
 
     const handleRoleAssigned = (data) => {
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`✅ [HumanBuddy] ROLE_ASSIGNED received`);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`🎯 Target User: ${data.targetUserId}`);
+      console.log(`👔 Role: ${data.role}`);
+      console.log(`📋 Assigned by: ${data.assignedBy}`);
+      console.log(``);
+      
       if (data.targetUserId === userId) {
-        console.log(`✅ Role assigned: ${data.role}`);
+        console.log(`✅ [ACTION] Role is for me! Setting role to: ${data.role}`);
         setUserRole(data.role);
         toast.success(`✅ You are now: ${data.role}`);
+      } else {
+        console.log(`ℹ️ [INFO] Role assignment for someone else (${data.targetUserId})`);
       }
     };
 
@@ -151,24 +190,28 @@ const HumanBuddySession = ({
 
     // Media toggle listeners
     newSocket.on('camera_toggled', (data) => {
+      console.log(`✅ [HumanBuddy] CAMERA_TOGGLED:`, data);
       if (data.userId !== userId) {
         setRemoteUser(prev => prev ? { ...prev, camera: data.enabled } : null);
       }
     });
 
     newSocket.on('mic_toggled', (data) => {
+      console.log(`✅ [HumanBuddy] MIC_TOGGLED:`, data);
       if (data.userId !== userId) {
         setRemoteUser(prev => prev ? { ...prev, mic: data.enabled } : null);
       }
     });
 
     newSocket.on('screenshare_started', (data) => {
+      console.log(`✅ [HumanBuddy] SCREENSHARE_STARTED:`, data);
       if (data.userId !== userId) {
         toast.info(`${data.username || 'Peer'} started sharing screen`);
       }
     });
 
     newSocket.on('screenshare_stopped', (data) => {
+      console.log(`✅ [HumanBuddy] SCREENSHARE_STOPPED:`, data);
       if (data.userId !== userId) {
         toast.info('Screen share ended');
       }
@@ -176,36 +219,63 @@ const HumanBuddySession = ({
 
     // WebRTC signaling
     newSocket.on('webrtc_offer_received', (data) => {
+      console.log(`✅ [HumanBuddy] WEBRTC_OFFER_RECEIVED:`, data);
       handleWebRTCOffer(data.offer, data.from);
     });
 
     newSocket.on('webrtc_answer_received', (data) => {
+      console.log(`✅ [HumanBuddy] WEBRTC_ANSWER_RECEIVED:`, data);
       handleWebRTCAnswer(data.answer);
     });
 
     newSocket.on('ice_candidate_received', (data) => {
+      console.log(`✅ [HumanBuddy] ICE_CANDIDATE_RECEIVED:`, data);
       handleICECandidate(data.candidate);
     });
 
     // Notes update
     newSocket.on('notes_updated', (data) => {
+      console.log(`✅ [HumanBuddy] NOTES_UPDATED:`, data);
       setSharedNotes(data.content);
     });
 
     // Session ended
     newSocket.on('session_ended', (data) => {
+      console.log(`✅ [HumanBuddy] SESSION_ENDED:`, data);
       toast.info('Session ended');
       handleSessionEnd();
     });
 
     newSocket.on('user_disconnected', (data) => {
+      console.log(`✅ [HumanBuddy] USER_DISCONNECTED:`, data);
       toast.warning(`${data.username} disconnected`);
     });
 
     setSocket(newSocket);
 
+    // � DEBUGGING: Monitor for remote user discovery
+    const debugTimeout = setTimeout(() => {
+      console.log(`\n${'═'.repeat(60)}`);
+      console.log(`⏰ [HumanBuddy] DEBUG CHECK (2 seconds after connect)`);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`📍 Current State:`);
+      console.log(`   - Socket ID: ${newSocket.id}`);
+      console.log(`   - Socket Connected: ${newSocket.connected}`);
+      console.log(`   - Participants Count: ${participants.length}`);
+      console.log(`   - Remote User Set: ${!!remoteUser}`);
+      console.log(`   - User ID: ${userId}`);
+      console.log(`   - Session Code: ${sessionCode}`);
+      
+      if (!remoteUser && participants.length === 0) {
+        console.warn(`⚠️ [WARNING] RemoteUser and participants both empty after 2 seconds`);
+        console.warn(`⚠️ [WARNING] This might indicate socket events not being received`);
+      }
+      console.log(``);
+    }, 2000);
+
     // 🔥 IMPORTANT: Only disconnect on component unmount (not on dependency changes)
     return () => {
+      clearTimeout(debugTimeout);
       console.log(`🧹 [HumanBuddy] Cleaning up socket listeners...`);
       newSocket.off('connect', handleConnect);
       newSocket.off('session_joined', handleSessionJoined);
@@ -251,15 +321,38 @@ const HumanBuddySession = ({
   // Initialize WebRTC connection
   useEffect(() => {
     // ✅ FIX 3: Trigger on remoteUser, not participants.length
-    if (!socket || !remoteUser || !remoteUser.userId) return;
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`🔍 [HumanBuddy] WebRTC Init Check`);
+    console.log(`${'═'.repeat(60)}`);
+    console.log(`   Socket exists: ${!!socket}`);
+    console.log(`   Remote user exists: ${!!remoteUser}`);
+    console.log(`   Remote user ID: ${remoteUser?.userId}`);
+    console.log(`   Peer connection exists: ${!!peerConnectionRef.current}`);
+    console.log(``);
+    
+    if (!socket) {
+      console.warn(`⚠️ Socket not ready, skipping WebRTC init`);
+      return;
+    }
+    
+    if (!remoteUser || !remoteUser.userId) {
+      console.warn(`⚠️ Remote user not available, skipping WebRTC init`);
+      return;
+    }
 
     const initializePeerConnection = async () => {
       try {
         // Avoid reinitializing
         if (peerConnectionRef.current) {
-          console.log('[HumanBuddy] WebRTC already initialized');
+          console.log('[HumanBuddy] ℹ️ WebRTC already initialized, skipping');
           return;
         }
+
+        console.log(`${'═'.repeat(60)}`);
+        console.log(`🚀 [HumanBuddy] Initializing RTCPeerConnection`);
+        console.log(`${'═'.repeat(60)}`);
+        console.log(`   Remote User: ${remoteUser.username} (${remoteUser.userId})`);
+        console.log(``);
 
         const peerConnection = new RTCPeerConnection({
           iceServers: [
@@ -269,31 +362,47 @@ const HumanBuddySession = ({
         });
 
         peerConnectionRef.current = peerConnection;
-        console.log('[HumanBuddy] ✓ Created RTCPeerConnection');
+        console.log('✅ [HumanBuddy] RTCPeerConnection created');
 
         // Add local stream tracks
         if (localStream) {
-          localStream.getTracks().forEach(track => {
+          console.log(`📹 [HumanBuddy] Adding local ${localStream.getTracks().length} tracks...`);
+          localStream.getTracks().forEach((track, idx) => {
             peerConnection.addTrack(track, localStream);
-            console.log(`[HumanBuddy] Added local ${track.kind} track`);
+            console.log(`   ✅ Added local ${track.kind} track #${idx + 1}`);
           });
+        } else {
+          console.warn(`⚠️ [WARNING] No local stream available`);
         }
 
         // Handle remote stream
         peerConnection.ontrack = (event) => {
-          console.log('[HumanBuddy] ✓ Received remote', event.track.kind, 'track');
+          console.log(`${'═'.repeat(60)}`);
+          console.log(`✅ [HumanBuddy] REMOTE TRACK RECEIVED`);
+          console.log(`${'═'.repeat(60)}`);
+          console.log(`   Track Kind: ${event.track.kind}`);
+          console.log(`   Track ID: ${event.track.id}`);
+          console.log(`   Streams: ${event.streams.length}`);
+          console.log(``);
+          
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = event.streams[0];
+            console.log(`✅ Set remote video source`);
+          } else {
+            console.warn(`⚠️ remoteVideoRef.current is not available`);
           }
         };
 
         // Handle ICE candidates
         peerConnection.onicecandidate = (event) => {
           if (event.candidate) {
+            console.log(`📡 [HumanBuddy] ICE candidate generated, sending to ${remoteUser?.username}`);
             socket.emit('ice_candidate', {
               candidate: event.candidate,
               targetUserId: remoteUser?.userId,
             });
+          } else {
+            console.log(`✅ [HumanBuddy] ICE candidate gathering complete`);
           }
         };
 
@@ -307,16 +416,30 @@ const HumanBuddySession = ({
 
         // ✅ FIX 3: Only owner creates offer; peer waits for it
         if (isOwner) {
-          console.log('[HumanBuddy] Owner: Creating WebRTC offer...');
+          console.log(`${'═'.repeat(60)}`);
+          console.log(`🎬 [HumanBuddy] OWNER: Creating WebRTC offer...`);
+          console.log(`${'═'.repeat(60)}`);
+          console.log(`   Remote User: ${remoteUser.username}`);
+          console.log(``);
+          
           const offer = await peerConnection.createOffer();
           await peerConnection.setLocalDescription(offer);
+          
+          console.log(`✅ [HumanBuddy] Offer created and set as local description`);
+          console.log(`📤 [HumanBuddy] Sending offer to ${remoteUser.username}...`);
+          
           socket.emit('webrtc_offer', {
             offer: offer,
             targetUserId: remoteUser.userId,
           });
-          console.log('[HumanBuddy] ✓ WebRTC offer sent');
+          
+          console.log(`✅ [HumanBuddy] Offer sent via socket`);
         } else {
-          console.log('[HumanBuddy] Peer: Waiting for WebRTC offer from owner...');
+          console.log(`${'═'.repeat(60)}`);
+          console.log(`👂 [HumanBuddy] PEER: Waiting for WebRTC offer...`);
+          console.log(`${'═'.repeat(60)}`);
+          console.log(`   Waiting for owner to send offer`);
+          console.log(``);
         }
       } catch (error) {
         console.error('Failed to initialize peer connection:', error);
@@ -341,7 +464,16 @@ const HumanBuddySession = ({
 
   const handleWebRTCOffer = async (offer, from) => {
     try {
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`📨 [HumanBuddy] WEBRTC OFFER RECEIVED`);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`   From User: ${from}`);
+      console.log(`   Current PeerConnection: ${!!peerConnectionRef.current}`);
+      console.log(``);
+      
       if (!peerConnectionRef.current) {
+        console.log(`🔨 [HumanBuddy] Creating PeerConnection to handle offer...`);
+        
         const peerConnection = new RTCPeerConnection({
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -350,12 +482,15 @@ const HumanBuddySession = ({
         peerConnectionRef.current = peerConnection;
 
         if (localStream) {
-          localStream.getTracks().forEach(track => {
+          console.log(`📹 [HumanBuddy] Adding local tracks...`);
+          localStream.getTracks().forEach((track, idx) => {
             peerConnection.addTrack(track, localStream);
+            console.log(`   ✅ Added ${track.kind} track #${idx + 1}`);
           });
         }
 
         peerConnection.ontrack = (event) => {
+          console.log(`✅ [HumanBuddy] Remote track received in offer handler:`, event.track.kind);
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = event.streams[0];
           }
@@ -363,10 +498,13 @@ const HumanBuddySession = ({
 
         peerConnection.onicecandidate = (event) => {
           if (event.candidate && socket) {
+            console.log(`📡 [HumanBuddy] Sending ICE candidate from offer response...`);
             socket.emit('ice_candidate', {
               candidate: event.candidate,
               targetUserId: from,
             });
+          } else {
+            console.log(`✅ [HumanBuddy] ICE gathering complete for answer`);
           }
         };
 
@@ -375,36 +513,59 @@ const HumanBuddySession = ({
         peerConnection.ondatachannel = (event) => setupDataChannel(event.channel);
       }
 
+      console.log(`🔄 [HumanBuddy] Setting remote description from offer...`);
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+      console.log(`✅ [HumanBuddy] Remote description set`);
+      
+      console.log(`🎬 [HumanBuddy] Creating answer...`);
       const answer = await peerConnectionRef.current.createAnswer();
       await peerConnectionRef.current.setLocalDescription(answer);
+      console.log(`✅ [HumanBuddy] Answer created and set as local description`);
 
+      console.log(`📤 [HumanBuddy] Sending answer back...`);
       socket.emit('webrtc_answer', {
         answer: answer,
         targetUserId: from,
       });
+      console.log(`✅ [HumanBuddy] Answer sent`);
     } catch (error) {
-      console.error('Error handling WebRTC offer:', error);
+      console.error(`❌ [HumanBuddy] Error handling WebRTC offer:`, error);
+      toast.error('Failed to establish video call');
     }
   };
 
   const handleWebRTCAnswer = async (answer) => {
     try {
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`📨 [HumanBuddy] WEBRTC ANSWER RECEIVED`);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`   Current PeerConnection: ${!!peerConnectionRef.current}`);
+      console.log(``);
+      
       if (peerConnectionRef.current) {
+        console.log(`🔄 [HumanBuddy] Setting remote description from answer...`);
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+        console.log(`✅ [HumanBuddy] Remote description set from answer - VIDEO CALL SHOULD START NOW`);
+      } else {
+        console.warn(`⚠️ [WARNING] No peer connection to set answer on`);
       }
     } catch (error) {
-      console.error('Error handling WebRTC answer:', error);
+      console.error('❌ Error handling WebRTC answer:', error);
+      toast.error('Failed to process answer');
     }
   };
 
   const handleICECandidate = async (candidate) => {
     try {
+      console.log(`📡 [HumanBuddy] ICE candidate received`);
       if (peerConnectionRef.current) {
         await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log(`✅ [HumanBuddy] ICE candidate added`);
+      } else {
+        console.warn(`⚠️ [WARNING] No peer connection to add ICE candidate to`);
       }
     } catch (error) {
-      console.error('Error adding ICE candidate:', error);
+      console.error('❌ Error adding ICE candidate:', error);
     }
   };
 

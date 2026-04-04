@@ -102,6 +102,7 @@ const HumanBuddySession = ({
       console.log(`👥 Participants: ${JSON.stringify(data.participants)}`);
       console.log(`👔 Your Role: ${data.role}`);
       console.log(`👑 IsCreator: ${data.isCreator}`);
+      console.log(`👥 Remote Users: ${JSON.stringify(data.remoteUsers)}`);
       
       // Check mismatch
       if (sessionId !== data.sessionId) {
@@ -112,6 +113,13 @@ const HumanBuddySession = ({
       
       setParticipants(data.participants);
       setUserRole(data.role);
+      
+      // 🔥 CRITICAL FIX: If there are other participants, set remoteUser from remoteUsers array
+      if (data.remoteUsers && data.remoteUsers.length > 0) {
+        const remoteUser = data.remoteUsers[0]; // Get first remote user
+        console.log(`✅ Setting remote user from remoteUsers: ${JSON.stringify(remoteUser)}`);
+        setRemoteUser(remoteUser);
+      }
       
       if (data.role === 'waiting' && data.isCreator === false) {
         toast.info('Waiting for role assignment from session owner...');

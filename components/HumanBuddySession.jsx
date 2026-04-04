@@ -66,6 +66,15 @@ const HumanBuddySession = ({
     console.log(`🔑 SessionCode: ${sessionCode}`);
     console.log(`👑 IsOwner: ${isOwner}`);
     console.log(`🌐 Socket URL: ${socketUrl}`);
+    console.log(`🔗 Socket Namespace: /interview-buddy`);
+    
+    // 🔍 VERIFY ENVIRONMENT
+    if (socketUrl.includes('localhost')) {
+      console.warn(`⚠️ [WARNING] Using localhost socket URL - make sure local socket server is running!`);
+    } else {
+      console.log(`✅ [INFO] Using production socket server URL`);
+    }
+    console.log(``);
     
     const newSocket = io(`${socketUrl}/interview-buddy`, {
       path: '/socket.io/',

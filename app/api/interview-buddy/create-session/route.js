@@ -88,10 +88,17 @@ export async function POST(request) {
       updatedAt: new Date(),
     });
 
+    // 🔗 Generate invite link for sharing
+    const origin = request.headers.get("origin") || "https://ai-interview-git-pr-d49414-errorbhupendra481-gmailcoms-projects.vercel.app";
+    const inviteLink = `${origin}/interview/buddy/${sessionCode}`;
+
+    console.log(`[create-session] Generated invite link: ${inviteLink}`);
+
     return NextResponse.json(
       {
         sessionId: sessionRef.id,
         sessionCode,
+        inviteLink, // 🔗 NEW: Direct invite link for sharing
         success: true,
       },
       { status: 201 }

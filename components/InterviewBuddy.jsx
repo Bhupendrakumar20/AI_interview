@@ -15,6 +15,7 @@ const InterviewBuddy = ({ userId }) => {
   const [selectedTopics, setSelectedTopics] = useState(["DSA", "System Design", "OOP"]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sessionCode, setSessionCode] = useState(null);
+  const [inviteLink, setInviteLink] = useState(null); // 🔗 NEW: Store invite link
   const [isLoading, setIsLoading] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [isInterviewActive, setIsInterviewActive] = useState(false);
@@ -81,6 +82,7 @@ const InterviewBuddy = ({ userId }) => {
 
       setActiveSessionId(data.sessionId);
       setSessionCode(data.sessionCode);
+      setInviteLink(data.inviteLink); // 🔗 NEW: Store invite link
 
       // If AI mode, start interview immediately
       if (currentMode === "ai") {
@@ -92,7 +94,7 @@ const InterviewBuddy = ({ userId }) => {
         setIsSessionOwner(true); // 🔥 User created the session, they are the owner
         setIsHumanBuddyActive(true);
         setIsModalOpen(false);
-        toast.success("Session created! Share the code with your buddy.");
+        toast.success("Session created! Share the invite link with your buddy.");
       }
     } catch (error) {
       console.error("Error creating session:", error);
@@ -102,12 +104,35 @@ const InterviewBuddy = ({ userId }) => {
     }
   };
 
-  const handleJoinSession = async (code) => {
+  const handleJoinSession = async (inputCode) => {
     if (!userId) {
       toast.error("Please log in first");
       return;
     }
 
+    if (!inputCode || !inputCode.trim()) {
+      toast.error("Please paste a link or code");
+      return;
+    }
+
+    // 🔗 Extract code from link or use plain code
+    let sessionCode = inputCode.trim().toUpperCase();
+    
+    // Check if it's a link containing /interview/buddy/
+    if (inputCode.includes('/interview/buddy/')) {
+      // Extract code from link
+      const match = inputCode.match(/\/interview\/buddy\/(IB-[A-Z0-9]{5})/);
+      if (match && match[1]) {
+        sessionCode = match[1];
+        console.log(`🔗 [handleJoinSession] Extracted code from link: ${sessionCode}`);
+        
+        // Route to invite link instead of using join API
+        window.location.href = `/interview/buddy/${sessionCode}`;
+        return;
+      }
+    }
+
+    // Use join-session API for plain codes
     setIsLoading(true);
     try {
       const response = await fetch("/api/interview-buddy/join-session", {
@@ -115,7 +140,7 @@ const InterviewBuddy = ({ userId }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId,
-          sessionCode: code,
+          sessionCode: sessionCode,
         }),
       });
 
@@ -768,25 +793,53 @@ const InterviewBuddy = ({ userId }) => {
                           1
                         </div>
                         <div>
-                          <div className="text-sm font-bold">Share your session code</div>
+                          <div className="text-sm font-bold">🔗 Share this invite link</div>
                           <div className="text-xs text-slate-400">
-                            Send this code to your buddy. They enter it to join.
+                            Your buddy just needs to click the link - no code to enter!
                           </div>
                         </div>
                       </div>
                     </div>
 
+                    {/* INVITE LINK */}
                     <div className="flex gap-2">
-                      <div className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 font-bold text-blue-400 text-center tracking-widest">
-                        {sessionCode || "IB-XXXXX"}
+                      <div className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-blue-400 break-all overflow-hidden">
+                        {inviteLink || "https://ai-interview.com/interview/buddy/IB-XXXXX"}
                       </div>
                       <button
-                        onClick={copyCode}
-                        disabled={!sessionCode || isLoading}
-                        className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => {
+                          if (inviteLink) {
+                            navigator.clipboard.writeText(inviteLink);
+                            toast.success("Invite link copied!");
+                          }
+                        }}
+                        disabled={!inviteLink || isLoading}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                       >
-                        {isLoading ? "Loading..." : "Copy"}
+                        {isLoading ? "Loading..." : "Copy Link"}
                       </button>
+                    </div>
+
+                    {/* SESSION CODE (BACKUP) */}
+                    <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-3">
+                      <div className="text-xs text-slate-500 mb-2">Or share the code:</div>
+                      <div className="flex gap-2">
+                        <div className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm font-bold text-blue-400 text-center tracking-widest">
+                          {sessionCode || "IB-XXXXX"}
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (sessionCode) {
+                              navigator.clipboard.writeText(sessionCode);
+                              toast.success("Code copied!");
+                            }
+                          }}
+                          disabled={!sessionCode}
+                          className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Copy
+                        </button>
+                      </div>
                     </div>
 
                     <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
@@ -877,12 +930,12 @@ const InterviewBuddy = ({ userId }) => {
                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                   <div className="flex gap-3">
                     <div className="w-6 h-6 rounded-full bg-linear-to-r from-purple-400 to-pink-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      📋
+                      �
                     </div>
                     <div>
-                      <div className="text-sm font-bold">Paste the session code</div>
+                      <div className="text-sm font-bold">Paste the invite link or code</div>
                       <div className="text-xs text-slate-400">
-                        Your buddy will share a code like "IB-7X4K9". Paste it below to join their session.
+                        Your buddy will share either an invite link or a code like "IB-7X4K9".
                       </div>
                     </div>
                   </div>
@@ -890,11 +943,17 @@ const InterviewBuddy = ({ userId }) => {
 
                 <input
                   type="text"
-                  placeholder="Enter session code (e.g., IB-7X4K9)"
+                  placeholder="Paste link (https://...) or code (IB-7X4K9)"
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-center text-lg tracking-widest"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-center text-sm"
                 />
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-xs text-blue-300">
+                    ✓ If you have a link, we'll extract the code automatically
+                  </p>
+                </div>
 
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
                   <p className="text-xs text-blue-300">

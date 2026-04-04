@@ -50,10 +50,15 @@ export default function BuddyInvitePage() {
 
         if (!inviteCode) {
           setError('Invalid invite code');
+          setIsLoading(false);
           return;
         }
 
-        console.log(`🔗 [BuddyInvite] Joining session with invite code: ${inviteCode}`);
+        console.log(`\n${'═'.repeat(60)}`);
+        console.log(`🔗 [BuddyInvite] Joining via invite link`);
+        console.log(`${'═'.repeat(60)}`);
+        console.log(`📍 UserId: ${userData.id}`);
+        console.log(`🔑 InviteCode: ${inviteCode}`);
         
         // Call API to join session via invite code
         const response = await fetch('/api/interview-buddy/join-by-invite', {
@@ -67,11 +72,16 @@ export default function BuddyInvitePage() {
 
         if (!response.ok) {
           const error = await response.json();
+          console.error(`❌ Join failed:`, error);
           throw new Error(error.error || 'Failed to join session');
         }
 
         const data = await response.json();
-        console.log(`✅ [BuddyInvite] Session data received:`, data);
+        console.log(`✅ Successfully joined session:`, {
+          sessionId: data.sessionId,
+          sessionCode: data.sessionCode,
+          isCreator: data.isCreator,
+        });
         
         setSessionData({
           sessionId: data.sessionId,
@@ -80,11 +90,11 @@ export default function BuddyInvitePage() {
         });
         
         setIsOwner(data.isCreator);
+        setIsLoading(false);
       } catch (err) {
-        console.error('Error joining session:', err);
+        console.error('❌ Error joining session:', err);
         setError(err.message || 'Failed to join session');
         toast.error(err.message || 'Failed to join session');
-      } finally {
         setIsLoading(false);
       }
     };

@@ -49,16 +49,21 @@ const HumanBuddySession = ({
 
   // ─── EFFECTS ───────────────────────────────────────────────────────
 
-  // Connect to socket
+  // 🔥 STABLE SOCKET CONNECTION (Only connects once, like Google Meet)
   useEffect(() => {
+    // Don't connect if missing required data
+    if (!userId || !sessionCode) {
+      console.log(`⏳ [HumanBuddy] Waiting for required data:`, { userId, sessionCode });
+      return;
+    }
+
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4001';
     console.log(`\n${'═'.repeat(60)}`);
-    console.log('🔧 [HumanBuddy] Component Initialized');
+    console.log('🔧 [HumanBuddy] ONE-TIME Socket Connection');
     console.log(`${'═'.repeat(60)}`);
     console.log(`📍 UserId: ${userId}`);
     console.log(`👤 Username: ${username}`);
     console.log(`🔑 SessionCode: ${sessionCode}`);
-    console.log(`📄 SessionId (local): ${sessionId}`);
     console.log(`👑 IsOwner: ${isOwner}`);
     console.log(`🌐 Socket URL: ${socketUrl}`);
     
@@ -66,15 +71,18 @@ const HumanBuddySession = ({
       path: '/socket.io/',
       transports: ['websocket', 'polling'],
       reconnect: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 10,
     });
 
     console.log('🔌 [HumanBuddy] Connecting to /interview-buddy namespace...');
 
-    // Connection events - handle once connected
-    newSocket.on('connect', () => {
+    // ✅ Connection handler - emit join once
+    const handleConnect = () => {
       console.log(`✅ [HumanBuddy] Socket connected: ${newSocket.id}`);
       
-      // NOW emit join_session - socket is ready
+      // Emit join_session exactly once
       const joinData = {
         userId,
         username,
@@ -82,95 +90,66 @@ const HumanBuddySession = ({
         isCreator: isOwner,
       };
       
-      console.log(`📤 [HumanBuddy] Emitting join_session:`);
-      console.log(`   - userId: ${joinData.userId}`);
-      console.log(`   - username: ${joinData.username}`);
-      console.log(`   - sessionCode: ${joinData.sessionCode}`);
-      console.log(`   - isCreator: ${joinData.isCreator}`);
-      
+      console.log(`📤 [HumanBuddy] Emitting join_session:`, joinData);
       newSocket.emit('join_session', joinData);
-    });
+    };
 
     // Listen for session joined
-    newSocket.on('session_joined', (data) => {
-      console.log(`\n${'─'.repeat(60)}`);
-      console.log(`✅ [HumanBuddy] session_joined event received`);
-      console.log(`${'─'.repeat(60)}`);
-      console.log(`📄 Local SessionId: ${sessionId}`);
-      console.log(`📄 Server SessionId: ${data.sessionId}`);
-      console.log(`🔑 SessionCode: ${data.sessionCode}`);
-      console.log(`👥 Participants: ${JSON.stringify(data.participants)}`);
-      console.log(`👔 Your Role: ${data.role}`);
-      console.log(`👑 IsCreator: ${data.isCreator}`);
-      console.log(`👥 Remote Users: ${JSON.stringify(data.remoteUsers)}`);
-      
-      // Check mismatch
-      if (sessionId !== data.sessionId) {
-        console.warn(`⚠️  SESSION ID MISMATCH! Local: ${sessionId}, Server: ${data.sessionId}`);
-      } else {
-        console.log(`✅ Session ID matches`);
-      }
-      
-      setParticipants(data.participants);
+    const handleSessionJoined = (data) => {
+      console.log(`✅ [HumanBuddy] session_joined received:`, data);
+      setParticipants(data.participants || []);
       setUserRole(data.role);
       
-      // 🔥 CRITICAL FIX: If there are other participants, set remoteUser from remoteUsers array
+      // Set remote users if available
       if (data.remoteUsers && data.remoteUsers.length > 0) {
-        const remoteUser = data.remoteUsers[0]; // Get first remote user
-        console.log(`✅ Setting remote user from remoteUsers: ${JSON.stringify(remoteUser)}`);
-        setRemoteUser(remoteUser);
+        console.log(`✅ Setting remote user:`, data.remoteUsers[0]);
+        setRemoteUser(data.remoteUsers[0]);
       }
       
-      if (data.role === 'waiting' && data.isCreator === false) {
+      if (data.role === 'waiting' && !data.isCreator) {
         toast.info('Waiting for role assignment from session owner...');
       }
-    });
+    };
 
     // Listen for user joining
-    newSocket.on('user_joined_session', (data) => {
-      console.log(`\n${'─'.repeat(60)}`);
-      console.log(`✅ [HumanBuddy] Another user joined`);
-      console.log(`${'─'.repeat(60)}`);
-      console.log(`👤 Username: ${data.username}`);
-      console.log(`🆔 UserId: ${data.userId}`);
-      console.log(`👥 Total participants: ${data.participantCount}`);
-      console.log(`👤 Remote User: ${JSON.stringify(data.user)}`);
-      console.log(`${'─'.repeat(60)}\n`);
-      
+    const handleUserJoined = (data) => {
+      console.log(`✅ Another user joined:`, data);
       toast.success(`${data.username} joined the session`);
-      setParticipants(data.participantCount);
+      setParticipants(data.participants || [data.participantCount]);
       
       // Set remote user
       if (data.user && data.user.userId !== userId) {
+        console.log(`✅ Setting remote user from user_joined:`, data.user);
         setRemoteUser(data.user);
       }
-    });
+    };
 
-    // Error handling
-    newSocket.on('error', (data) => {
-      console.error(`❌ [HumanBuddy] Socket error:`, data);
+    const handleError = (data) => {
+      console.error(`❌ Socket error:`, data);
       toast.error(data.message || 'Socket connection error');
-    });
+    };
 
-    // Connection events
-    newSocket.on('connect', () => {
-      console.log(`✅ [HumanBuddy] Socket connected: ${newSocket.id}`);
-    });
-
-    newSocket.on('disconnect', () => {
+    const handleDisconnect = () => {
       console.log(`❌ [HumanBuddy] Socket disconnected`);
-    });
+    };
 
-    // Listen for role assignments
-    newSocket.on('role_assigned', (data) => {
+    const handleRoleAssigned = (data) => {
       if (data.targetUserId === userId) {
-        console.log(`✅ [HumanBuddy] Role assigned: ${data.role}`);
+        console.log(`✅ Role assigned: ${data.role}`);
         setUserRole(data.role);
-        toast.success(`Role assigned: ${data.role}`);
+        toast.success(`✅ You are now: ${data.role}`);
       }
-    });
+    };
 
-    // Listen for media toggles
+    // Register all listeners
+    newSocket.on('connect', handleConnect);
+    newSocket.on('session_joined', handleSessionJoined);
+    newSocket.on('user_joined_session', handleUserJoined);
+    newSocket.on('error', handleError);
+    newSocket.on('disconnect', handleDisconnect);
+    newSocket.on('role_assigned', handleRoleAssigned);
+
+    // Media toggle listeners
     newSocket.on('camera_toggled', (data) => {
       if (data.userId !== userId) {
         setRemoteUser(prev => prev ? { ...prev, camera: data.enabled } : null);
@@ -215,7 +194,7 @@ const HumanBuddySession = ({
 
     // Session ended
     newSocket.on('session_ended', (data) => {
-      toast.info('Session ended by ' + (data.endedBy === userId ? 'you' : 'peer'));
+      toast.info('Session ended');
       handleSessionEnd();
     });
 
@@ -225,10 +204,18 @@ const HumanBuddySession = ({
 
     setSocket(newSocket);
 
+    // 🔥 IMPORTANT: Only disconnect on component unmount (not on dependency changes)
     return () => {
+      console.log(`🧹 [HumanBuddy] Cleaning up socket listeners...`);
+      newSocket.off('connect', handleConnect);
+      newSocket.off('session_joined', handleSessionJoined);
+      newSocket.off('user_joined_session', handleUserJoined);
+      newSocket.off('error', handleError);
+      newSocket.off('disconnect', handleDisconnect);
+      newSocket.off('role_assigned', handleRoleAssigned);
       newSocket.disconnect();
     };
-  }, [userId, username, sessionCode, isOwner]);
+  }, []); // 🔥 EMPTY DEPS: Only runs once on mount, not on state changes
 
   // Initialize local media
   useEffect(() => {

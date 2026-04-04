@@ -89,10 +89,16 @@ export async function POST(request) {
     });
 
     // 🔗 Generate invite link for sharing
-    const origin = request.headers.get("origin") || "https://ai-interview-git-pr-d49414-errorbhupendra481-gmailcoms-projects.vercel.app";
+    const origin = request.headers.get("origin") || process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : "https://ai-interview-git-pr-d49414-errorbhupendra481-gmailcoms-projects.vercel.app";
+    
     const inviteLink = `${origin}/interview/buddy/${sessionCode}`;
 
-    console.log(`[create-session] Generated invite link: ${inviteLink}`);
+    console.log(`\n[create-session] ✅ SUCCESS`);
+    console.log(`  SessionId: ${sessionRef.id}`);
+    console.log(`  SessionCode: ${sessionCode}`);
+    console.log(`  InviteLink: ${inviteLink}`);
 
     return NextResponse.json(
       {

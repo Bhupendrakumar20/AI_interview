@@ -52,7 +52,15 @@ const HumanBuddySession = ({
   // Connect to socket
   useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4001';
-    console.log('[HumanBuddy] Socket URL:', socketUrl);
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log('🔧 [HumanBuddy] Component Initialized');
+    console.log(`${'═'.repeat(60)}`);
+    console.log(`📍 UserId: ${userId}`);
+    console.log(`👤 Username: ${username}`);
+    console.log(`🔑 SessionCode: ${sessionCode}`);
+    console.log(`📄 SessionId (local): ${sessionId}`);
+    console.log(`👑 IsOwner: ${isOwner}`);
+    console.log(`🌐 Socket URL: ${socketUrl}`);
     
     const newSocket = io(`${socketUrl}/interview-buddy`, {
       path: '/socket.io/',
@@ -60,26 +68,48 @@ const HumanBuddySession = ({
       reconnect: true,
     });
 
-    console.log('[HumanBuddy] Connecting to /interview-buddy namespace...');
+    console.log('🔌 [HumanBuddy] Connecting to /interview-buddy namespace...');
 
     // Connection events - handle once connected
     newSocket.on('connect', () => {
-      console.log('[HumanBuddy] ✓ Socket connected:', newSocket.id);
+      console.log(`✅ [HumanBuddy] Socket connected: ${newSocket.id}`);
       
       // NOW emit join_session - socket is ready
-      newSocket.emit('join_session', {
+      const joinData = {
         userId,
         username,
         sessionCode,
         isCreator: isOwner,
-      });
-      console.log('[HumanBuddy] ✓ Emitted join_session after connect event');
+      };
+      
+      console.log(`📤 [HumanBuddy] Emitting join_session:`);
+      console.log(`   - userId: ${joinData.userId}`);
+      console.log(`   - username: ${joinData.username}`);
+      console.log(`   - sessionCode: ${joinData.sessionCode}`);
+      console.log(`   - isCreator: ${joinData.isCreator}`);
+      
+      newSocket.emit('join_session', joinData);
     });
 
     // Listen for session joined
     newSocket.on('session_joined', (data) => {
-      console.log('[HumanBuddy] Session joined event received:', data);
-      console.log('[HumanBuddy] Current sessionId:', sessionId, 'Server sessionId:', data.sessionId);
+      console.log(`\n${'─'.repeat(60)}`);
+      console.log(`✅ [HumanBuddy] session_joined event received`);
+      console.log(`${'─'.repeat(60)}`);
+      console.log(`📄 Local SessionId: ${sessionId}`);
+      console.log(`📄 Server SessionId: ${data.sessionId}`);
+      console.log(`🔑 SessionCode: ${data.sessionCode}`);
+      console.log(`👥 Participants: ${JSON.stringify(data.participants)}`);
+      console.log(`👔 Your Role: ${data.role}`);
+      console.log(`👑 IsCreator: ${data.isCreator}`);
+      
+      // Check mismatch
+      if (sessionId !== data.sessionId) {
+        console.warn(`⚠️  SESSION ID MISMATCH! Local: ${sessionId}, Server: ${data.sessionId}`);
+      } else {
+        console.log(`✅ Session ID matches`);
+      }
+      
       setParticipants(data.participants);
       setUserRole(data.role);
       
@@ -90,29 +120,43 @@ const HumanBuddySession = ({
 
     // Listen for user joining
     newSocket.on('user_joined_session', (data) => {
-      console.log('[HumanBuddy] Another user joined:', data);
+      console.log(`\n${'─'.repeat(60)}`);
+      console.log(`✅ [HumanBuddy] Another user joined`);
+      console.log(`${'─'.repeat(60)}`);
+      console.log(`👤 Username: ${data.username}`);
+      console.log(`🆔 UserId: ${data.userId}`);
+      console.log(`👥 Total participants: ${data.participantCount}`);
+      console.log(`👤 Remote User: ${JSON.stringify(data.user)}`);
+      console.log(`${'─'.repeat(60)}\n`);
+      
       toast.success(`${data.username} joined the session`);
       setParticipants(data.participantCount);
+      
+      // Set remote user
+      if (data.user && data.user.userId !== userId) {
+        setRemoteUser(data.user);
+      }
     });
 
     // Error handling
     newSocket.on('error', (data) => {
-      console.error('[HumanBuddy] Socket error:', data);
+      console.error(`❌ [HumanBuddy] Socket error:`, data);
       toast.error(data.message || 'Socket connection error');
     });
 
     // Connection events
     newSocket.on('connect', () => {
-      console.log('[HumanBuddy] Socket connected:', newSocket.id);
+      console.log(`✅ [HumanBuddy] Socket connected: ${newSocket.id}`);
     });
 
     newSocket.on('disconnect', () => {
-      console.log('[HumanBuddy] Socket disconnected');
+      console.log(`❌ [HumanBuddy] Socket disconnected`);
     });
 
     // Listen for role assignments
     newSocket.on('role_assigned', (data) => {
       if (data.targetUserId === userId) {
+        console.log(`✅ [HumanBuddy] Role assigned: ${data.role}`);
         setUserRole(data.role);
         toast.success(`Role assigned: ${data.role}`);
       }

@@ -169,6 +169,73 @@ function unregisterUserFromRoom(userId, roomId) {
   }
 }
 
+/**
+ * Check if user is already in a room (Firestore flag)
+ * FIRESTORE SOURCE OF TRUTH: inRoomFlag = true means user is in some room
+ * 
+ * @param {string} userId - User's Firebase UID
+ * @returns {Promise<{isInRoom: boolean, currentRoomId?: string}>}
+ */
+async function checkUserRoomFlag(userId) {
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      return {
+        isInRoom: userData.inRoomFlag === true,
+        currentRoomId: userData.currentRoomId || null,
+      };
+    }
+    return { isInRoom: false };
+  } catch (error) {
+    console.error('[checkUserRoomFlag] Error:', error);
+    return { isInRoom: false };
+  }
+}
+
+/**
+ * Set user's room flag to true (user entering a room)
+ * 
+ * @param {string} userId - User's Firebase UID
+ * @param {string} roomId - Room ID they're joining
+ * @returns {Promise<boolean>}
+ */
+async function setUserInRoomFlag(userId, roomId) {
+  try {
+    await db.collection('users').doc(userId).update({
+      inRoomFlag: true,
+      currentRoomId: roomId,
+      enteredRoomAt: new Date(),
+    });
+    console.log(`✅ [setUserInRoomFlag] User ${userId} flag set to TRUE for room ${roomId}`);
+    return true;
+  } catch (error) {
+    console.error('[setUserInRoomFlag] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * Clear user's room flag (user leaving a room)
+ * 
+ * @param {string} userId - User's Firebase UID
+ * @returns {Promise<boolean>}
+ */
+async function clearUserRoomFlag(userId) {
+  try {
+    await db.collection('users').doc(userId).update({
+      inRoomFlag: false,
+      currentRoomId: null,
+      leftRoomAt: new Date(),
+    });
+    console.log(`✅ [clearUserRoomFlag] User ${userId} flag cleared - can rejoin`);
+    return true;
+  } catch (error) {
+    console.error('[clearUserRoomFlag] Error:', error);
+    return false;
+  }
+}
+
 // ─── USER PROFILE VALIDATION ───────────────────────────────────────────────
 
 /**
@@ -260,6 +327,20 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       console.log(`✅ [room_join] Profile validated. Using registered username: ${validatedUsername}`);
 
+      // 🚩 CHECK USER ROOM FLAG: Is user already in ANY room?
+      const flagCheck = await checkUserRoomFlag(userId);
+      if (flagCheck.isInRoom) {
+        console.error(`❌ [room_join] User ${userId} is already in a room (Flag = TRUE)`);
+        socket.emit('error', {
+          message: 'You are already in a room. Please leave that room first before joining another.',
+          code: 'ALREADY_IN_ROOM',
+          currentRoomId: flagCheck.currentRoomId,
+        });
+        return;
+      }
+
+      console.log(`✅ [room_join] Room flag check passed - user can join`);
+
       // Find room by code
       const roomQuery = await db
         .collection('dsa_rooms')
@@ -323,6 +404,9 @@ dsaRoomNamespace.on('connection', (socket) => {
         participantCount: roomData.participants.length + 1,
         updatedAt: new Date(),
       });
+
+      // 🚩 SET USER ROOM FLAG = TRUE (user is now in room)
+      await setUserInRoomFlag(userId, roomId);
 
       // Create participant record with validated data from registration
       await db.collection('dsa_room_participants').add({
@@ -558,6 +642,18 @@ dsaRoomNamespace.on('connection', (socket) => {
         return;
       }
 
+      // 🚩 CHECK USER ROOM FLAG: Is user already in ANY room?
+      const flagCheck = await checkUserRoomFlag(userId);
+      if (flagCheck.isInRoom && flagCheck.currentRoomId !== roomId) {
+        console.error(`❌ [join_room_socket] User ${userId} is already in a room (Flag = TRUE)`);
+        socket.emit('error', {
+          message: 'You are already in a different room. Please leave that room first.',
+          code: 'ALREADY_IN_ROOM',
+          currentRoomId: flagCheck.currentRoomId,
+        });
+        return;
+      }
+
       // ⚠️ ENFORCE SINGLE ROOM CONSTRAINT: Prevent user from being in multiple rooms
       const constraintCheck = await enforceUserSingleRoomConstraint(userId, roomId);
       if (!constraintCheck.canJoin) {
@@ -603,6 +699,11 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       // Register in global room tracking (prevents being in multiple rooms)
       registerUserInRoom(userId, roomId, socket.id, username);
+
+      // 🚩 SET USER ROOM FLAG = TRUE (if not already set)
+      if (!flagCheck.isInRoom) {
+        await setUserInRoomFlag(userId, roomId);
+      }
 
       console.log(`✓ [join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
       
@@ -678,6 +779,20 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       console.log(`✅ [room_create] Profile validated. Room creator: ${validatedUsername} (${userEmail})`);
 
+      // 🚩 CHECK USER ROOM FLAG: Is user already in ANY room?
+      const flagCheck = await checkUserRoomFlag(userId);
+      if (flagCheck.isInRoom) {
+        console.error(`❌ [room_create] User ${userId} is already in a room (Flag = TRUE)`);
+        socket.emit('error_response', {
+          message: 'You are already in a room. Please leave that room first before creating another.',
+          code: 'ALREADY_IN_ROOM',
+          currentRoomId: flagCheck.currentRoomId,
+        });
+        return;
+      }
+
+      console.log(`✅ [room_create] Room flag check passed - user can create room`);
+
       // Generate room code
       const roomCode = `DSA-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
@@ -702,6 +817,9 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       const roomRef = await db.collection('dsa_rooms').add(roomData);
       const roomId = roomRef.id;
+
+      // 🚩 SET USER ROOM FLAG = TRUE (creator is now in room)
+      await setUserInRoomFlag(userId, roomId);
 
       // Store socket data with validated profile
       socket.data = { roomId, userId, username: validatedUsername, email: userEmail, isOwner: true };
@@ -756,6 +874,18 @@ dsaRoomNamespace.on('connection', (socket) => {
       }
 
       console.log(`[request_join_room] ${username} requesting to join room ${roomCode}`);
+
+      // 🚩 CHECK USER ROOM FLAG: Is user already in ANY room?
+      const flagCheck = await checkUserRoomFlag(userId);
+      if (flagCheck.isInRoom) {
+        console.error(`❌ [request_join_room] User ${userId} is already in a room (Flag = TRUE)`);
+        socket.emit('error_response', {
+          message: 'You are already in a room. Please leave that room first before requesting to join another.',
+          code: 'ALREADY_IN_ROOM',
+          currentRoomId: flagCheck.currentRoomId,
+        });
+        return;
+      }
 
       // Find room by code
       const roomQuery = await db
@@ -1178,6 +1308,9 @@ dsaRoomNamespace.on('connection', (socket) => {
         
         // Unregister from global room tracking
         unregisterUserFromRoom(userId, roomId);
+
+        // 🚩 CLEAR USER ROOM FLAG = FALSE (user is no longer in room)
+        await clearUserRoomFlag(userId);
 
         // Update participant status
         const participantQuery = await db

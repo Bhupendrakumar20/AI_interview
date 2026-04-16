@@ -130,6 +130,10 @@ async function enforceUserSingleRoomConstraint(userId, targetRoomId) {
     // Clean up old session
     const oldSessionKey = `${userId}_${existingRoom.roomId}`;
     activeUserSessions.delete(oldSessionKey);
+    
+    // Remove from global room tracking so they can be re-registered for new room
+    userCurrentRoom.delete(userId);
+    console.log(`✓ [enforceUserSingleRoomConstraint] Global room tracking updated`);
   }
 
   return { canJoin: true };
@@ -255,13 +259,6 @@ dsaRoomNamespace.on('connection', (socket) => {
       const userEmail = profileValidation.email;
 
       console.log(`✅ [room_join] Profile validated. Using registered username: ${validatedUsername}`);
-
-      // ⚠️ ENFORCE SINGLE ROOM CONSTRAINT: Prevent user from being in multiple rooms
-      const constraintCheck = await enforceUserSingleRoomConstraint(userId, null);
-      if (!constraintCheck.canJoin) {
-        socket.emit('error', { message: constraintCheck.message });
-        return;
-      }
 
       // Find room by code
       const roomQuery = await db
@@ -561,6 +558,13 @@ dsaRoomNamespace.on('connection', (socket) => {
         return;
       }
 
+      // ⚠️ ENFORCE SINGLE ROOM CONSTRAINT: Prevent user from being in multiple rooms
+      const constraintCheck = await enforceUserSingleRoomConstraint(userId, roomId);
+      if (!constraintCheck.canJoin) {
+        socket.emit('error', { message: constraintCheck.message });
+        return;
+      }
+
       // ⚠️ CONSISTENCY CHECK: Prevent same user from joining same room from multiple devices
       const sessionKey = `${userId}_${roomId}`;
       const existingSession = activeUserSessions.get(sessionKey);
@@ -596,6 +600,9 @@ dsaRoomNamespace.on('connection', (socket) => {
         username,
         connectedAt: new Date(),
       });
+
+      // Register in global room tracking (prevents being in multiple rooms)
+      registerUserInRoom(userId, roomId, socket.id, username);
 
       console.log(`✓ [join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
       
@@ -670,13 +677,6 @@ dsaRoomNamespace.on('connection', (socket) => {
       const userEmail = profileValidation.email;
 
       console.log(`✅ [room_create] Profile validated. Room creator: ${validatedUsername} (${userEmail})`);
-
-      // ⚠️ ENFORCE SINGLE ROOM CONSTRAINT: Prevent user from creating/joining multiple rooms
-      const constraintCheck = await enforceUserSingleRoomConstraint(userId, null);
-      if (!constraintCheck.canJoin) {
-        socket.emit('error_response', { message: constraintCheck.message });
-        return;
-      }
 
       // Generate room code
       const roomCode = `DSA-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -772,6 +772,13 @@ dsaRoomNamespace.on('connection', (socket) => {
       const roomDoc = roomQuery.docs[0];
       const roomData = roomDoc.data();
       const roomId = roomDoc.id;
+
+      // ⚠️ ENFORCE SINGLE ROOM CONSTRAINT: Prevent user from sending join requests to multiple rooms
+      const constraintCheck = await enforceUserSingleRoomConstraint(userId, roomId);
+      if (!constraintCheck.canJoin) {
+        socket.emit('error_response', { message: constraintCheck.message });
+        return;
+      }
 
       // Check if room is full
       if (roomData.participants.length >= roomData.maxParticipants) {

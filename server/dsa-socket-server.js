@@ -165,6 +165,104 @@ dsaRoomNamespace.on('connection', (socket) => {
     }
   });
 
+  // ─── MEMBER APPROVAL ───────────────────────────────────────────────────
+
+  /**
+   * Room owner approves a pending member join request
+   */
+  socket.on('approve_member', async (data) => {
+    try {
+      const { requesterId, requesterUsername } = data;
+      const roomId = socket.data.roomId;
+      const ownerId = socket.data.userId;
+
+      if (!roomId || !requesterId) {
+        socket.emit('error_response', { message: 'Missing required data' });
+        return;
+      }
+
+      console.log(`[approve_member] Owner ${ownerId} approving ${requesterUsername} for room ${roomId}`);
+
+      // Update room: add to participants
+      const roomRef = db.collection('dsa_rooms').doc(roomId);
+      const roomData = (await roomRef.get()).data();
+
+      if (!roomData.participants.includes(requesterId)) {
+        await roomRef.update({
+          participants: [...roomData.participants, requesterId],
+          participantCount: roomData.participants.length + 1,
+          updatedAt: new Date(),
+        });
+      }
+
+      // Create participant record
+      if (roomId && requesterId) {
+        try {
+          await db.collection('dsa_room_participants').add({
+            roomId,
+            userId: requesterId,
+            username: requesterUsername,
+            joinedAt: new Date(),
+            status: 'active',
+            points: 0,
+            submissionsCount: 0,
+            correctSubmissions: [],
+            firstBloodQuestions: [],
+          });
+        } catch (e) {
+          console.log('[approve_member] Could not create participant record:', e.message);
+        }
+      }
+
+      // Notify the approved member
+      dsaRoomNamespace.to(`user_${requesterId}`).emit('join_approved', {
+        roomId,
+        roomCode: roomData.roomCode,
+        owner: socket.data.username,
+      });
+
+      // Broadcast to room
+      dsaRoomNamespace.to(`room_${roomId}`).emit('member_joined', {
+        userId: requesterId,
+        username: requesterUsername,
+        totalMembers: roomData.participants.length + 1,
+      });
+
+      console.log(`✓ ${requesterUsername} approved for room ${roomId}`);
+    } catch (error) {
+      console.error('[approve_member] Error:', error);
+      socket.emit('error_response', { message: 'Failed to approve member' });
+    }
+  });
+
+  /**
+   * Room owner rejects a pending member join request
+   */
+  socket.on('reject_member', async (data) => {
+    try {
+      const { requesterId, requesterUsername } = data;
+      const roomId = socket.data.roomId;
+
+      if (!roomId || !requesterId) {
+        socket.emit('error_response', { message: 'Missing required data' });
+        return;
+      }
+
+      console.log(`[reject_member] Rejecting ${requesterUsername} from room ${roomId}`);
+
+      // Notify the rejected member
+      dsaRoomNamespace.to(`user_${requesterId}`).emit('join_rejected', {
+        roomId,
+        reason: 'Owner rejected your join request',
+      });
+
+      console.log(`✓ ${requesterUsername} rejected for room ${roomId}`);
+    } catch (error) {
+      console.error('[reject_member] Error:', error);
+      socket.emit('error_response', { message: 'Failed to reject member' });
+    }
+  });
+
   // ─── VOTING ────────────────────────────────────────────────────────────
 
   socket.on('vote_time_limit', async (data) => {
@@ -281,6 +379,139 @@ dsaRoomNamespace.on('connection', (socket) => {
     }
   });
 
+  // ─── ROOM CREATE ───────────────────────────────────────────────────────
+  
+  /**
+   * Create a new DSA room
+   * Emitted by: Room creator
+   */
+  socket.on('room_create', async (data) => {
+    try {
+      const { userId, username, maxParticipants = 4 } = data;
+      
+      if (!userId || !username) {
+        socket.emit('error_response', { message: 'Missing user info' });
+        return;
+      }
+
+      console.log(`\n━━━ [room_create] START ━━━`);
+      console.log(`👤 Creator: ${username} (${userId})`);
+
+      // Generate room code
+      const roomCode = `DSA-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+      // Create room in Firestore
+      const roomData = {
+        roomCode,
+        owner: userId,
+        ownerName: username,
+        status: 'lobby',
+        participants: [userId],
+        participantCount: 1,
+        maxParticipants,
+        timeVotes: {},
+        questionModeVotes: {},
+        questionIds: [],
+        questions: [],
+        leaderboard: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const roomRef = await db.collection('dsa_rooms').add(roomData);
+      const roomId = roomRef.id;
+
+      // Store socket data
+      socket.data = { roomId, userId, username, isOwner: true };
+      socket.join(`room_${roomId}`);
+
+      console.log(`✓ Room created: ${roomCode} (ID: ${roomId})`);
+
+      socket.emit('room_created', {
+        roomId,
+        roomCode,
+        owner: username,
+        participants: [{ userId, username }],
+        status: 'lobby',
+      });
+
+      console.log(`✓ [room_create] Complete\n`);
+    } catch (error) {
+      console.error('[room_create] Error:', error);
+      socket.emit('error_response', { message: 'Failed to create room: ' + error.message });
+    }
+  });
+
+  // ─── REQUEST JOIN ROOM ─────────────────────────────────────────────────
+
+  /**
+   * Non-owner user requests to join a room
+   * Sends notification to room owner
+   */
+  socket.on('request_join_room', async (data) => {
+    try {
+      const { roomCode, userId, username } = data;
+
+      if (!roomCode || !userId || !username) {
+        socket.emit('error_response', { message: 'Missing required data' });
+        return;
+      }
+
+      console.log(`[request_join_room] ${username} requesting to join room ${roomCode}`);
+
+      // Find room by code
+      const roomQuery = await db
+        .collection('dsa_rooms')
+        .where('roomCode', '==', roomCode)
+        .limit(1)
+        .get();
+
+      if (roomQuery.empty) {
+        socket.emit('error_response', { message: 'Room not found' });
+        return;
+      }
+
+      const roomDoc = roomQuery.docs[0];
+      const roomData = roomDoc.data();
+      const roomId = roomDoc.id;
+
+      // Check if room is full
+      if (roomData.participants.length >= roomData.maxParticipants) {
+        socket.emit('error_response', { message: 'Room is full' });
+        return;
+      }
+
+      // Check if already in room
+      if (roomData.participants.includes(userId)) {
+        socket.emit('error_response', { message: 'Already in this room' });
+        return;
+      }
+
+      // Store join request temporarily
+      socket.data = { roomId, userId, username, requestingJoin: true };
+
+      // Notify owner of join request
+      dsaRoomNamespace.to(`user_${roomData.owner}`).emit('member_request', {
+        requesterId: userId,
+        requesterUsername: username,
+        roomId,
+        requestTime: new Date(),
+      });
+
+      // Send acknowledgment to requester
+      socket.emit('join_request_sent', {
+        roomCode,
+        roomId,
+        message: 'Join request sent to room owner',
+      });
+
+      console.log(`✓ Join request sent for ${username} to room ${roomId}`);
+    } catch (error) {
+      console.error('[request_join_room] Error:', error);
+      socket.emit('error_response', { message: 'Failed to request join' });
+    }
+  });
+
   // ─── START GAME ────────────────────────────────────────────────────────
 
   socket.on('start_game', async (data) => {
@@ -392,6 +623,232 @@ dsaRoomNamespace.on('connection', (socket) => {
     } catch (error) {
       console.error('[code_submit] Error:', error);
       socket.emit('error', { message: 'Failed to submit code' });
+    }
+  });
+
+  // ─── SET LANGUAGE ──────────────────────────────────────────────────────
+
+  /**
+   * Set code editor language for this user
+   */
+  socket.on('set_language', async (data) => {
+    try {
+      const { language } = data;
+      const roomId = socket.data.roomId;
+      const userId = socket.data.userId;
+
+      if (!roomId || !userId || !language) {
+        socket.emit('error_response', { message: 'Missing language or room info' });
+        return;
+      }
+
+      console.log(`[set_language] ${socket.data.username} set language to ${language}`);
+
+      // Update participant language preference
+      const participantQuery = await db
+        .collection('dsa_room_participants')
+        .where('roomId', '==', roomId)
+        .where('userId', '==', userId)
+        .limit(1)
+        .get();
+
+      if (!participantQuery.empty) {
+        await participantQuery.docs[0].ref.update({
+          preferredLanguage: language,
+          updatedAt: new Date(),
+        });
+      }
+
+      // Broadcast language change to room
+      dsaRoomNamespace.to(`room_${roomId}`).emit('user_language_changed', {
+        userId,
+        username: socket.data.username,
+        language,
+      });
+
+      console.log(`✓ Language set for ${socket.data.username}`);
+    } catch (error) {
+      console.error('[set_language] Error:', error);
+      socket.emit('error_response', { message: 'Failed to set language' });
+    }
+  });
+
+  // ─── FIRST BLOOD (First to solve) ──────────────────────────────────────
+
+  /**
+   * Broadcast when first user solves a question
+   */
+  socket.on('first_blood_submission', async (data) => {
+    try {
+      const { questionId, username, timeFromStart } = data;
+      const roomId = socket.data.roomId;
+
+      if (!roomId || !questionId) {
+        return;
+      }
+
+      console.log(`[first_blood] ${username} first solved ${questionId} at ${timeFromStart}ms`);
+
+      // Broadcast to room
+      dsaRoomNamespace.to(`room_${roomId}`).emit('first_blood', {
+        userId: socket.data.userId,
+        username,
+        questionId,
+        timeFromStart,
+      });
+
+      // Update room first blood record
+      const roomRef = db.collection('dsa_rooms').doc(roomId);
+      const roomData = (await roomRef.get()).data();
+      
+      const firstBloodList = roomData.firstBloodQuestions || [];
+      if (!firstBloodList.find(fb => fb.questionId === questionId)) {
+        firstBloodList.push({
+          questionId,
+          userId: socket.data.userId,
+          username,
+          timestamp: new Date(),
+        });
+        await roomRef.update({
+          firstBloodQuestions: firstBloodList,
+        });
+      }
+    } catch (error) {
+      console.error('[first_blood_submission] Error:', error);
+    }
+  });
+
+  // ─── USER JUDGING NOTIFICATION ────────────────────────────────────────
+
+  /**
+   * Notify room that someone's code is being judged
+   */
+  socket.on('user_judging_update', async (data) => {
+    try {
+      const { userId, username, questionId } = data;
+      const roomId = socket.data.roomId;
+
+      if (!roomId) return;
+
+      console.log(`[user_judging] ${username} code being judged for ${questionId}`);
+
+      // Broadcast to room
+      dsaRoomNamespace.to(`room_${roomId}`).emit('user_judging', {
+        username,
+        questionId,
+      });
+    } catch (error) {
+      console.error('[user_judging_update] Error:', error);
+    }
+  });
+
+  // ─── GET ROOM STATE ────────────────────────────────────────────────────
+
+  /**
+   * Fetch current room state (for late joiners or state refresh)
+   */
+  socket.on('get_room_state', async (data) => {
+    try {
+      const { roomId } = data;
+      const userId = socket.data.userId;
+
+      if (!roomId) {
+        socket.emit('error_response', { message: 'Missing room ID' });
+        return;
+      }
+
+      console.log(`[get_room_state] Fetching state for room ${roomId}`);
+
+      const roomRef = db.collection('dsa_rooms').doc(roomId);
+      const roomData = (await roomRef.get()).data();
+
+      if (!roomData) {
+        socket.emit('error_response', { message: 'Room not found' });
+        return;
+      }
+
+      // Get participants
+      const participants = await fetchParticipants(roomId);
+
+      socket.emit('room_state_update', {
+        roomId,
+        status: roomData.status,
+        owner: roomData.ownerName,
+        maxParticipants: roomData.maxParticipants,
+        participants,
+        timeVotes: roomData.timeVotes,
+        questionModeVotes: roomData.questionModeVotes,
+        questions: roomData.questions || [],
+        leaderboard: roomData.leaderboard || [],
+        serverStartTime: roomData.serverStartTime?.toDate?.() || null,
+        timeLimit: roomData.timeLimit,
+        questionMode: roomData.questionMode,
+      });
+
+      console.log(`✓ Room state sent for ${roomId}`);
+    } catch (error) {
+      console.error('[get_room_state] Error:', error);
+      socket.emit('error_response', { message: 'Failed to fetch room state' });
+    }
+  });
+
+  // ─── END ROOM ──────────────────────────────────────────────────────────
+
+  /**
+   * End the DSA room session
+   */
+  socket.on('end_room', async (data) => {
+    try {
+      const roomId = socket.data.roomId;
+      const userId = socket.data.userId;
+
+      if (!roomId) {
+        socket.emit('error_response', { message: 'No active room' });
+        return;
+      }
+
+      console.log(`\n━━━ [end_room] START ━━━`);
+      console.log(`🏁 Ending room ${roomId}`);
+
+      const roomRef = db.collection('dsa_rooms').doc(roomId);
+      const roomData = (await roomRef.get()).data();
+
+      // Only owner can end the room
+      if (roomData.owner !== userId) {
+        socket.emit('error_response', { message: 'Only room owner can end the room' });
+        return;
+      }
+
+      // Get final leaderboard
+      const participants = await fetchParticipants(roomId);
+      const finalLeaderboard = participants
+        .sort((a, b) => b.points - a.points)
+        .map((p, idx) => ({ ...p, rank: idx + 1 }));
+
+      // Update room status
+      await roomRef.update({
+        status: 'completed',
+        endedAt: new Date(),
+        finalLeaderboard,
+      });
+
+      // Broadcast room ended to all participants
+      dsaRoomNamespace.to(`room_${roomId}`).emit('room_ended', {
+        roomId,
+        reason: 'owner_ended',
+        leaderboard: finalLeaderboard,
+        summary: {
+          totalQuestions: roomData.questions?.length || 0,
+          totalParticipants: participants.length,
+          timeSpent: Date.now() - (roomData.serverStartTime?.getTime?.() || Date.now()),
+        },
+      });
+
+      console.log(`✓ Room ${roomId} ended with ${participants.length} participants`);
+      console.log(`✓ [end_room] Complete\n`);
+    } catch (error) {
+      console.error('[end_room] Error:', error);
+      socket.emit('error_response', { message: 'Failed to end room' });
     }
   });
 

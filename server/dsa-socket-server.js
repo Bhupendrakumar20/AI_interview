@@ -77,6 +77,66 @@ const dsaRoomNamespace = io.of('/dsa-room');
 // Structure: { userId_roomId: { socketId, userId, roomId, username, connectedAt } }
 const activeUserSessions = new Map();
 
+// ─── USER PROFILE VALIDATION ───────────────────────────────────────────────
+
+/**
+ * Validate and fetch user profile from Firestore
+ * Ensures user joins with their ACTUAL registered username, not arbitrary names
+ * 
+ * @param {string} userId - Firebase UID (user.uid)
+ * @param {string} providedUsername - Username provided by client
+ * @returns {Promise<{ valid: boolean, username: string, email: string, error?: string }>}
+ */
+async function validateUserProfile(userId, providedUsername) {
+  try {
+    if (!userId) {
+      return { valid: false, error: 'Missing userId (Firebase UID)' };
+    }
+
+    // Fetch user profile from Firestore using Firebase UID
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      console.error(`⚠️ [validateUserProfile] User profile not found in Firestore for UID: ${userId}`);
+      return { 
+        valid: false, 
+        error: 'User profile not found in system. Please complete registration first.' 
+      };
+    }
+
+    const userData = userDoc.data();
+    const registeredUsername = userData.username;
+    const userEmail = userData.email;
+
+    // ✅ CONSISTENCY CHECK: Username must match registered username
+    if (providedUsername && providedUsername !== registeredUsername) {
+      console.warn(`❌ [validateUserProfile] Username mismatch for ${userId}`);
+      console.warn(`   Registered: ${registeredUsername}, Attempted: ${providedUsername}`);
+      
+      return {
+        valid: false,
+        username: registeredUsername,
+        error: `Username mismatch. Your registered username is "${registeredUsername}", not "${providedUsername}". Please use your registered username.`,
+      };
+    }
+
+    console.log(`✅ [validateUserProfile] User validated: ${userId} -> ${registeredUsername}`);
+
+    return {
+      valid: true,
+      username: registeredUsername,
+      email: userEmail,
+      userId,
+    };
+  } catch (error) {
+    console.error('[validateUserProfile] Error:', error);
+    return {
+      valid: false,
+      error: 'Failed to validate user profile: ' + error.message,
+    };
+  }
+}
+
 dsaRoomNamespace.on('connection', (socket) => {
   console.log(`[DSA Room] User connected: ${socket.id}`);
 
@@ -86,8 +146,27 @@ dsaRoomNamespace.on('connection', (socket) => {
     try {
       const { userId, username, roomCode } = data;
       console.log(`\n━━━ [room_join] START ━━━`);
-      console.log(`👤 User: ${username} (${userId})`);
-      console.log(`🔑 Code: ${roomCode}`);
+      console.log(`👤 Firebase UID: ${userId}`);
+      console.log(`📝 Provided Username: ${username}`);
+      console.log(`🔑 Room Code: ${roomCode}`);
+
+      // ✅ STEP 1: VALIDATE USER PROFILE - Ensure user joins with ACTUAL registered username
+      const profileValidation = await validateUserProfile(userId, username);
+      
+      if (!profileValidation.valid) {
+        console.error(`❌ [room_join] Profile validation failed: ${profileValidation.error}`);
+        socket.emit('error_response', { 
+          message: profileValidation.error,
+          code: 'PROFILE_VALIDATION_FAILED'
+        });
+        return;
+      }
+
+      // Use validated username from database (NOT the one provided by client)
+      const validatedUsername = profileValidation.username;
+      const userEmail = profileValidation.email;
+
+      console.log(`✅ [room_join] Profile validated. Using registered username: ${validatedUsername}`);
 
       // Find room by code
       const roomQuery = await db
@@ -122,12 +201,12 @@ dsaRoomNamespace.on('connection', (socket) => {
       const existingSession = activeUserSessions.get(sessionKey);
 
       if (existingSession) {
-        console.log(`⚠️ [room_join] ${username} already in room from socket ${existingSession.socketId}`);
+        console.log(`⚠️ [room_join] ${validatedUsername} already in room from socket ${existingSession.socketId}`);
         
         // Disconnect the old socket (from previous device)
         const oldSocket = dsaRoomNamespace.sockets.get(existingSession.socketId);
         if (oldSocket) {
-          console.log(`🔌 [room_join] Disconnecting old socket for ${username}`);
+          console.log(`🔌 [room_join] Disconnecting old socket for ${validatedUsername}`);
           oldSocket.emit('session_taken_over', {
             message: 'Your session was taken over from another device',
             newSocket: socket.id,
@@ -146,11 +225,12 @@ dsaRoomNamespace.on('connection', (socket) => {
         updatedAt: new Date(),
       });
 
-      // Create participant record
+      // Create participant record with validated data from registration
       await db.collection('dsa_room_participants').add({
         roomId,
         userId,
-        username,
+        username: validatedUsername,
+        email: userEmail,
         joinedAt: new Date(),
         status: 'active',
         points: 0,
@@ -161,18 +241,19 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       // Join Socket.io room
       socket.join(`room_${roomId}`);
-      socket.data = { roomId, userId, username };
+      socket.data = { roomId, userId, username: validatedUsername, email: userEmail };
 
       // Track this user session for consistency checking (sessionKey already declared above)
       activeUserSessions.set(sessionKey, {
         socketId: socket.id,
         userId,
         roomId,
-        username,
+        username: validatedUsername,
+        email: userEmail,
         connectedAt: new Date(),
       });
 
-      console.log(`🟢 [room_join] Session tracked for ${username} in room ${roomId}`);
+      console.log(`🟢 [room_join] Session tracked for ${validatedUsername} (${userEmail}) in room ${roomId}`);
 
       // Fetch updated room state
       const updatedRoom = (await db.collection('dsa_rooms').doc(roomId).get()).data();
@@ -190,14 +271,15 @@ dsaRoomNamespace.on('connection', (socket) => {
         })),
       });
 
-      // Broadcast user joined
+      // Broadcast user joined with VALIDATED profile data
       dsaRoomNamespace.to(`room_${roomId}`).emit('user_joined', {
         userId,
-        username,
+        username: validatedUsername,
+        email: userEmail,
         totalParticipants: updatedRoom.participants.length,
       });
 
-      console.log(`✓ ${username} joined room ${roomId}`);
+      console.log(`✅ ${validatedUsername} joined room ${roomId} with email ${userEmail}`);
     } catch (error) {
       console.error('[room_join] Error:', error);
       socket.emit('error', { message: 'Failed to join room' });
@@ -457,22 +539,42 @@ dsaRoomNamespace.on('connection', (socket) => {
     try {
       const { userId, username, maxParticipants = 4 } = data;
       
-      if (!userId || !username) {
-        socket.emit('error_response', { message: 'Missing user info' });
+      if (!userId) {
+        socket.emit('error_response', { message: 'Missing Firebase UID (userId)' });
         return;
       }
 
       console.log(`\n━━━ [room_create] START ━━━`);
-      console.log(`👤 Creator: ${username} (${userId})`);
+      console.log(`👤 Firebase UID: ${userId}`);
+      console.log(`📝 Provided Username: ${username}`);
+
+      // ✅ VALIDATE USER PROFILE - Ensure creator joins with ACTUAL registered username
+      const profileValidation = await validateUserProfile(userId, username);
+      
+      if (!profileValidation.valid) {
+        console.error(`❌ [room_create] Profile validation failed: ${profileValidation.error}`);
+        socket.emit('error_response', { 
+          message: profileValidation.error,
+          code: 'PROFILE_VALIDATION_FAILED'
+        });
+        return;
+      }
+
+      // Use validated username and email from database
+      const validatedUsername = profileValidation.username;
+      const userEmail = profileValidation.email;
+
+      console.log(`✅ [room_create] Profile validated. Room creator: ${validatedUsername} (${userEmail})`);
 
       // Generate room code
       const roomCode = `DSA-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-      // Create room in Firestore
+      // Create room in Firestore with VALIDATED owner data
       const roomData = {
         roomCode,
         owner: userId,
-        ownerName: username,
+        ownerName: validatedUsername,
+        ownerEmail: userEmail,
         status: 'lobby',
         participants: [userId],
         participantCount: 1,
@@ -489,8 +591,8 @@ dsaRoomNamespace.on('connection', (socket) => {
       const roomRef = await db.collection('dsa_rooms').add(roomData);
       const roomId = roomRef.id;
 
-      // Store socket data
-      socket.data = { roomId, userId, username, isOwner: true };
+      // Store socket data with validated profile
+      socket.data = { roomId, userId, username: validatedUsername, email: userEmail, isOwner: true };
       socket.join(`room_${roomId}`);
 
       // Track this user session for consistency checking
@@ -499,22 +601,24 @@ dsaRoomNamespace.on('connection', (socket) => {
         socketId: socket.id,
         userId,
         roomId,
-        username,
+        username: validatedUsername,
+        email: userEmail,
         connectedAt: new Date(),
       });
 
       console.log(`✓ Room created: ${roomCode} (ID: ${roomId})`);
-      console.log(`🟢 Session tracked for creator ${username}`);
+      console.log(`🟢 Session tracked for creator ${validatedUsername} (${userEmail})`);
 
       socket.emit('room_created', {
         roomId,
         roomCode,
-        owner: username,
-        participants: [{ userId, username }],
+        owner: validatedUsername,
+        ownerEmail: userEmail,
+        participants: [{ userId, username: validatedUsername, email: userEmail }],
         status: 'lobby',
       });
 
-      console.log(`✓ [room_create] Complete\n`);
+      console.log(`✅ [room_create] Complete - Room created by ${validatedUsername}\n`);
     } catch (error) {
       console.error('[room_create] Error:', error);
       socket.emit('error_response', { message: 'Failed to create room: ' + error.message });

@@ -6,6 +6,8 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Bell, User, LogOut, Settings } from "lucide-react";
 import { logout } from "@/lib/actions/auth.action";
+import { db } from "@/firebase/client";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function TopBar({ user }) {
   const router = useRouter();
@@ -14,25 +16,78 @@ export default function TopBar({ user }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
-  // Listen for pending approvals from localStorage or context
+  /**
+   * Fetch pending approvals count from Firestore
+   * This ensures consistency across devices
+   */
+  const fetchPendingApprovalsFromFirestore = async () => {
+    if (!user?.uid) return;
+
+    try {
+      // Query all DSA rooms where user is the owner
+      const roomsRef = collection(db, 'dsa_rooms');
+      const q = query(roomsRef, where('owner', '==', user.uid));
+      const roomsSnapshot = await getDocs(q);
+
+      let totalPendingCount = 0;
+
+      // Check each room for pending requests
+      for (const roomDoc of roomsSnapshot.docs) {
+        const roomData = roomDoc.data();
+        const pendingRequests = roomData.pendingRequests || [];
+        totalPendingCount += pendingRequests.length;
+      }
+
+      if (totalPendingCount > 0) {
+        setPendingApprovalsCount(totalPendingCount);
+        localStorage.setItem('dsaPendingCount', totalPendingCount.toString());
+      } else {
+        setPendingApprovalsCount(0);
+        localStorage.removeItem('dsaPendingCount');
+      }
+
+      console.log(`✅ [TopBar] Fetched pending approvals: ${totalPendingCount}`);
+    } catch (error) {
+      console.error('[TopBar] Error fetching pending approvals:', error);
+      // Fall back to localStorage if Firestore fails
+      const stored = localStorage.getItem('dsaPendingCount');
+      if (stored) {
+        setPendingApprovalsCount(parseInt(stored));
+      }
+    }
+  };
+
+  // Fetch pending approvals on mount and when user changes
+  useEffect(() => {
+    if (user?.uid) {
+      fetchPendingApprovalsFromFirestore();
+    }
+  }, [user?.uid]);
+
+  // Listen for real-time updates from localStorage
   useEffect(() => {
     const checkPendingApprovals = () => {
       const stored = localStorage.getItem('dsaPendingCount');
       if (stored) {
         setPendingApprovalsCount(parseInt(stored));
+      } else {
+        setPendingApprovalsCount(0);
       }
     };
 
-    checkPendingApprovals();
     window.addEventListener('storage', checkPendingApprovals);
-    // Check every 5 seconds for updates
-    const interval = setInterval(checkPendingApprovals, 5000);
+    // Refresh from Firestore every 10 seconds for accuracy
+    const interval = setInterval(() => {
+      if (user?.uid) {
+        fetchPendingApprovalsFromFirestore();
+      }
+    }, 10000);
 
     return () => {
       window.removeEventListener('storage', checkPendingApprovals);
       clearInterval(interval);
     };
-  }, []);
+  }, [user?.uid]);
 
   const handleLogout = async () => {
     try {

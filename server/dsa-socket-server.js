@@ -73,6 +73,10 @@ app.get('/health', (req, res) => {
 
 const dsaRoomNamespace = io.of('/dsa-room');
 
+// Track active user sessions to prevent duplicate logins from multiple devices
+// Structure: { userId_roomId: { socketId, userId, roomId, username, connectedAt } }
+const activeUserSessions = new Map();
+
 dsaRoomNamespace.on('connection', (socket) => {
   console.log(`[DSA Room] User connected: ${socket.id}`);
 
@@ -81,7 +85,9 @@ dsaRoomNamespace.on('connection', (socket) => {
   socket.on('room_join', async (data) => {
     try {
       const { userId, username, roomCode } = data;
-      console.log(`[room_join] ${username} joining with code ${roomCode}`);
+      console.log(`\n━━━ [room_join] START ━━━`);
+      console.log(`👤 User: ${username} (${userId})`);
+      console.log(`🔑 Code: ${roomCode}`);
 
       // Find room by code
       const roomQuery = await db
@@ -111,6 +117,28 @@ dsaRoomNamespace.on('connection', (socket) => {
         return;
       }
 
+      // ⚠️ CONSISTENCY CHECK: Prevent same user from joining same room from multiple devices
+      const sessionKey = `${userId}_${roomId}`;
+      const existingSession = activeUserSessions.get(sessionKey);
+
+      if (existingSession) {
+        console.log(`⚠️ [room_join] ${username} already in room from socket ${existingSession.socketId}`);
+        
+        // Disconnect the old socket (from previous device)
+        const oldSocket = dsaRoomNamespace.sockets.get(existingSession.socketId);
+        if (oldSocket) {
+          console.log(`🔌 [room_join] Disconnecting old socket for ${username}`);
+          oldSocket.emit('session_taken_over', {
+            message: 'Your session was taken over from another device',
+            newSocket: socket.id,
+          });
+          oldSocket.disconnect(true);
+        }
+        
+        // Continue with new connection
+        console.log(`✓ [room_join] Old socket disconnected, allowing new connection`);
+      }
+
       // Add participant to room
       await db.collection('dsa_rooms').doc(roomId).update({
         participants: [...roomData.participants, userId],
@@ -134,6 +162,17 @@ dsaRoomNamespace.on('connection', (socket) => {
       // Join Socket.io room
       socket.join(`room_${roomId}`);
       socket.data = { roomId, userId, username };
+
+      // Track this user session for consistency checking (sessionKey already declared above)
+      activeUserSessions.set(sessionKey, {
+        socketId: socket.id,
+        userId,
+        roomId,
+        username,
+        connectedAt: new Date(),
+      });
+
+      console.log(`🟢 [room_join] Session tracked for ${username} in room ${roomId}`);
 
       // Fetch updated room state
       const updatedRoom = (await db.collection('dsa_rooms').doc(roomId).get()).data();
@@ -335,6 +374,25 @@ dsaRoomNamespace.on('connection', (socket) => {
         return;
       }
 
+      // ⚠️ CONSISTENCY CHECK: Prevent same user from joining same room from multiple devices
+      const sessionKey = `${userId}_${roomId}`;
+      const existingSession = activeUserSessions.get(sessionKey);
+
+      if (existingSession) {
+        console.log(`⚠️ [join_room_socket] ${username} already in room from socket ${existingSession.socketId}`);
+        
+        // Disconnect the old socket (from previous device)
+        const oldSocket = dsaRoomNamespace.sockets.get(existingSession.socketId);
+        if (oldSocket) {
+          console.log(`🔌 [join_room_socket] Disconnecting old socket for ${username}`);
+          oldSocket.emit('session_taken_over', {
+            message: 'Your session was taken over from another device',
+            newSocket: socket.id,
+          });
+          oldSocket.disconnect(true);
+        }
+      }
+
       // Register socket data for this user
       socket.data.userId = userId;
       socket.data.username = username;
@@ -342,7 +400,17 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       // Join the socket room so they receive broadcasts
       socket.join(`room_${roomId}`);
-      console.log(`[join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
+      
+      // Track this user session for consistency checking
+      activeUserSessions.set(sessionKey, {
+        socketId: socket.id,
+        userId,
+        roomId,
+        username,
+        connectedAt: new Date(),
+      });
+
+      console.log(`✓ [join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
       
       // Get room data and send current state
       try {
@@ -359,7 +427,7 @@ dsaRoomNamespace.on('connection', (socket) => {
 
           // 🔥 CRITICAL FIX: If game has already started, send game state immediately to late joiners
           if (roomData.status === 'in-progress' && roomData.questions) {
-            console.log(`[join_room_socket] Game already in progress! Sending game_starting to ${username}`);
+            console.log(`✓ [join_room_socket] Game already in progress! Sending game_starting to ${username}`);
             socket.emit('game_starting', {
               roomId,
               questions: roomData.questions,
@@ -425,7 +493,18 @@ dsaRoomNamespace.on('connection', (socket) => {
       socket.data = { roomId, userId, username, isOwner: true };
       socket.join(`room_${roomId}`);
 
+      // Track this user session for consistency checking
+      const sessionKey = `${userId}_${roomId}`;
+      activeUserSessions.set(sessionKey, {
+        socketId: socket.id,
+        userId,
+        roomId,
+        username,
+        connectedAt: new Date(),
+      });
+
       console.log(`✓ Room created: ${roomCode} (ID: ${roomId})`);
+      console.log(`🟢 Session tracked for creator ${username}`);
 
       socket.emit('room_created', {
         roomId,
@@ -858,8 +937,19 @@ dsaRoomNamespace.on('connection', (socket) => {
     try {
       const roomId = socket.data.roomId;
       const userId = socket.data.userId;
+      const username = socket.data.username;
 
       if (roomId && userId) {
+        // Remove from active sessions
+        const sessionKey = `${userId}_${roomId}`;
+        const existingSession = activeUserSessions.get(sessionKey);
+        
+        // Only remove if this is the current socket (not already replaced)
+        if (existingSession && existingSession.socketId === socket.id) {
+          activeUserSessions.delete(sessionKey);
+          console.log(`🔴 [disconnect] Session removed for ${username} from room ${roomId}`);
+        }
+
         // Update participant status
         const participantQuery = await db
           .collection('dsa_room_participants')
@@ -877,10 +967,10 @@ dsaRoomNamespace.on('connection', (socket) => {
         // Broadcast
         dsaRoomNamespace.to(`room_${roomId}`).emit('user_left', {
           userId,
-          username: socket.data.username,
+          username,
         });
 
-        console.log(`[disconnect] ${socket.data.username} left room ${roomId}`);
+        console.log(`[disconnect] ${username} left room ${roomId}`);
       }
     } catch (error) {
       console.error('[disconnect] Error:', error);

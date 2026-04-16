@@ -77,6 +77,94 @@ const dsaRoomNamespace = io.of('/dsa-room');
 // Structure: { userId_roomId: { socketId, userId, roomId, username, connectedAt } }
 const activeUserSessions = new Map();
 
+// Track which room each user is currently in (GLOBALLY - prevents same user in multiple rooms)
+// Structure: { userId: { roomId, socketId, username, joinedAt } }
+const userCurrentRoom = new Map();
+
+/**
+ * Check if user is already in a different room
+ * If yes, disconnect them from that room first
+ * @param {string} userId - User's Firebase UID
+ * @param {string} targetRoomId - Room they're trying to join
+ * @returns {Promise<{canJoin: boolean, message?: string}>}
+ */
+async function enforceUserSingleRoomConstraint(userId, targetRoomId) {
+  const existingRoom = userCurrentRoom.get(userId);
+
+  if (existingRoom && existingRoom.roomId !== targetRoomId) {
+    console.log(`⚠️ [enforceUserSingleRoomConstraint] User ${userId} is already in room ${existingRoom.roomId}`);
+    console.log(`⚠️ [enforceUserSingleRoomConstraint] Attempting to disconnect from old room...`);
+
+    // Disconnect user from old room
+    const oldSocket = dsaRoomNamespace.sockets.get(existingRoom.socketId);
+    if (oldSocket) {
+      // Notify client that they're being moved to a new room
+      oldSocket.emit('room_switch_notification', {
+        message: 'You are being moved to a new room',
+        oldRoomId: existingRoom.roomId,
+        newRoomId: targetRoomId,
+      });
+
+      // Leave the old room
+      oldSocket.leave(`room_${existingRoom.roomId}`);
+
+      // Update old room participants
+      try {
+        const oldRoomDoc = await db.collection('dsa_rooms').doc(existingRoom.roomId).get();
+        if (oldRoomDoc.exists) {
+          const oldRoomData = oldRoomDoc.data();
+          const updatedParticipants = oldRoomData.participants.filter((id) => id !== userId);
+          await db.collection('dsa_rooms').doc(existingRoom.roomId).update({
+            participants: updatedParticipants,
+            participantCount: updatedParticipants.length,
+            updatedAt: new Date(),
+          });
+        }
+      } catch (error) {
+        console.error('[enforceUserSingleRoomConstraint] Error removing from old room:', error);
+      }
+
+      console.log(`✓ [enforceUserSingleRoomConstraint] User ${userId} removed from room ${existingRoom.roomId}`);
+    }
+
+    // Clean up old session
+    const oldSessionKey = `${userId}_${existingRoom.roomId}`;
+    activeUserSessions.delete(oldSessionKey);
+  }
+
+  return { canJoin: true };
+}
+
+/**
+ * Register user's current room globally
+ * @param {string} userId - User's Firebase UID
+ * @param {string} roomId - Room ID
+ * @param {string} socketId - Socket ID
+ * @param {string} username - Username
+ */
+function registerUserInRoom(userId, roomId, socketId, username) {
+  userCurrentRoom.set(userId, {
+    roomId,
+    socketId,
+    username,
+    joinedAt: new Date(),
+  });
+  console.log(`🟢 [registerUserInRoom] User ${userId} (${username}) registered in room ${roomId}`);
+}
+
+/**
+ * Unregister user from current room
+ * @param {string} userId - User's Firebase UID
+ * @param {string} roomId - Room ID to verify
+ */
+function unregisterUserFromRoom(userId, roomId) {
+  const currentRoom = userCurrentRoom.get(userId);
+  if (currentRoom && currentRoom.roomId === roomId) {
+    userCurrentRoom.delete(userId);
+    console.log(`🔴 [unregisterUserFromRoom] User ${userId} unregistered from room ${roomId}`);
+  }
+}
+
 // ─── USER PROFILE VALIDATION ───────────────────────────────────────────────
 
 /**
@@ -168,6 +256,13 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       console.log(`✅ [room_join] Profile validated. Using registered username: ${validatedUsername}`);
 
+      // ⚠️ ENFORCE SINGLE ROOM CONSTRAINT: Prevent user from being in multiple rooms
+      const constraintCheck = await enforceUserSingleRoomConstraint(userId, null);
+      if (!constraintCheck.canJoin) {
+        socket.emit('error', { message: constraintCheck.message });
+        return;
+      }
+
       // Find room by code
       const roomQuery = await db
         .collection('dsa_rooms')
@@ -218,6 +313,13 @@ dsaRoomNamespace.on('connection', (socket) => {
         console.log(`✓ [room_join] Old socket disconnected, allowing new connection`);
       }
 
+      // Now enforce single room constraint with actual target room ID
+      const finalConstraintCheck = await enforceUserSingleRoomConstraint(userId, roomId);
+      if (!finalConstraintCheck.canJoin) {
+        socket.emit('error', { message: finalConstraintCheck.message });
+        return;
+      }
+
       // Add participant to room
       await db.collection('dsa_rooms').doc(roomId).update({
         participants: [...roomData.participants, userId],
@@ -252,6 +354,9 @@ dsaRoomNamespace.on('connection', (socket) => {
         email: userEmail,
         connectedAt: new Date(),
       });
+
+      // Register in global room tracking (prevents being in multiple rooms)
+      registerUserInRoom(userId, roomId, socket.id, validatedUsername);
 
       console.log(`🟢 [room_join] Session tracked for ${validatedUsername} (${userEmail}) in room ${roomId}`);
 
@@ -566,6 +671,13 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       console.log(`✅ [room_create] Profile validated. Room creator: ${validatedUsername} (${userEmail})`);
 
+      // ⚠️ ENFORCE SINGLE ROOM CONSTRAINT: Prevent user from creating/joining multiple rooms
+      const constraintCheck = await enforceUserSingleRoomConstraint(userId, null);
+      if (!constraintCheck.canJoin) {
+        socket.emit('error_response', { message: constraintCheck.message });
+        return;
+      }
+
       // Generate room code
       const roomCode = `DSA-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
@@ -605,6 +717,9 @@ dsaRoomNamespace.on('connection', (socket) => {
         email: userEmail,
         connectedAt: new Date(),
       });
+
+      // Register in global room tracking (prevents being in multiple rooms)
+      registerUserInRoom(userId, roomId, socket.id, validatedUsername);
 
       console.log(`✓ Room created: ${roomCode} (ID: ${roomId})`);
       console.log(`🟢 Session tracked for creator ${validatedUsername} (${userEmail})`);
@@ -1053,6 +1168,9 @@ dsaRoomNamespace.on('connection', (socket) => {
           activeUserSessions.delete(sessionKey);
           console.log(`🔴 [disconnect] Session removed for ${username} from room ${roomId}`);
         }
+        
+        // Unregister from global room tracking
+        unregisterUserFromRoom(userId, roomId);
 
         // Update participant status
         const participantQuery = await db

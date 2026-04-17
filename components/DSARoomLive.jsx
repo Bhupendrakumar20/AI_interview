@@ -160,42 +160,45 @@ const DSARoomLive = ({
       const currentQuestion = questions[currentQuestionIdx];
       const submissionTime = Date.now() - roomStartTimeRef.current;
 
-      // Emit to socket
+      // Emit to socket - backend will execute code via Judge0
       socket.emit('code_submit', {
-        userId,
-        roomId,
-        questionId: currentQuestion.questionId,
-        code,
-        language,
-        submittedAt: Date.now(),
-        timeFromStart: submissionTime,
+        sourceCode: code,
+        language: language,
+      }, (response) => {
+        // This callback returns the Judge0 result from the server
+        if (response.success) {
+          if (response.passed) {
+            setSubmissionStatus(SUBMISSION_STATUS.ACCEPTED);
+            toast.success(`✅ Accepted! +${response.points} points`);
+            setSolvedQuestions((prev) => [...new Set([...prev, currentQuestion.questionId])]);
+          } else {
+            setSubmissionStatus(SUBMISSION_STATUS.WRONG_ANSWER);
+            toast.error('❌ Some test cases failed. Try again!');
+          }
+          
+          // Set test results from Judge0
+          setTestResults({
+            totalTests: response.testResults?.length || 0,
+            passed: response.testResults?.filter((r) => r.status === 'Accepted').length || 0,
+            failed: response.testResults?.filter((r) => r.status !== 'Accepted').length || 0,
+            results: response.testResults || [],
+            executionTime: response.testResults?.[0]?.time,
+          });
+          setShowTestResults(true);
+        } else {
+          setSubmissionStatus(SUBMISSION_STATUS.ERROR);
+          toast.error(response.error || 'Submission failed');
+        }
       });
 
       setLastSubmissionTime(submissionTime);
-
-      // Simulate Judge0 response (in real implementation, backend handles this)
-      await simulateJudge0Response();
     } catch (error) {
       console.error('Submission error:', error);
       toast.error('Failed to submit code');
+      setSubmissionStatus(SUBMISSION_STATUS.ERROR);
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const simulateJudge0Response = async () => {
-    // This would come from the server via Socket.io
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Simulated response
-    setTestResults({
-      totalTests: 5,
-      passed: 4,
-      failed: 1,
-      failedTests: [{ input: '[4,1,2,1,2]', expected: '4', actual: '2' }],
-    });
-
-    setShowTestResults(true);
   };
 
   const handleLanguageChange = (newLang) => {

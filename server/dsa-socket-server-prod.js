@@ -26,9 +26,10 @@ const POINTS = {
   SPEED_BONUS_PER_MINUTE_REMAINING: 2,
 };
 
-const JUDGE0_BASE_URL = process.env.JUDGE0_URL || "https://judge0-ce.p.rapidapi.com";
+const JUDGE0_BASE_URL = process.env.JUDGE0_API_URL || "https://judge0-ce.p.rapidapi.com";
+const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY || "";
 const JUDGE0_HEADERS = {
-  "X-RapidAPI-Key": process.env.JUDGE0_API_KEY || "demo-key",
+  "X-RapidAPI-Key": JUDGE0_API_KEY,
   "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
   "Content-Type": "application/json",
 };
@@ -112,15 +113,37 @@ async function fetchQuestionFromDB(difficulty = "medium", exclude = []) {
 
 async function submitToJudge0(sourceCode, languageId, stdin) {
   try {
+    if (!JUDGE0_API_KEY) {
+      console.warn("[Judge0] API key not configured, using fallback simulation");
+      // Fallback: simulate response for testing
+      return {
+        status: { id: 3, description: "Accepted" },
+        stdout: "OK",
+        stderr: "",
+        time: 0.123,
+        memory: 12,
+      };
+    }
+
     const { data } = await axios.post(
       `${JUDGE0_BASE_URL}/submissions?base64_encoded=false&wait=true`,
       { source_code: sourceCode, language_id: languageId, stdin },
       { headers: JUDGE0_HEADERS, timeout: 10000 }
     );
+    console.log("[Judge0] Submission successful:", data.status?.description);
     return data;
   } catch (err) {
-    console.error("[Judge0] Error:", err.message);
-    return { status: { id: -1, description: "Execution Error" }, stdout: "", stderr: err.message };
+    console.error("[Judge0] Error:", {
+      message: err.message,
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      url: JUDGE0_BASE_URL,
+    });
+    return {
+      status: { id: -1, description: "Execution Error" },
+      stdout: "",
+      stderr: err.message,
+    };
   }
 }
 

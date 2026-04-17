@@ -21,17 +21,3 @@ export default function DSARoomPage() {
     </div>
   );
 }
-
-            <div className="mt-8 space-y-3 text-sm text-slate-400">
-              <p>✅ Create rooms and invite friends</p>
-              <p>✅ Vote on game settings (question mode, time limit)</p>
-              <p>✅ Real-time code execution with Judge0</p>
-              <p>✅ Live leaderboard with first blood bonuses</p>
-              <p>✅ Post-match code review dashboard</p>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}

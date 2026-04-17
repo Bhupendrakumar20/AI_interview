@@ -13,6 +13,7 @@ const QuickAccess = () => {
     { label: "Jobs", icon: DollarSign, href: "/jobs" },
     { label: "Competitions", icon: Trophy, href: "/competitions" },
     { label: "Mock Tests", icon: MessageSquare, href: "/mock-tests" },
+    { label: "DSA Room", icon: Users, href: "/dsa-room" },
     { label: "Mentorship", icon: Users, href: "/mentorship" },
     { label: "Courses", icon: BookOpen, href: "/courses" },
     { label: "Mock Interview", icon: Mic, href: "/interview" },

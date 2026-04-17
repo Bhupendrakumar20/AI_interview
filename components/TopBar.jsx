@@ -21,13 +21,20 @@ export default function TopBar({ user }) {
    * This ensures consistency across devices
    */
   const fetchPendingApprovalsFromFirestore = async () => {
-    if (!user?.uid) return;
+    if (!user?.uid) {
+      console.log('[TopBar] No user UID available');
+      return;
+    }
 
     try {
+      console.log(`[TopBar] Fetching pending approvals for user: ${user.uid}`);
+      
       // Query all DSA rooms where user is the owner
       const roomsRef = collection(db, 'dsa_rooms');
       const q = query(roomsRef, where('owner', '==', user.uid));
       const roomsSnapshot = await getDocs(q);
+
+      console.log(`[TopBar] Found ${roomsSnapshot.docs.length} rooms owned by user`);
 
       let totalPendingCount = 0;
 
@@ -35,8 +42,11 @@ export default function TopBar({ user }) {
       for (const roomDoc of roomsSnapshot.docs) {
         const roomData = roomDoc.data();
         const pendingRequests = roomData.pendingRequests || [];
+        console.log(`[TopBar] Room ${roomDoc.id}: ${pendingRequests.length} pending requests`);
         totalPendingCount += pendingRequests.length;
       }
+
+      console.log(`[TopBar] Total pending count: ${totalPendingCount}`);
 
       if (totalPendingCount > 0) {
         setPendingApprovalsCount(totalPendingCount);
@@ -46,13 +56,14 @@ export default function TopBar({ user }) {
         localStorage.removeItem('dsaPendingCount');
       }
 
-      console.log(`✅ [TopBar] Fetched pending approvals: ${totalPendingCount}`);
+      console.log(`✅ [TopBar] Updated pending approvals count: ${totalPendingCount}`);
     } catch (error) {
       console.error('[TopBar] Error fetching pending approvals:', error);
       // Fall back to localStorage if Firestore fails
       const stored = localStorage.getItem('dsaPendingCount');
       if (stored) {
         setPendingApprovalsCount(parseInt(stored));
+        console.log(`[TopBar] Using localStorage fallback: ${stored}`);
       }
     }
   };

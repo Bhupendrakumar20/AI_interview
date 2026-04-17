@@ -11,10 +11,35 @@ import DSALiveRoom from "./DSALiveRoom";
 let socketInstance = null;
 function getSocket() {
   if (!socketInstance) {
-    socketInstance = io(
-      process.env.NEXT_PUBLIC_SOCKET_IO_URL || "http://localhost:4001",
-      { autoConnect: false }
-    );
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || "http://localhost:4001";
+    console.log("🔌 Initializing socket connection to:", socketUrl);
+    
+    socketInstance = io(socketUrl, {
+      autoConnect: false,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      transports: ["websocket", "polling"],
+      forceNew: false,
+    });
+
+    // Add global error handlers
+    socketInstance.on("connect_error", (error) => {
+      console.error("❌ Socket connection error:", error);
+    });
+
+    socketInstance.on("error", (error) => {
+      console.error("❌ Socket error:", error);
+    });
+
+    socketInstance.on("connect", () => {
+      console.log("✅ Socket connected with ID:", socketInstance.id);
+    });
+
+    socketInstance.on("disconnect", (reason) => {
+      console.log("⚠️ Socket disconnected:", reason);
+    });
   }
   return socketInstance;
 }
@@ -43,47 +68,153 @@ export default function DSARoomLobby({ userName, onClose }) {
   const [myQuestionModeVote, setMyQuestionModeVote] = useState("");
   const [myTimeLimitVote, setMyTimeLimitVote] = useState("");
 
+  // Socket state
+  const [socketError, setSocketError] = useState(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+
   const socket = getSocket();
+
+  // Setup socket event listeners on component mount
+  useEffect(() => {
+    const handleConnect = () => {
+      console.log("✅ Socket connected!");
+      setIsSocketConnected(true);
+      setSocketError(null);
+    };
+
+    const handleDisconnect = (reason) => {
+      console.warn("⚠️ Socket disconnected:", reason);
+      setIsSocketConnected(false);
+    };
+
+    const handleConnectError = (error) => {
+      console.error("❌ Socket connection error:", error);
+      setSocketError(String(error) || "Failed to connect to DSA Room server");
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("connect_error", handleConnectError);
+
+    // Check if already connected
+    if (socket.connected) {
+      setIsSocketConnected(true);
+    }
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("connect_error", handleConnectError);
+    };
+  }, [socket]);
 
   // ── CREATE ROOM ──────────────────────────────────────────────────────────────
   const handleCreateRoom = async () => {
     setIsCreating(true);
-    socket.connect();
+    setSocketError(null);
+    
+    try {
+      // Check if socket is already connected
+      if (!socket.connected) {
+        console.log("🔌 Connecting socket...");
+        socket.connect();
+        
+        // Wait for connection with timeout
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error("Socket connection timeout"));
+          }, 5000);
 
-    socket.emit("room_create", { username: userName, avatar: "[U]" }, (response) => {
-      if (response.success) {
-        setRoomCode(response.roomCode);
-        setCreatedRoomCode(response.roomCode);
-        setIsInRoom(true);
-        setIsHost(true);
-        setCurrentUser({ username: userName, id: socket.id });
-        setupRoomListeners();
-      } else {
-        alert("Failed to create room: " + response.error);
+          socket.once("connect", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+
+          socket.once("connect_error", (error) => {
+            clearTimeout(timer);
+            reject(error);
+          });
+        });
       }
+
+      // Now emit the room_create event
+      socket.emit("room_create", { username: userName, avatar: "[U]" }, (response) => {
+        if (response && response.success) {
+          setRoomCode(response.roomCode);
+          setCreatedRoomCode(response.roomCode);
+          setIsInRoom(true);
+          setIsHost(true);
+          setCurrentUser({ username: userName, id: socket.id });
+          setupRoomListeners();
+          setSocketError(null);
+        } else {
+          const errorMsg = response?.error || "Failed to create room";
+          setSocketError(errorMsg);
+          console.error("❌ Create room failed:", errorMsg);
+        }
+        setIsCreating(false);
+      });
+    } catch (error) {
+      const errorMsg = String(error) || "Failed to connect and create room";
+      setSocketError(errorMsg);
+      console.error("❌ Error creating room:", error);
       setIsCreating(false);
-    });
+    }
   };
 
   // ── JOIN ROOM ────────────────────────────────────────────────────────────────
   const handleJoinRoom = async () => {
     if (!joinRoomCode.trim()) return;
     setIsJoining(true);
-    socket.connect();
+    setSocketError(null);
 
-    socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "[U]" }, (response) => {
-      if (response.success) {
-        setRoomCode(joinRoomCode);
-        setIsInRoom(true);
-        setUsers(response.lobbyState.users);
-        setIsHost(response.lobbyState.hostId === socket.id);
-        setCurrentUser({ username: userName, id: socket.id });
-        setupRoomListeners();
-      } else {
-        alert("Failed to join room: " + response.error);
+    try {
+      // Check if socket is already connected
+      if (!socket.connected) {
+        console.log("🔌 Connecting socket...");
+        socket.connect();
+
+        // Wait for connection with timeout
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error("Socket connection timeout"));
+          }, 5000);
+
+          socket.once("connect", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+
+          socket.once("connect_error", (error) => {
+            clearTimeout(timer);
+            reject(error);
+          });
+        });
       }
+
+      // Now emit the room_join event
+      socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "[U]" }, (response) => {
+        if (response && response.success) {
+          setRoomCode(joinRoomCode);
+          setIsInRoom(true);
+          setUsers(response.lobbyState?.users || []);
+          setIsHost(response.lobbyState?.hostId === socket.id);
+          setCurrentUser({ username: userName, id: socket.id });
+          setupRoomListeners();
+          setSocketError(null);
+        } else {
+          const errorMsg = response?.error || "Failed to join room";
+          setSocketError(errorMsg);
+          console.error("❌ Join room failed:", errorMsg);
+        }
+        setIsJoining(false);
+      });
+    } catch (error) {
+      const errorMsg = String(error) || "Failed to connect and join room";
+      setSocketError(errorMsg);
+      console.error("❌ Error joining room:", error);
       setIsJoining(false);
-    });
+    }
   };
 
   // ── SETUP ROOM LISTENERS ──────────────────────────────────────────────────────
@@ -148,8 +279,31 @@ export default function DSARoomLobby({ userName, onClose }) {
             <p className="text-slate-400">Real-time competitive coding with friends</p>
           </div>
 
+          {/* Connection Status Alert */}
+          {socketError && (
+            <div className="mb-6 p-4 bg-red-950/50 border border-red-700 rounded-lg">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div className="flex-1">
+                  <h3 className="text-red-300 font-bold mb-1">Connection Error</h3>
+                  <p className="text-red-200 text-sm">{socketError}</p>
+                  <p className="text-red-300 text-xs mt-2">
+                    Make sure the DSA Room server is running. Check your internet connection or try again later.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Socket Status Indicator */}
+          <div className="mb-6 flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${isSocketConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+            <span className={`text-sm font-medium ${isSocketConnected ? "text-green-400" : "text-red-400"}`}>
+              {isSocketConnected ? "✓ Connected to DSA Server" : "✗ Disconnected from DSA Server"}
+            </span>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Create Room Card */}
             <div className="group relative p-8 rounded-3xl border-2 border-emerald-700/50 bg-linear-to-br from-emerald-950/40 to-slate-900/60 hover:border-emerald-600 transition-all duration-300">
               <div className="absolute inset-0 rounded-3xl bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-all duration-300" />
 

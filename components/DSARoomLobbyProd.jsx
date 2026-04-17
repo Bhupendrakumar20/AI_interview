@@ -44,7 +44,7 @@ function getSocket() {
   return socketInstance;
 }
 
-export default function DSARoomLobby({ userName, onClose }) {
+export default function DSARoomLobby({ userId, userName, onClose }) {
   // Tab state
   const [activeTab, setActiveTab] = useState("create"); // 'create' | 'join'
 
@@ -137,8 +137,8 @@ export default function DSARoomLobby({ userName, onClose }) {
         });
       }
 
-      // Now emit the room_create event
-      socket.emit("room_create", { username: userName, avatar: "[U]" }, (response) => {
+      // Now emit the room_create event with userId
+      socket.emit("room_create", { username: userName, avatar: "[U]", userId }, (response) => {
         if (response && response.success) {
           setRoomCode(response.roomCode);
           setCreatedRoomCode(response.roomCode);
@@ -192,8 +192,8 @@ export default function DSARoomLobby({ userName, onClose }) {
         });
       }
 
-      // Now emit the room_join event
-      socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "[U]" }, (response) => {
+      // Now emit the room_join event with userId
+      socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "[U]", userId }, (response) => {
         if (response && response.success) {
           setRoomCode(joinRoomCode);
           setIsInRoom(true);

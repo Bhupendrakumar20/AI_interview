@@ -49,7 +49,8 @@ const PISTON_LANGUAGES = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const roomStore = new Map();
-const userRoomMap = new Map(); // Track userId -> roomCode to prevent duplicate joins
+const userRoomMap = new Map(); // Track userId -> roomCode (user can only be in ONE room)
+const userSocketMap = new Map(); // Track userId -> socket.id for cleanup on disconnect
 
 function generateRoomCode() {
   return "DSA-" + Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -253,7 +254,9 @@ function registerSocketHandlers(io) {
     console.log(`[Socket] Connected: ${socket.id}`);
 
     // ── CREATE ROOM ──────────────────────────────────────────────────────────
-    socket.on("room_create", ({ username, avatar }, callback) => {
+    socket.on("room_create", ({ username, avatar, userId }, callback) => {      if (!userId) {
+        return callback?.({ success: false, error: "User ID required" });
+      }
       const code = generateRoomCode();
       roomStore.set(code, {
         code,
@@ -281,13 +284,20 @@ function registerSocketHandlers(io) {
         language: "javascript",
       };
       socket.data.roomCode = code;
+      socket.data.userId = userId; // Store userId on socket for disconnect cleanup
+      userRoomMap.set(userId, code); // Track this user in this room
+      userSocketMap.set(userId, socket.id); // Map userId to socket.id
 
       callback({ success: true, roomCode: code });
-      console.log(`[Room] Created: ${code} by ${username}`);
+      console.log(`[Room] Created: ${code} by ${username} (userId: ${userId})`);
     });
 
     // ── JOIN ROOM ────────────────────────────────────────────────────────────
-    socket.on("room_join", ({ roomCode, username, avatar }, callback) => {
+    socket.on("room_join", ({ roomCode, username, avatar, userId }, callback) => {
+      if (!userId) {
+        return callback({ success: false, error: "User ID required" });
+      }
+
       const room = getRoom(roomCode);
 
       if (!room) return callback({ success: false, error: "Room not found." });
@@ -295,26 +305,28 @@ function registerSocketHandlers(io) {
       if (Object.keys(room.users).length >= MAX_ROOM_SIZE)
         return callback({ success: false, error: "Room is full." });
 
-      // ✅ Check if user is already in another room (prevent simultaneous joins)
-      const existingRoomCode = userRoomMap.get(socket.id);
+      // ✅ CRITICAL: Check if userId is already in ANOTHER room
+      const existingRoomCode = userRoomMap.get(userId);
       if (existingRoomCode && existingRoomCode !== roomCode) {
         return callback({
           success: false,
-          error: `Already in room: ${existingRoomCode}. Leave that room first.`,
+          error: `User already in room: ${existingRoomCode}. Cannot be in multiple rooms. Leave first.`,
         });
       }
 
-      // ✅ Check if user is already in this room (prevent duplicate join)
-      if (socket.id in room.users) {
+      // ✅ CRITICAL: Check if userId already exists in THIS specific room (from different device/connection)
+      const userAlreadyInRoom = Object.values(room.users).some(u => u.userId === userId);
+      if (userAlreadyInRoom) {
         return callback({
           success: false,
-          error: "Already joined this room from another device.",
+          error: "This account is already joined in this room from another device. Cannot join twice.",
         });
       }
 
       socket.join(roomCode);
       room.users[socket.id] = {
         id: socket.id,
+        userId: userId, // ✅ Add userId to user object for tracking
         username,
         avatar,
         solvedAt: null,
@@ -322,7 +334,9 @@ function registerSocketHandlers(io) {
         language: "javascript",
       };
       socket.data.roomCode = roomCode;
-      userRoomMap.set(socket.id, roomCode); // ✅ Track this user in the room
+      socket.data.userId = userId; // Store userId on socket for disconnect cleanup
+      userRoomMap.set(userId, roomCode); // ✅ Track userId -> roomCode
+      userSocketMap.set(userId, socket.id); // ✅ Map userId to socket.id for cleanup
 
       callback({
         success: true,
@@ -335,7 +349,7 @@ function registerSocketHandlers(io) {
       });
 
       socket.to(roomCode).emit("lobby_update", { users: Object.values(room.users) });
-      console.log(`[Room] ${username} joined ${roomCode}`);
+      console.log(`[Room] ${username} joined ${roomCode} (userId: ${userId})`);
     });
 
     // ── CAST VOTE ────────────────────────────────────────────────────────────
@@ -506,6 +520,7 @@ function registerSocketHandlers(io) {
     // ── DISCONNECT ───────────────────────────────────────────────────────────
     socket.on("disconnect", () => {
       const roomCode = socket.data.roomCode;
+      const userId = socket.data.userId; // ✅ Get userId from socket
       const room = getRoom(roomCode);
       if (!room) return;
 
@@ -513,7 +528,12 @@ function registerSocketHandlers(io) {
       delete room.users[socket.id];
       delete room.votes.questionMode[socket.id];
       delete room.votes.timeLimit[socket.id];
-      userRoomMap.delete(socket.id); // ✅ Clean up user-room mapping
+      
+      // ✅ CRITICAL: Clean up userId mappings on disconnect
+      if (userId) {
+        userRoomMap.delete(userId); // Remove userId -> roomCode mapping
+        userSocketMap.delete(userId); // Remove userId -> socket.id mapping
+      }
 
       io.to(roomCode).emit("user_left", {
         userId: socket.id,

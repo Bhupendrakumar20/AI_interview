@@ -5,7 +5,7 @@
  *  • Room lifecycle (lobby → voting → active → review → closed)
  *  • Vote aggregation for game config
  *  • Server-authoritative timer (1s broadcasts)
- *  • Judge0 code execution pipeline
+ *  • Piston code execution pipeline (free, no API key)
  *  • Points calculation + First Blood detection
  *  • Real-time leaderboard + code review phase
  */
@@ -26,20 +26,22 @@ const POINTS = {
   SPEED_BONUS_PER_MINUTE_REMAINING: 2,
 };
 
-const JUDGE0_BASE_URL = process.env.JUDGE0_API_URL || "https://judge0-ce.p.rapidapi.com";
-const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY || "";
-const JUDGE0_HEADERS = {
-  "X-RapidAPI-Key": JUDGE0_API_KEY,
-  "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
-  "Content-Type": "application/json",
-};
+// Piston API Configuration (free, no API key needed)
+const PISTON_API_URL = process.env.PISTON_API_URL || "https://emkc.org/api/v2/piston";
+const PISTON_TIMEOUT = 5000; // 5 seconds execution timeout
 
-const LANGUAGE_IDS = {
-  javascript: 63,
-  python: 71,
-  java: 62,
-  cpp: 54,
-  c: 50,
+const PISTON_LANGUAGES = {
+  javascript: "javascript",
+  python: "python",
+  java: "java",
+  cpp: "cpp",
+  c: "c",
+  go: "go",
+  rust: "rust",
+  csharp: "csharp",
+  ruby: "ruby",
+  php: "php",
+  typescript: "typescript",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,62 +113,86 @@ async function fetchQuestionFromDB(difficulty = "medium", exclude = []) {
 // JUDGE0 EXECUTION PIPELINE
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function submitToJudge0(sourceCode, languageId, stdin) {
+async function executePistonCode(sourceCode, language, stdin) {
   try {
-    if (!JUDGE0_API_KEY) {
-      console.warn("[Judge0] API key not configured, using fallback simulation");
-      // Fallback: simulate response for testing
-      return {
-        status: { id: 3, description: "Accepted" },
-        stdout: "OK",
-        stderr: "",
-        time: 0.123,
-        memory: 12,
-      };
-    }
+    const pistonLanguage = PISTON_LANGUAGES[language] || "javascript";
+    
+    const payload = {
+      language: pistonLanguage,
+      version: "*",
+      files: [
+        {
+          name: `main.${getFileExtension(pistonLanguage)}`,
+          content: sourceCode,
+        },
+      ],
+      stdin: stdin,
+    };
 
-    const { data } = await axios.post(
-      `${JUDGE0_BASE_URL}/submissions?base64_encoded=false&wait=true`,
-      { source_code: sourceCode, language_id: languageId, stdin },
-      { headers: JUDGE0_HEADERS, timeout: 10000 }
+    const response = await axios.post(
+      `${PISTON_API_URL}/execute`,
+      payload,
+      { timeout: PISTON_TIMEOUT, headers: { "Content-Type": "application/json" } }
     );
-    console.log("[Judge0] Submission successful:", data.status?.description);
-    return data;
+
+    console.log("[Piston] Execution successful:", response.data?.run?.exit_code === 0 ? "PASS" : "FAIL");
+    
+    return {
+      stdout: response.data?.run?.stdout || "",
+      stderr: response.data?.run?.stderr || "",
+      exit_code: response.data?.run?.exit_code || 0,
+    };
   } catch (err) {
-    console.error("[Judge0] Error:", {
+    console.error("[Piston] Error:", {
       message: err.message,
       status: err.response?.status,
-      statusText: err.response?.statusText,
-      url: JUDGE0_BASE_URL,
+      url: PISTON_API_URL,
     });
     return {
-      status: { id: -1, description: "Execution Error" },
       stdout: "",
-      stderr: err.message,
+      stderr: err.message || "Execution error",
+      exit_code: -1,
     };
   }
 }
 
-async function runAllTestCases(sourceCode, languageId, testCases) {
+function getFileExtension(language) {
+  const extensions = {
+    python: "py",
+    javascript: "js",
+    typescript: "ts",
+    cpp: "cpp",
+    c: "c",
+    java: "java",
+    go: "go",
+    rust: "rs",
+    csharp: "cs",
+    ruby: "rb",
+    php: "php",
+  };
+  return extensions[language] || "txt";
+}
+
+async function runAllTestCases(sourceCode, language, testCases) {
   const results = await Promise.all(
-    testCases.map((tc) => submitToJudge0(sourceCode, languageId, tc.stdin))
+    testCases.map((tc) => executePistonCode(sourceCode, language, tc.stdin))
   );
 
   const passed = results.every((r, i) => {
-    const actual = (r.stdout || "").trim();
+    const actual = (r.output || "").trim();
     const expected = testCases[i].expectedOutput.trim();
-    return r.status?.id === 3 && actual === expected; // status 3 = Accepted
+    return r.success && actual === expected;
   });
 
   return {
     passed,
     results: results.map((r, i) => ({
       testCase: i + 1,
-      status: r.status?.description || "Unknown",
-      stdout: r.stdout || "",
-      stderr: r.stderr || "",
-      time: r.time,
-      memory: r.memory,
+      status: r.success ? "Accepted" : "Failed",
+      stdout: r.output || "",
+      stderr: r.error || "",
+      time: null,
+      memory: null,
     })),
   };
 }
@@ -380,14 +406,12 @@ function registerSocketHandlers(io) {
       const question = room.questions[socket.id];
       if (!question) return callback?.({ success: false, error: "No question assigned." });
 
-      const languageId = LANGUAGE_IDS[language] || LANGUAGE_IDS.javascript;
-
       io.to(roomCode).emit("user_judging", { userId: socket.id, username: user.username });
 
       try {
         const { passed, results } = await runAllTestCases(
           sourceCode,
-          languageId,
+          language,
           question.hiddenTestCases
         );
 

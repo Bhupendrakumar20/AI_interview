@@ -49,6 +49,7 @@ const PISTON_LANGUAGES = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const roomStore = new Map();
+const userRoomMap = new Map(); // Track userId -> roomCode to prevent duplicate joins
 
 function generateRoomCode() {
   return "DSA-" + Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -294,6 +295,23 @@ function registerSocketHandlers(io) {
       if (Object.keys(room.users).length >= MAX_ROOM_SIZE)
         return callback({ success: false, error: "Room is full." });
 
+      // ✅ Check if user is already in another room (prevent simultaneous joins)
+      const existingRoomCode = userRoomMap.get(socket.id);
+      if (existingRoomCode && existingRoomCode !== roomCode) {
+        return callback({
+          success: false,
+          error: `Already in room: ${existingRoomCode}. Leave that room first.`,
+        });
+      }
+
+      // ✅ Check if user is already in this room (prevent duplicate join)
+      if (socket.id in room.users) {
+        return callback({
+          success: false,
+          error: "Already joined this room from another device.",
+        });
+      }
+
       socket.join(roomCode);
       room.users[socket.id] = {
         id: socket.id,
@@ -304,6 +322,7 @@ function registerSocketHandlers(io) {
         language: "javascript",
       };
       socket.data.roomCode = roomCode;
+      userRoomMap.set(socket.id, roomCode); // ✅ Track this user in the room
 
       callback({
         success: true,
@@ -494,6 +513,7 @@ function registerSocketHandlers(io) {
       delete room.users[socket.id];
       delete room.votes.questionMode[socket.id];
       delete room.votes.timeLimit[socket.id];
+      userRoomMap.delete(socket.id); // ✅ Clean up user-room mapping
 
       io.to(roomCode).emit("user_left", {
         userId: socket.id,

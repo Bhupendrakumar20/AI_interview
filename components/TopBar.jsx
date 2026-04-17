@@ -135,9 +135,9 @@ export default function TopBar({ user }) {
           {/* DSA Room Notifications Badge */}
           {pendingApprovalsCount > 0 && (
             <Link
-              href="/dsa-room"
+              href="/interview/buddy"
               className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all hover:shadow-lg hover:shadow-orange-500/20"
-              title="Pending DSA Room approvals"
+              title="Pending Interview Buddy DSA approvals"
             >
               <Bell size={20} className="text-orange-400" />
               <span className="absolute top-0 right-0 w-5 h-5 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center transform translate-x-1 -translate-y-1">

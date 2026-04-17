@@ -49,7 +49,7 @@ export async function POST(request) {
         <p><strong>${requesterName}</strong> (${requesterEmail}) has requested to join your DSA Room.</p>
         <p><strong>Room Code:</strong> ${roomCode}</p>
         <p>Please log in to your PrepWise account to approve or reject this request.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dsa-room" style="padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/interview/buddy" style="padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">
           Review Request
         </a>
       `;
@@ -60,7 +60,7 @@ export async function POST(request) {
         <p>Great news! <strong>${roomOwnerName}</strong> has approved your request to join the DSA Room.</p>
         <p><strong>Room Code:</strong> ${roomCode}</p>
         <p>You can now enter the room and start competing!</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dsa-room" style="padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/interview/buddy" style="padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">
           Enter Room
         </a>
       `;
@@ -71,7 +71,7 @@ export async function POST(request) {
         <p><strong>${roomOwnerName}</strong> has rejected your request to join the DSA Room.</p>
         <p><strong>Room Code:</strong> ${roomCode}</p>
         <p>You can try joining another room or create your own.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dsa-room" style="padding: 10px 20px; background-color: #8b5cf6; color: white; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/interview/buddy" style="padding: 10px 20px; background-color: #8b5cf6; color: white; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">
           Explore Rooms
         </a>
       `;

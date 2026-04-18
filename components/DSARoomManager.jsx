@@ -2,7 +2,22 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { HUNDRED_DAYS_DSA } from "../constants/hundredDaysOfCode";
+import { getAllDays } from "../constants/hundredDaysOfCode";
+import { getQuestionTestCases, hasQuestionTestCases } from "../constants/dsaTestCaseBank";
+
+const LANGUAGE_OPTIONS = ["javascript", "python", "cpp", "java"];
+
+const DEFAULT_STARTER = {
+  javascript: "// Write your solution here\n",
+  python: "# Write your solution here\n",
+  cpp: "// Write your solution here\n",
+  java: "// Write your solution here\n",
+};
+
+const pickRandomQuestions = (questions, count) => {
+  const shuffled = [...questions].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+};
 
 const DSARoomManager = ({ 
   socket, 
@@ -25,6 +40,11 @@ const DSARoomManager = ({
   const [showCopyNotice, setShowCopyNotice] = useState(false);
   const [submissionFeed, setSubmissionFeed] = useState([]);
   const [gameActivity, setGameActivity] = useState([]);
+  const [selectedQuestionIdx, setSelectedQuestionIdx] = useState(0);
+  const [language, setLanguage] = useState("javascript");
+  const [codeByQuestion, setCodeByQuestion] = useState({});
+  const [isSubmittingCode, setIsSubmittingCode] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState(null);
   
   // Track if countdown was actually initiated (to avoid false positives on initial null)
   const countdownStartedRef = useRef(false);
@@ -251,10 +271,22 @@ const DSARoomManager = ({
       return;
     }
 
-    // Get random questions from 100 DAYS OF CODE
-    const allDays = Object.values(HUNDRED_DAYS_DSA);
-    const randomDay = allDays[Math.floor(Math.random() * allDays.length)];
-    const dayQuestions = randomDay.questions.slice(0, Math.min(3, randomDay.questions.length));
+    // Fetch questions through the same method used by 100-days-of-code page
+    const allDays = getAllDays();
+    const questionPool = allDays.flatMap((day) =>
+      (day.questions || []).map((q) => ({
+        ...q,
+        sourceDay: day.day,
+        hiddenTestCases: getQuestionTestCases(q),
+      }))
+    );
+    const judgeableQuestions = questionPool.filter((q) => hasQuestionTestCases(q));
+    const dayQuestions = pickRandomQuestions(judgeableQuestions, 3);
+
+    if (dayQuestions.length === 0) {
+      toast.error("No judgeable questions found from 100 days source");
+      return;
+    }
 
     // Emit to entire room (both owner and members)
     // Server will broadcast "game_starting" or "game_started" to all members including owner
@@ -302,6 +334,72 @@ const DSARoomManager = ({
 
     // Wait for socket event to broadcast to all players
     // Both owner and members will receive "game_starting" event
+  };
+
+  const activeQuestion = questions[selectedQuestionIdx];
+  const activeQuestionId = activeQuestion?.id || `q_${selectedQuestionIdx}`;
+
+  const getCurrentCode = () => {
+    if (!activeQuestion) return "";
+    if (codeByQuestion[activeQuestionId]?.[language]) {
+      return codeByQuestion[activeQuestionId][language];
+    }
+    return activeQuestion?.starterCode?.[language] || DEFAULT_STARTER[language] || "// Write your solution\n";
+  };
+
+  const handleCodeChange = (value) => {
+    if (!activeQuestion) return;
+    setCodeByQuestion((prev) => ({
+      ...prev,
+      [activeQuestionId]: {
+        ...(prev[activeQuestionId] || {}),
+        [language]: value,
+      },
+    }));
+  };
+
+  const handleSubmitCode = () => {
+    if (!socket || !activeQuestion) return;
+
+    const sourceCode = getCurrentCode();
+    if (!sourceCode.trim()) {
+      toast.error("Code cannot be empty");
+      return;
+    }
+
+    setIsSubmittingCode(true);
+    setSubmissionResult(null);
+
+    socket.emit(
+      "code_submit",
+      {
+        roomId,
+        userId,
+        username,
+        questionId: activeQuestion.id || activeQuestionId,
+        sourceCode,
+        language,
+      },
+      (response) => {
+        setIsSubmittingCode(false);
+        if (!response?.success) {
+          toast.error(response?.error || "Submission failed");
+          return;
+        }
+
+        setSubmissionResult(response);
+        if (response.passed) {
+          toast.success(`All test cases passed! +${response.points || 0} pts`);
+          setQuestions((prev) =>
+            prev.map((q, idx) =>
+              idx === selectedQuestionIdx ? { ...q, solved: true } : q
+            )
+          );
+        } else {
+          toast.error("Some test cases failed");
+        }
+      }
+    );
   };
 
   const copyCode = async () => {
@@ -373,7 +471,7 @@ const DSARoomManager = ({
 
         <div className="flex gap-6 max-w-7xl mx-auto">
           {/* Questions Panel */}
-          <div className="flex-1 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
+          <div className="w-[30%] min-w-[320px] bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
             <div className="flex items-center gap-3 mb-6">
               <div className="text-3xl">◆</div>
               <div>
@@ -385,7 +483,12 @@ const DSARoomManager = ({
               {questions.map((q, idx) => (
                 <div
                   key={idx}
-                  className="p-4 bg-gradient-to-r from-slate-800/60 to-slate-800/30 rounded-lg border border-purple-500/40 hover:border-cyan-400/60 transition hover:shadow-lg hover:shadow-cyan-500/20 cursor-pointer group"
+                  onClick={() => setSelectedQuestionIdx(idx)}
+                  className={`p-4 bg-gradient-to-r from-slate-800/60 to-slate-800/30 rounded-lg border transition hover:shadow-lg hover:shadow-cyan-500/20 cursor-pointer group ${
+                    selectedQuestionIdx === idx
+                      ? "border-cyan-400/80 ring-1 ring-cyan-400/50"
+                      : "border-purple-500/40 hover:border-cyan-400/60"
+                  }`}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-start gap-3 flex-1">
@@ -414,6 +517,133 @@ const DSARoomManager = ({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Problem + Editor */}
+          <div className="flex-1 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-emerald-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-emerald-500/10">
+            {activeQuestion ? (
+              <div className="h-full flex flex-col">
+                <div className="mb-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-2xl font-black text-emerald-300">{activeQuestion.title}</h3>
+                      <p className="text-sm text-slate-300 mt-2">{activeQuestion.description}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        {activeQuestion.geeksforgeeksUrl && (
+                          <a
+                            href={activeQuestion.geeksforgeeksUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-cyan-300 hover:text-cyan-200"
+                          >
+                            Full Statement (GFG)
+                          </a>
+                        )}
+                        {activeQuestion.leetcodeUrl && (
+                          <a
+                            href={activeQuestion.leetcodeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-cyan-300 hover:text-cyan-200"
+                          >
+                            LeetCode Link
+                          </a>
+                        )}
+                        {activeQuestion.sourceDay && (
+                          <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300">
+                            Day {activeQuestion.sourceDay}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      {(activeQuestion.difficulty || "medium").toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                {(activeQuestion.examples?.length || 0) > 0 && (
+                  <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/70 p-4">
+                    <div className="text-xs font-bold text-slate-400 mb-2">EXAMPLES</div>
+                    <div className="space-y-2">
+                      {activeQuestion.examples.map((ex, idx) => (
+                        <div key={idx} className="text-xs text-slate-300 font-mono">
+                          <div>Input: {ex.input}</div>
+                          <div>Output: {ex.output}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(activeQuestion.constraints?.length || 0) > 0 && (
+                  <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/70 p-4">
+                    <div className="text-xs font-bold text-slate-400 mb-2">CONSTRAINTS</div>
+                    <div className="text-xs text-slate-300 space-y-1">
+                      {activeQuestion.constraints.map((constraint, idx) => (
+                        <div key={idx}>• {constraint}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-400">LANGUAGE</label>
+                    <select
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
+                      className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white"
+                    >
+                      {LANGUAGE_OPTIONS.map((lang) => (
+                        <option key={lang} value={lang}>
+                          {lang.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleSubmitCode}
+                    disabled={isSubmittingCode}
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 rounded font-bold text-sm disabled:opacity-60"
+                  >
+                    {isSubmittingCode ? "Judging..." : "Submit (Piston)"}
+                  </button>
+                </div>
+
+                <textarea
+                  value={getCurrentCode()}
+                  onChange={(e) => handleCodeChange(e.target.value)}
+                  className="flex-1 min-h-[240px] bg-slate-950 border border-slate-700 rounded-lg p-4 font-mono text-sm text-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  spellCheck={false}
+                />
+
+                {submissionResult && (
+                  <div className={`mt-3 rounded-lg border p-3 text-sm ${
+                    submissionResult.passed
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                      : "bg-red-500/10 border-red-500/30 text-red-300"
+                  }`}>
+                    <div className="font-bold">
+                      {submissionResult.passed ? "All tests passed" : "Some test cases failed"}
+                    </div>
+                    {submissionResult.testResults?.length > 0 && (
+                      <div className="mt-2 text-xs space-y-1">
+                        {submissionResult.testResults.map((result, idx) => (
+                          <div key={idx}>
+                            Test {result.testCase}: {result.status}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400">
+                Waiting for questions...
+              </div>
+            )}
           </div>
 
           {/* Leaderboard & Activity Panel */}

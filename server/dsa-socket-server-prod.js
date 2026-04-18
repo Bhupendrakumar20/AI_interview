@@ -277,6 +277,7 @@ function registerSocketHandlers(io) {
       const room = getRoom(code);
       room.users[socket.id] = {
         id: socket.id,
+        userId: userId, // ✅ ADD userId to user object (CRITICAL - was missing!)
         username,
         avatar,
         solvedAt: null,
@@ -294,10 +295,6 @@ function registerSocketHandlers(io) {
 
     // ── JOIN ROOM ────────────────────────────────────────────────────────────
     socket.on("room_join", ({ roomCode, username, avatar, userId }, callback) => {
-      if (!userId) {
-        return callback({ success: false, error: "User ID required" });
-      }
-
       const room = getRoom(roomCode);
 
       if (!room) return callback({ success: false, error: "Room not found." });
@@ -305,22 +302,50 @@ function registerSocketHandlers(io) {
       if (Object.keys(room.users).length >= MAX_ROOM_SIZE)
         return callback({ success: false, error: "Room is full." });
 
-      // ✅ CRITICAL: Check if userId is already in ANOTHER room
-      const existingRoomCode = userRoomMap.get(userId);
-      if (existingRoomCode && existingRoomCode !== roomCode) {
-        return callback({
-          success: false,
-          error: `User already in room: ${existingRoomCode}. Cannot be in multiple rooms. Leave first.`,
-        });
+      console.log(`[Debug] Join attempt: username=${username}, userId=${userId}, roomCode=${roomCode}`);
+
+      // ✅ Validation Priority 1: Check by userId (database ID)
+      if (userId) {
+        // Check 1a: userId already in another room
+        const existingRoomCode = userRoomMap.get(userId);
+        if (existingRoomCode && existingRoomCode !== roomCode) {
+          console.error(`[Block] ${username} already in room ${existingRoomCode}, rejecting join to ${roomCode}`);
+          return callback({
+            success: false,
+            error: `User already in room: ${existingRoomCode}. Cannot be in multiple rooms. Leave first.`,
+          });
+        }
+
+        // Check 1b: userId already in THIS specific room (different device/connection)
+        const userAlreadyInRoom = Object.values(room.users).some(u => u.userId === userId);
+        if (userAlreadyInRoom) {
+          console.error(`[Block] ${username} (${userId}) already in this room from another device`);
+          return callback({
+            success: false,
+            error: "This account is already joined in this room from another device. Cannot join twice.",
+          });
+        }
       }
 
-      // ✅ CRITICAL: Check if userId already exists in THIS specific room (from different device/connection)
-      const userAlreadyInRoom = Object.values(room.users).some(u => u.userId === userId);
-      if (userAlreadyInRoom) {
-        return callback({
-          success: false,
-          error: "This account is already joined in this room from another device. Cannot join twice.",
-        });
+      // ✅ Validation Priority 2: FALLBACK - Check by username (if userId missing or as extra layer)
+      const userByUsername = Object.values(room.users).find(u => u.username === username);
+      if (userByUsername) {
+        console.error(`[Block] Username ${username} already in room, forcing disconnect of old connection`);
+        
+        // AGGRESSIVE: Force disconnect the old socket with same username
+        const oldSocket = io.sockets.sockets.get(userByUsername.id);
+        if (oldSocket) {
+          console.log(`[Force-Disconnect] Disconnecting old socket ${userByUsername.id} for duplicate ${username}`);
+          oldSocket.emit("duplicate_join_detected", { 
+            message: "Your account was logged in from another device. Disconnecting..." 
+          });
+          oldSocket.disconnect(true);
+        }
+        
+        // Remove the stale user entry after force disconnect
+        delete room.users[userByUsername.id];
+        delete room.votes.questionMode[userByUsername.id];
+        delete room.votes.timeLimit[userByUsername.id];
       }
 
       socket.join(roomCode);

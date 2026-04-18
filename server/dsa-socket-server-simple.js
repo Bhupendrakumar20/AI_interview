@@ -7,6 +7,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import { getQuestionTestCases } from '../constants/dsaTestCaseBank.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -42,6 +43,108 @@ const rooms = new Map(); // roomId -> { roomCode, ownerId, ownerUsername, approv
 const userRooms = new Map(); // userId -> roomId
 const userSockets = new Map(); // userId -> socketId for targeting specific users
 const socketUsers = new Map(); // socketId -> { userId, username, roomId }
+
+const PISTON_API_URL = process.env.PISTON_API_URL || 'https://emkc.org/api/v2/piston';
+const PISTON_TIMEOUT_MS = 8000;
+const LANGUAGE_MAP = {
+  javascript: 'javascript',
+  js: 'javascript',
+  python: 'python',
+  py: 'python',
+  cpp: 'cpp',
+  'c++': 'cpp',
+  java: 'java',
+};
+
+function normalizeOutput(text) {
+  return String(text ?? '').replace(/\r\n/g, '\n').trim();
+}
+
+function getPistonLanguage(language) {
+  return LANGUAGE_MAP[String(language || '').toLowerCase()] || 'javascript';
+}
+
+function getFileName(language) {
+  const names = {
+    javascript: 'main.js',
+    python: 'main.py',
+    cpp: 'main.cpp',
+    java: 'Main.java',
+  };
+  return names[language] || 'main.js';
+}
+
+async function executeWithPiston(sourceCode, language, stdin = '') {
+  const pistonLanguage = getPistonLanguage(language);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PISTON_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${PISTON_API_URL}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: pistonLanguage,
+        version: '*',
+        files: [{ name: getFileName(pistonLanguage), content: sourceCode }],
+        stdin,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) throw new Error(`Piston request failed (${response.status})`);
+    const data = await response.json();
+
+    return {
+      success: true,
+      stdout: data?.run?.stdout || '',
+      stderr: data?.run?.stderr || '',
+      exitCode: data?.run?.exit_code ?? 0,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      stdout: '',
+      stderr: error?.message || 'Execution error',
+      exitCode: -1,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function judgeSubmission(sourceCode, language, question) {
+  const bankCases = getQuestionTestCases(question);
+  const testCases = question?.hiddenTestCases || question?.testCases || bankCases || [];
+  if (!Array.isArray(testCases) || testCases.length === 0) {
+    return {
+      passed: false,
+      testResults: [{ testCase: 1, status: 'No Test Cases Configured', stderr: 'Question has no tests' }],
+    };
+  }
+
+  const testResults = [];
+  for (let i = 0; i < testCases.length; i += 1) {
+    const tc = testCases[i];
+    const run = await executeWithPiston(sourceCode, language, tc.stdin || tc.input || '');
+    const expected = normalizeOutput(tc.expectedOutput || tc.expected || '');
+    const actual = normalizeOutput(run.stdout);
+    const passed = run.success && run.exitCode === 0 && actual === expected;
+
+    testResults.push({
+      testCase: i + 1,
+      status: passed ? 'Accepted' : 'Failed',
+      stdout: run.stdout,
+      stderr: run.stderr,
+      expectedOutput: expected,
+      actualOutput: actual,
+    });
+
+    if (!passed) return { passed: false, testResults };
+  }
+
+  return { passed: true, testResults };
+}
 
 // Helper function to generate room codes
 function generateRoomCode() {
@@ -544,27 +647,12 @@ dsaRoomNamespace.on('connection', (socket) => {
         return;
       }
 
-      // Use questions from client (100 DAYS OF CODE) or fallback to mocks
-      let questions = clientQuestions || [
-        {
-          id: 'q1',
-          title: 'Two Sum',
-          description: 'Find two numbers that add up to target',
-          difficulty: 'easy',
-        },
-        {
-          id: 'q2',
-          title: 'Longest Substring',
-          description: 'Find longest substring without repeating characters',
-          difficulty: 'medium',
-        },
-        {
-          id: 'q3',
-          title: 'Median of Sorted Arrays',
-          description: 'Find median of two sorted arrays',
-          difficulty: 'hard',
-        },
-      ];
+      // Questions must come from the same 100-days flow payload (no static fallback).
+      const questions = Array.isArray(clientQuestions) ? clientQuestions : [];
+      if (questions.length === 0) {
+        socket.emit('error', { message: 'No questions received from 100 days source.' });
+        return;
+      }
 
       // Build leaderboard with approved members (CRITICAL: include owner + all approved members)
       const leaderboard = [
@@ -672,42 +760,25 @@ dsaRoomNamespace.on('connection', (socket) => {
 
   // ─── CODE SUBMISSION ────────────────────────────────────────────────
 
-  socket.on('code_submit', (data) => {
+  socket.on('code_submit', async (data, callback) => {
     try {
-      const { roomId, userId, username, questionId, isCorrect, time } = data;
-      console.log(`[code_submit] ${username} submitted for question ${questionId} - ${isCorrect ? '✓ Correct' : '✗ Wrong'}`);
+      const { roomId, userId, username, questionId, sourceCode, language = 'javascript' } = data;
+      console.log(`[code_submit] ${username} submitted for question ${questionId} in ${language}`);
 
       const room = rooms.get(roomId);
-      if (!room) return;
+      if (!room) {
+        callback?.({ success: false, error: 'Room not found' });
+        return;
+      }
 
-      if (isCorrect) {
-        // Calculate points based on time (faster = more points)
-        const timeBonus = Math.max(0, 100 - Math.floor(time / 6));
-        const basePoints = 50;
-        const points = basePoints + timeBonus;
+      const question = (room.questions || []).find((q) => q.id === questionId) || room.questions?.[0];
+      if (!question) {
+        callback?.({ success: false, error: 'Question not found' });
+        return;
+      }
 
-        // Broadcast to all members in room
-        dsaRoomNamespace.to(`room_${roomId}`).emit('submission_notification', {
-          type: 'success',
-          userId,
-          username,
-          questionId,
-          points,
-          time,
-          message: `🎉 ${username} solved a problem in ${time}s (+${points} pts)`,
-          icon: '✓',
-        });
-
-        // Trigger leaderboard update
-        socket.emit('leaderboard_update', {
-          roomId,
-          userId,
-          points,
-          solved: 1,
-          status: 'completed',
-        });
-      } else {
-        // Wrong submission - broadcast to all
+      const verdict = await judgeSubmission(sourceCode, language, question);
+      if (!verdict.passed) {
         dsaRoomNamespace.to(`room_${roomId}`).emit('submission_notification', {
           type: 'error',
           userId,
@@ -716,11 +787,59 @@ dsaRoomNamespace.on('connection', (socket) => {
           message: `${username} tried a problem`,
           icon: '⚠️',
         });
+
+        callback?.({ success: true, passed: false, testResults: verdict.testResults });
+        return;
       }
 
-      console.log(`[code_submit] Broadcasted to room ${roomId}`);
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - (room.startTime || Date.now())) / 1000));
+      const timeBonus = Math.max(0, 100 - Math.floor(elapsedSeconds / 6));
+      const points = 50 + timeBonus;
+
+      const playerIdx = room.leaderboard?.findIndex((p) => p.userId === userId);
+      if (playerIdx >= 0) {
+        const current = room.leaderboard[playerIdx];
+        current.points = Number(current.points || 0) + points;
+        current.solved = Number(current.solved || 0) + 1;
+        current.status = 'completed';
+      }
+
+      const sortedLeaderboard = [...(room.leaderboard || [])].sort(
+        (a, b) => (b.points || 0) - (a.points || 0)
+      );
+      room.leaderboard = sortedLeaderboard;
+
+      dsaRoomNamespace.to(`room_${roomId}`).emit('submission_notification', {
+        type: 'success',
+        userId,
+        username,
+        questionId,
+        points,
+        time: elapsedSeconds,
+        message: `🎉 ${username} solved a problem (+${points} pts)`,
+        icon: '✓',
+      });
+
+      dsaRoomNamespace.to(`room_${roomId}`).emit('leaderboard_update', {
+        leaderboard: sortedLeaderboard,
+        updatedPlayer: {
+          userId,
+          username,
+          points: sortedLeaderboard.find((p) => p.userId === userId)?.points || points,
+          solved: sortedLeaderboard.find((p) => p.userId === userId)?.solved || 1,
+          status: 'completed',
+        },
+      });
+
+      callback?.({
+        success: true,
+        passed: true,
+        points,
+        testResults: verdict.testResults,
+      });
     } catch (error) {
       console.error('[code_submit] Error:', error);
+      callback?.({ success: false, error: 'Submission failed' });
     }
   });
 
@@ -832,45 +951,7 @@ dsaRoomNamespace.on('connection', (socket) => {
     }
   });
 
-  // ─── CODE SUBMISSION ────────────────────────────────────────────────────
-
-  socket.on('code_submit', (data) => {
-    try {
-      const { questionId, code, language } = data;
-      const roomId = socket.data.roomId;
-      const userId = socket.data.userId;
-
-      if (!roomId) {
-        socket.emit('error', { message: 'Not in a room' });
-        return;
-      }
-
-      console.log(`[code_submit] ${socket.data.username} submitted code in ${language}`);
-
-      // Mock result - simulate test passing
-      const passed = Math.random() > 0.3; // 70% pass rate for demo
-
-      socket.emit('submission_result', {
-        questionId,
-        passed,
-        message: passed ? 'All tests passed!' : 'Test failed',
-        points: passed ? 150 : 0,
-      });
-
-      // Broadcast to leaderboard
-      dsaRoomNamespace.to(`room_${roomId}`).emit('leaderboard_update', {
-        participantId: userId,
-        username: socket.data.username,
-        points: passed ? 150 : 0,
-        solved: passed,
-      });
-
-      console.log(`[code_submit] Result: ${passed ? 'PASSED' : 'FAILED'}`);
-    } catch (error) {
-      console.error('[code_submit] Error:', error);
-      socket.emit('error', { message: 'Submission failed' });
-    }
-  });
+  // NOTE: code_submit is handled above with Piston judging.
 
   // ─── TIMER TICK ─────────────────────────────────────────────────────────
 

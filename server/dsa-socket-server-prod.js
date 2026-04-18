@@ -14,6 +14,7 @@ const { Server } = require("socket.io");
 const http = require("http");
 const express = require("express");
 const axios = require("axios");
+const { getMixedProblems, fetchLeetCodeDetails, getRandomProblem } = require("../lib/dsa-question-service");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -390,6 +391,114 @@ function registerSocketHandlers(io) {
         timeLimitVotes: room.votes.timeLimit,
         totalUsers: Object.keys(room.users).length,
       });
+    });
+
+    // ── GET QUESTION LIST (Real problems from LeetCode/GFG) ──────────────────
+    socket.on("get_question_list", async ({ difficulty = "Medium" }, callback) => {
+      try {
+        console.log(`[Questions] Fetching ${difficulty} problems...`);
+        const problems = await getMixedProblems(difficulty, 5);
+        
+        // Return only titles and IDs (for the clickable list)
+        const questionTitles = problems.map((p) => ({
+          id: p.id,
+          title: p.title,
+          difficulty: p.difficulty,
+          source: p.source,
+          tags: p.tags,
+          url: p.url,
+          acRate: p.acRate,
+        }));
+
+        callback?.({
+          success: true,
+          questions: questionTitles,
+        });
+        console.log(`[Questions] Sent ${questionTitles.length} problems`);
+      } catch (error) {
+        console.error("[Questions] Error fetching problems:", error.message);
+        callback?.({
+          success: false,
+          error: "Failed to fetch questions. Using fallback.",
+          questions: [
+            {
+              id: "fallback_1",
+              title: "Two Sum",
+              difficulty: "Easy",
+              source: "leetcode",
+              tags: ["Array", "Hash Table"],
+            },
+            {
+              id: "fallback_2", 
+              title: "Add Two Numbers",
+              difficulty: "Medium",
+              source: "leetcode",
+              tags: ["Linked List", "Math"],
+            },
+            {
+              id: "fallback_3",
+              title: "Longest Substring Without Repeating",
+              difficulty: "Medium",
+              source: "leetcode",
+              tags: ["Hash Table", "String"],
+            },
+          ],
+        });
+      }
+    });
+
+    // ── GET QUESTION DETAILS (Full problem with description & test cases) ────
+    socket.on("get_question_details", async ({ questionId, titleSlug }, callback) => {
+      try {
+        console.log(`[Question Details] Fetching ${titleSlug}...`);
+        
+        let details;
+        if (questionId.startsWith("lc_")) {
+          // Fetch from LeetCode
+          details = await fetchLeetCodeDetails(titleSlug);
+        } else {
+          // GFG or fallback - return mock data with test cases
+          details = {
+            id: questionId,
+            title: titleSlug.replace(/-/g, " "),
+            description:
+              "Given an array of integers, find the pair that sums to a target value.",
+            examples: [
+              {
+                input: "nums = [2,7,11,15], target = 9",
+                output: "[0,1]",
+                explanation: "Because nums[0] + nums[1] == 9, we return [0, 1].",
+              },
+              {
+                input: "nums = [3,2,4], target = 6",
+                output: "[1,2]",
+                explanation: "Because nums[1] + nums[2] == 6, we return [1, 2].",
+              },
+            ],
+            testCases: [
+              { stdin: "4\n2 7 11 15\n9", expectedOutput: "0 1" },
+              { stdin: "3\n3 2 4\n6", expectedOutput: "1 2" },
+              { stdin: "2\n3 3\n6", expectedOutput: "0 1" },
+            ],
+          };
+        }
+
+        if (details) {
+          callback?.({
+            success: true,
+            question: details,
+          });
+          console.log(`[Question Details] Sent ${details.title}`);
+        } else {
+          throw new Error("Could not fetch question details");
+        }
+      } catch (error) {
+        console.error("[Question Details] Error:", error.message);
+        callback?.({
+          success: false,
+          error: "Failed to fetch question details",
+        });
+      }
     });
 
     // ── START ROOM (Host only) ───────────────────────────────────────────────

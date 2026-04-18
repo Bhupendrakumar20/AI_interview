@@ -24,8 +24,10 @@ const DSARoomLive = ({
   // ─── STATE ────────────────────────────────────────────────────────────
   const [code, setCode] = useState('// Write your solution here\n');
   const [language, setLanguage] = useState('javascript');
-  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
-  const [questions, setQuestions] = useState(initialQuestions);
+  const [currentQuestionId, setCurrentQuestionId] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [questionsList, setQuestionsList] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState(initialParticipants);
   
   const [timeRemaining, setTimeRemaining] = useState(timeLimit * 60 * 1000);
@@ -44,6 +46,36 @@ const DSARoomLive = ({
   const lastSyncTimeRef = useRef(Date.now());
 
   // ─── EFFECTS ────────────────────────────────────────────────────────────
+
+  // Fetch questions list on mount
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.emit('get_question_list', { difficulty: 'Medium' }, (response) => {
+      if (response?.success && response.questions) {
+        setQuestionsList(response.questions);
+        // Select first question by default
+        if (response.questions.length > 0) {
+          setCurrentQuestionId(response.questions[0].id);
+          fetchQuestionDetails(response.questions[0].id, response.questions[0].title);
+        }
+      }
+      setQuestionsLoading(false);
+    });
+  }, [socket]);
+
+  // Fetch question details when question is selected
+  const fetchQuestionDetails = (questionId, titleSlug) => {
+    if (!socket) return;
+
+    socket.emit('get_question_details', { questionId, titleSlug }, (response) => {
+      if (response?.success && response.question) {
+        setCurrentQuestion(response.question);
+        setCurrentQuestionId(questionId);
+        setCode('// Write your solution here\n');
+      }
+    });
+  };
 
   // Initialize room
   useEffect(() => {

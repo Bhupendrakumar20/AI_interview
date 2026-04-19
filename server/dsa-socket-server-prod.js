@@ -393,56 +393,61 @@ function registerSocketHandlers(io) {
       });
     });
 
-    // ── GET QUESTION LIST (Real problems from LeetCode/GFG) ──────────────────
+    // ── GET QUESTION LIST (LeetCode ONLY via GraphQL API) ──────────────────
     socket.on("get_question_list", async ({ difficulty = "Medium" }, callback) => {
       try {
-        console.log(`[Questions] Fetching ${difficulty} problems...`);
+        console.log(`[LeetCode Questions] Fetching ${difficulty} problems from LeetCode GraphQL API...`);
+        // LEETCODE ONLY - getMixedProblems calls fetchFromLeetCode exclusively
         const problems = await getMixedProblems(difficulty, 5);
         
-        // Return only titles and IDs (for the clickable list)
-        const questionTitles = problems.map((p) => ({
-          id: p.id,
-          title: p.title,
-          difficulty: p.difficulty,
-          source: p.source,
-          tags: p.tags,
-          url: p.url,
-          acRate: p.acRate,
-        }));
+        if (!problems || problems.length === 0) {
+          console.warn("[LeetCode Questions] LeetCode API returned no results");
+          return callback?.({
+            success: false,
+            error: "No LeetCode problems available at this time. Check LeetCode API connectivity.",
+            questions: [],
+          });
+        }
+        
+        // Return ONLY LeetCode questions with LeetCode titles from GraphQL API
+        const leetcodeQuestions = problems.map((p) => {
+          // STRICT VALIDATION - Must be LeetCode
+          if (!p.id || !p.id.startsWith("lc_")) {
+            console.error("[LeetCode Validation] Non-LeetCode question detected:", p);
+            return null;
+          }
+          return {
+            id: p.id,
+            title: p.title,  // LeetCode title from GraphQL ONLY
+            difficulty: p.difficulty,
+            source: "leetcode",  // ALWAYS leetcode
+            tags: p.tags || [],
+            titleSlug: p.titleSlug,  // For fetching full details
+            url: p.url,  // Official LeetCode URL
+            acRate: p.acRate,
+          };
+        }).filter(q => q !== null);
+
+        if (leetcodeQuestions.length === 0) {
+          console.error("[LeetCode Questions] All questions failed validation");
+          return callback?.({
+            success: false,
+            error: "LeetCode questions validation failed.",
+            questions: [],
+          });
+        }
 
         callback?.({
           success: true,
-          questions: questionTitles,
+          questions: leetcodeQuestions,
         });
-        console.log(`[Questions] Sent ${questionTitles.length} problems`);
+        console.log(`[LeetCode Questions] ✅ Successfully sent ${leetcodeQuestions.length} verified LeetCode problems`);
       } catch (error) {
-        console.error("[Questions] Error fetching problems:", error.message);
+        console.error("[LeetCode Questions] Error fetching from LeetCode API:", error.message);
         callback?.({
           success: false,
-          error: "Failed to fetch questions. Using fallback.",
-          questions: [
-            {
-              id: "fallback_1",
-              title: "Two Sum",
-              difficulty: "Easy",
-              source: "leetcode",
-              tags: ["Array", "Hash Table"],
-            },
-            {
-              id: "fallback_2", 
-              title: "Add Two Numbers",
-              difficulty: "Medium",
-              source: "leetcode",
-              tags: ["Linked List", "Math"],
-            },
-            {
-              id: "fallback_3",
-              title: "Longest Substring Without Repeating",
-              difficulty: "Medium",
-              source: "leetcode",
-              tags: ["Hash Table", "String"],
-            },
-          ],
+          error: "Failed to connect to LeetCode API. LeetCode GraphQL service may be unavailable.",
+          questions: [],
         });
       }
     });
@@ -450,53 +455,67 @@ function registerSocketHandlers(io) {
     // ── GET QUESTION DETAILS (Full problem with description & test cases) ────
     socket.on("get_question_details", async ({ questionId, titleSlug }, callback) => {
       try {
-        console.log(`[Question Details] Fetching ${titleSlug}...`);
-        
-        let details;
-        if (questionId.startsWith("lc_")) {
-          // Fetch from LeetCode
-          details = await fetchLeetCodeDetails(titleSlug);
-        } else {
-          // Fallback - return mock data with test cases
-          details = {
-            id: questionId,
-            title: titleSlug.replace(/-/g, " "),
-            description:
-              "Given an array of integers, find the pair that sums to a target value.",
-            examples: [
-              {
-                input: "nums = [2,7,11,15], target = 9",
-                output: "[0,1]",
-                explanation: "Because nums[0] + nums[1] == 9, we return [0, 1].",
-              },
-              {
-                input: "nums = [3,2,4], target = 6",
-                output: "[1,2]",
-                explanation: "Because nums[1] + nums[2] == 6, we return [1, 2].",
-              },
-            ],
-            testCases: [
-              { stdin: "4\n2 7 11 15\n9", expectedOutput: "0 1" },
-              { stdin: "3\n3 2 4\n6", expectedOutput: "1 2" },
-              { stdin: "2\n3 3\n6", expectedOutput: "0 1" },
-            ],
-          };
+        // ========== STRICT LEETCODE-ONLY VALIDATION ==========
+        if (!questionId || !titleSlug) {
+          console.error("[LeetCode Details] Missing questionId or titleSlug");
+          return callback?.({
+            success: false,
+            error: "Invalid request: Missing question ID or slug.",
+          });
         }
 
-        if (details) {
-          callback?.({
-            success: true,
-            question: details,
+        if (!questionId.startsWith("lc_")) {
+          console.error("[LeetCode Details] REJECTED Non-LeetCode question ID:", questionId);
+          return callback?.({
+            success: false,
+            error: "ERROR: Only LeetCode problems are supported in DSA Room. Non-LeetCode questions are NOT allowed.",
           });
-          console.log(`[Question Details] Sent ${details.title}`);
-        } else {
-          throw new Error("Could not fetch question details");
         }
+
+        console.log(`[LeetCode Details] Fetching LeetCode problem from GraphQL API: ${titleSlug}...`);
+        
+        // FETCH FROM LEETCODE GRAPHQL API ONLY
+        const details = await fetchLeetCodeDetails(titleSlug);
+
+        if (!details) {
+          console.error("[LeetCode Details] LeetCode API returned null:", titleSlug);
+          return callback?.({
+            success: false,
+            error: "LeetCode API failed. The problem may not exist or the API is temporarily unavailable.",
+          });
+        }
+
+        // VALIDATE Response source is LeetCode
+        if (details.source !== "leetcode") {
+          console.error("[LeetCode Details] VALIDATION FAILED: Source is not LeetCode:", details.source);
+          return callback?.({
+            success: false,
+            error: "SECURITY ERROR: Received non-LeetCode content. Only LeetCode is allowed.",
+          });
+        }
+
+        // RETURN LEETCODE DATA ONLY
+        callback?.({
+          success: true,
+          question: {
+            id: details.id,
+            title: details.title,  // LeetCode title from GraphQL ONLY
+            titleSlug: details.titleSlug,
+            difficulty: details.difficulty,
+            description: details.description,  // LeetCode description from GraphQL ONLY
+            tags: details.tags || [],
+            examples: details.examples || [],
+            testCases: details.testCases || [],
+            url: details.url,
+            source: "leetcode",
+          },
+        });
+        console.log(`[LeetCode Details] Successfully sent LeetCode problem: "${details.title}" with full description and test cases`);
       } catch (error) {
-        console.error("[Question Details] Error:", error.message);
+        console.error("[LeetCode Details] Error fetching from LeetCode API:", error.message);
         callback?.({
           success: false,
-          error: "Failed to fetch question details",
+          error: "LeetCode API connection error. Please try another problem or check internet connectivity.",
         });
       }
     });

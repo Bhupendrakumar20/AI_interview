@@ -36,13 +36,19 @@ const DSARoomLive = ({
   useEffect(() => {
     if (!socket) return;
 
+    console.log("[DSA Room] Requesting LeetCode question list from socket server...");
     socket.emit('get_question_list', { difficulty: 'Medium' }, (response) => {
+      console.log("[DSA Room] Question list response received:", response);
       if (response?.success && response.questions) {
+        console.log(`[DSA Room] ✅ Loaded ${response.questions.length} LeetCode questions:`, response.questions.map(q => ({ id: q.id, title: q.title, source: q.source })));
         setQuestionsList(response.questions);
         if (response.questions.length > 0) {
+          console.log(`[DSA Room] First question: "${response.questions[0].title}" (${response.questions[0].id})`);
           setCurrentQuestionId(response.questions[0].id);
-          fetchQuestionDetails(response.questions[0].id, response.questions[0].title);
+          fetchQuestionDetails(response.questions[0].id, response.questions[0].titleSlug);
         }
+      } else {
+        console.error("[DSA Room] Failed to load questions:", response?.error || "Unknown error");
       }
       setQuestionsLoading(false);
     });
@@ -52,12 +58,19 @@ const DSARoomLive = ({
   const fetchQuestionDetails = (questionId, titleSlug) => {
     if (!socket) return;
 
+    console.log(`[DSA Room] Fetching LeetCode question details: "${titleSlug}" (ID: ${questionId})...`);
     socket.emit('get_question_details', { questionId, titleSlug }, (response) => {
+      console.log("[DSA Room] Question details response received:", response);
       if (response?.success && response.question) {
+        console.log(`[DSA Room] ✅ Loaded LeetCode question: "${response.question.title}"`);
+        console.log(`[DSA Room] Description length: ${response.question.description?.length || 0} chars`);
+        console.log(`[DSA Room] Examples: ${response.question.examples?.length || 0}, Test cases: ${response.question.testCases?.length || 0}`);
         setCurrentQuestion(response.question);
         setCurrentQuestionId(questionId);
         setCode('// Write your solution here\n');
         setActiveTab('problem');
+      } else {
+        console.error("[DSA Room] Failed to load question details:", response?.error || "Unknown error");
       }
     });
   };

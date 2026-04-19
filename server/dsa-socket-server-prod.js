@@ -14,7 +14,7 @@ const { Server } = require("socket.io");
 const http = require("http");
 const express = require("express");
 const axios = require("axios");
-const { getMixedProblems, fetchLeetCodeDetails, getRandomProblem, fetchGFGDetails } = require("../lib/dsa-question-service");
+const { getMixedProblems, fetchLeetCodeDetails, getRandomProblem } = require("../lib/dsa-question-service");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -456,9 +456,6 @@ function registerSocketHandlers(io) {
         if (questionId.startsWith("lc_")) {
           // Fetch from LeetCode
           details = await fetchLeetCodeDetails(titleSlug);
-        } else if (questionId.startsWith("gfg_")) {
-          // Fetch from GFG curated problems
-          details = fetchGFGDetails(questionId);
         } else {
           // Fallback - return mock data with test cases
           details = {

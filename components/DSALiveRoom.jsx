@@ -433,8 +433,9 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
   useEffect(() => {
     socket.connect();
 
-    socket.on("room_started", ({ config, endsAt, leaderboard }) => {
-      console.log("Room started:", { config, endsAt, leaderboard });
+    // ✅ CRITICAL: Define all handlers BEFORE registering them
+    const handleRoomStarted = ({ config, endsAt, leaderboard }) => {
+      console.log("✅ [DSALiveRoom] Room started:", { config, endsAt, leaderboard });
       // Set timer from endsAt or config
       const now = Date.now();
       const timeLimitSecs = config?.timeLimitSecs || Math.round((endsAt - now) / 1000);
@@ -447,59 +448,71 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
         setLeaderboard(leaderboard);
       }
       addEvent("Room started! Good luck. Waiting for question...");
-    });
+    };
 
-    // ✅ FIXED: Listen for individual question assignment (for non-owners)
-    socket.on("question_assigned", ({ question: q }) => {
-      console.log("Question received:", q);
+    // ✅ CRITICAL: Listen for individual question assignment (for non-owners)
+    const handleQuestionAssigned = ({ question: q }) => {
+      console.log("✅ [DSALiveRoom] Question received:", q);
       setQuestion(q);
       addEvent(`Question loaded: ${q?.title || "Unknown"}`);
-    });
+    };
 
-    socket.on("timer_tick", ({ remaining }) => {
+    const handleTimerTick = ({ remaining }) => {
       setTimerRemaining(remaining);
       if (remaining === 60) addEvent("⚠ 1 minute remaining!");
-    });
+    };
 
-    socket.on("leaderboard_update", ({ leaderboard: lb, event: ev }) => {
+    const handleLeaderboardUpdate = ({ leaderboard: lb, event: ev }) => {
       setLeaderboard(lb);
       if (ev.type === "solve" || ev.type === "first_blood") {
         addEvent(`${ev.isFirstBlood ? "FIRST BLOOD" : "SOLVED"} ${ev.username} solved! +${ev.points} pts`);
       }
-    });
+    };
 
-    socket.on("first_blood", (data) => {
+    const handleFirstBlood = (data) => {
       setFirstBlood(data);
       setTimeout(() => setFirstBlood(null), 8000);
-    });
+    };
 
-    socket.on("user_judging", ({ username: uname }) => {
+    const handleUserJudging = ({ username: uname }) => {
       addEvent(`${uname} submitted — judging…`);
-    });
+    };
 
-    socket.on("user_left", ({ username: uname }) => {
+    const handleUserLeft = ({ username: uname }) => {
       addEvent(`${uname} disconnected.`);
-    });
+    };
 
-    socket.on("room_ended", ({ leaderboard: lb, codeReview, summary }) => {
+    const handleRoomEnded = ({ leaderboard: lb, codeReview, summary }) => {
+      console.log("✅ [DSALiveRoom] Room ended");
       setRoomStatus("ended");
       setLeaderboard(lb);
       setReviewSubmissions(codeReview);
       setPostMatch({ leaderboard: lb, summary });
       addEvent("Room ended! Check results.");
-    });
+    };
+
+    // ✅ CRITICAL: Register ALL listeners ONCE
+    socket.on("room_started", handleRoomStarted);
+    socket.on("question_assigned", handleQuestionAssigned);
+    socket.on("timer_tick", handleTimerTick);
+    socket.on("leaderboard_update", handleLeaderboardUpdate);
+    socket.on("first_blood", handleFirstBlood);
+    socket.on("user_judging", handleUserJudging);
+    socket.on("user_left", handleUserLeft);
+    socket.on("room_ended", handleRoomEnded);
 
     socket.emit("set_language", { language: "javascript" });
 
+    // ✅ CRITICAL: Clean up ALL listeners on unmount (must pass handler reference)
     return () => {
-      socket.off("room_started");
-      socket.off("question_assigned");
-      socket.off("timer_tick");
-      socket.off("leaderboard_update");
-      socket.off("first_blood");
-      socket.off("user_judging");
-      socket.off("user_left");
-      socket.off("room_ended");
+      socket.off("room_started", handleRoomStarted);
+      socket.off("question_assigned", handleQuestionAssigned);
+      socket.off("timer_tick", handleTimerTick);
+      socket.off("leaderboard_update", handleLeaderboardUpdate);
+      socket.off("first_blood", handleFirstBlood);
+      socket.off("user_judging", handleUserJudging);
+      socket.off("user_left", handleUserLeft);
+      socket.off("room_ended", handleRoomEnded);
     };
   }, []);
 

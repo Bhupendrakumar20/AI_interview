@@ -71,7 +71,6 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
   // Socket state
   const [socketError, setSocketError] = useState(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
-  const [listenersSetup, setListenersSetup] = useState(false);
 
   const socket = getSocket();
 
@@ -93,60 +92,61 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
       setSocketError(String(error) || "Failed to connect to DSA Room server");
     };
 
-    // ✅ CRITICAL FIX: Setup ALL listeners immediately, BEFORE any join
-    const setupGlobalListeners = () => {
-      // These listeners work for BOTH owner and non-owners
-      socket.on("lobby_update", ({ users: u }) => {
-        console.log("[DSA] Lobby update:", u);
-        setUsers(u);
-      });
-
-      socket.on("vote_update", ({ questionModeVotes: qv, timeLimitVotes: tv }) => {
-        console.log("[DSA] Vote update:", { qv, tv });
-        setQuestionModeVotes(qv);
-        setTimeLimitVotes(tv);
-      });
-
-      // ✅ CRITICAL FIX: room_started event listener - for both owner and non-owners
-      socket.on("room_started", (data) => {
-        console.log("[DSA] 🎮 Room started event received:", data);
-        setRoomStatus("active");
-      });
-
-      socket.on("user_left", ({ users: u }) => {
-        console.log("[DSA] User left:", u);
-        setUsers(u);
-      });
-
-      socket.on("host_transferred", ({ newHostId }) => {
-        console.log("[DSA] Host transferred to:", newHostId);
-        setIsHost(newHostId === socket.id);
-      });
-
-      setListenersSetup(true);
+    // ✅ CRITICAL FIX: These listeners MUST be registered ONCE per component lifetime
+    const handleLobbyUpdate = ({ users: u }) => {
+      console.log("[DSA] Lobby update:", u);
+      setUsers(u);
     };
 
-    // Setup global listeners immediately
-    if (!listenersSetup) {
-      setupGlobalListeners();
-    }
+    const handleVoteUpdate = ({ questionModeVotes: qv, timeLimitVotes: tv }) => {
+      console.log("[DSA] Vote update:", { qv, tv });
+      setQuestionModeVotes(qv);
+      setTimeLimitVotes(tv);
+    };
 
+    // ✅ CRITICAL: room_started event listener - for BOTH owner and non-owners
+    const handleRoomStarted = (data) => {
+      console.log("[DSA] 🎮 Room started event received:", data);
+      setRoomStatus("active");
+    };
+
+    const handleUserLeft = ({ users: u }) => {
+      console.log("[DSA] User left:", u);
+      setUsers(u);
+    };
+
+    const handleHostTransferred = ({ newHostId }) => {
+      console.log("[DSA] Host transferred to:", newHostId);
+      setIsHost(newHostId === socket.id);
+    };
+
+    // ✅ FIXED: Register ALL listeners ONCE on mount
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("connect_error", handleConnectError);
+    socket.on("lobby_update", handleLobbyUpdate);
+    socket.on("vote_update", handleVoteUpdate);
+    socket.on("room_started", handleRoomStarted);
+    socket.on("user_left", handleUserLeft);
+    socket.on("host_transferred", handleHostTransferred);
 
     // Check if already connected
     if (socket.connected) {
       setIsSocketConnected(true);
     }
 
+    // ✅ CRITICAL: Clean up ALL listeners on unmount
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("connect_error", handleConnectError);
-      // DO NOT remove room-specific listeners here - they're needed throughout
+      socket.off("lobby_update", handleLobbyUpdate);
+      socket.off("vote_update", handleVoteUpdate);
+      socket.off("room_started", handleRoomStarted);
+      socket.off("user_left", handleUserLeft);
+      socket.off("host_transferred", handleHostTransferred);
     };
-  }, [socket, listenersSetup]);
+  }, []);
 
   // ── CREATE ROOM ──────────────────────────────────────────────────────────────
   const handleCreateRoom = async () => {

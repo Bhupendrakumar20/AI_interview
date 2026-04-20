@@ -433,14 +433,20 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
   useEffect(() => {
     socket.connect();
 
-    socket.on("room_started", ({ question: q, config }) => {
-      console.log("Room started:", { q, config });
-      setQuestion(q);
-      if (config?.timeLimitSecs) {
-        setTimerTotal(config.timeLimitSecs);
-        setTimerRemaining(config.timeLimitSecs);
+    socket.on("room_started", ({ config, endsAt, leaderboard }) => {
+      console.log("Room started:", { config, endsAt, leaderboard });
+      // Set timer from endsAt or config
+      const now = Date.now();
+      const timeLimitSecs = config?.timeLimitSecs || Math.round((endsAt - now) / 1000);
+      if (timeLimitSecs > 0) {
+        setTimerTotal(timeLimitSecs);
+        setTimerRemaining(timeLimitSecs);
       }
-      addEvent("Room started! Good luck.");
+      // Update leaderboard
+      if (leaderboard) {
+        setLeaderboard(leaderboard);
+      }
+      addEvent("Room started! Good luck. Waiting for question...");
     });
 
     // ✅ FIXED: Listen for individual question assignment (for non-owners)

@@ -71,10 +71,11 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
   // Socket state
   const [socketError, setSocketError] = useState(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [listenersSetup, setListenersSetup] = useState(false);
 
   const socket = getSocket();
 
-  // Setup socket event listeners on component mount
+  // Setup socket event listeners on component mount - IMMEDIATELY, not after join
   useEffect(() => {
     const handleConnect = () => {
       console.log("✅ Socket connected!");
@@ -92,6 +93,44 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
       setSocketError(String(error) || "Failed to connect to DSA Room server");
     };
 
+    // ✅ CRITICAL FIX: Setup ALL listeners immediately, BEFORE any join
+    const setupGlobalListeners = () => {
+      // These listeners work for BOTH owner and non-owners
+      socket.on("lobby_update", ({ users: u }) => {
+        console.log("[DSA] Lobby update:", u);
+        setUsers(u);
+      });
+
+      socket.on("vote_update", ({ questionModeVotes: qv, timeLimitVotes: tv }) => {
+        console.log("[DSA] Vote update:", { qv, tv });
+        setQuestionModeVotes(qv);
+        setTimeLimitVotes(tv);
+      });
+
+      // ✅ CRITICAL FIX: room_started event listener - for both owner and non-owners
+      socket.on("room_started", (data) => {
+        console.log("[DSA] 🎮 Room started event received:", data);
+        setRoomStatus("active");
+      });
+
+      socket.on("user_left", ({ users: u }) => {
+        console.log("[DSA] User left:", u);
+        setUsers(u);
+      });
+
+      socket.on("host_transferred", ({ newHostId }) => {
+        console.log("[DSA] Host transferred to:", newHostId);
+        setIsHost(newHostId === socket.id);
+      });
+
+      setListenersSetup(true);
+    };
+
+    // Setup global listeners immediately
+    if (!listenersSetup) {
+      setupGlobalListeners();
+    }
+
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("connect_error", handleConnectError);
@@ -105,8 +144,9 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("connect_error", handleConnectError);
+      // DO NOT remove room-specific listeners here - they're needed throughout
     };
-  }, [socket]);
+  }, [socket, listenersSetup]);
 
   // ── CREATE ROOM ──────────────────────────────────────────────────────────────
   const handleCreateRoom = async () => {
@@ -145,7 +185,6 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
           setIsInRoom(true);
           setIsHost(true);
           setCurrentUser({ username: userName, id: socket.id });
-          setupRoomListeners();
           setSocketError(null);
         } else {
           const errorMsg = response?.error || "Failed to create room";
@@ -200,7 +239,6 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
           setUsers(response.lobbyState?.users || []);
           setIsHost(response.lobbyState?.hostId === socket.id);
           setCurrentUser({ username: userName, id: socket.id });
-          setupRoomListeners();
           setSocketError(null);
         } else {
           const errorMsg = response?.error || "Failed to join room";
@@ -215,30 +253,6 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
       console.error("❌ Error joining room:", error);
       setIsJoining(false);
     }
-  };
-
-  // ── SETUP ROOM LISTENERS ──────────────────────────────────────────────────────
-  const setupRoomListeners = () => {
-    socket.on("lobby_update", ({ users: u }) => {
-      setUsers(u);
-    });
-
-    socket.on("vote_update", ({ questionModeVotes: qv, timeLimitVotes: tv }) => {
-      setQuestionModeVotes(qv);
-      setTimeLimitVotes(tv);
-    });
-
-    socket.on("room_started", () => {
-      setRoomStatus("active");
-    });
-
-    socket.on("user_left", ({ users: u }) => {
-      setUsers(u);
-    });
-
-    socket.on("host_transferred", ({ newHostId }) => {
-      setIsHost(newHostId === socket.id);
-    });
   };
 
   // ── CAST VOTE ────────────────────────────────────────────────────────────────

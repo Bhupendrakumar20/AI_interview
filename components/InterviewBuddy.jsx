@@ -5,7 +5,7 @@ import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Bra
 import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
 import HumanBuddySession from "./HumanBuddySession";
-import DSARoomLobby from "./DSARoomLobby";
+import DSARoomLobbyProd from "./DSARoomLobbyProd";
 
 const InterviewBuddy = ({ userId }) => {
   const [currentMode, setCurrentMode] = useState("human");
@@ -329,13 +329,9 @@ const InterviewBuddy = ({ userId }) => {
   return (
     <>
       {dsaRoomActive ? (
-        <DSARoomLobby
+        <DSARoomLobbyProd
           userId={userId}
-          username={`User_${userId?.slice(0, 8) || 'Guest'}`}
-          onRoomJoined={(roomData) => {
-            toast.success("Room joined! Starting DSA competition...");
-            // Room data contains socket connection for further use
-          }}
+          userName={`User_${userId?.slice(0, 8) || 'Guest'}`}
           onClose={() => setDsaRoomActive(false)}
         />
       ) : isHumanBuddyActive && sessionCode && activeSessionId ? (

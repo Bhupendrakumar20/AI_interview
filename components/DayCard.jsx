@@ -45,15 +45,15 @@ export default function DayCard({ day, isExpanded, onToggleExpand, getDifficulty
                   key={question.id}
                   className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <button
                       onClick={() => setSelectedQuestion(question)}
-                      className="text-left group"
+                      className="w-full text-left group"
                     >
-                      <h4 className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <h4 className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors break-words">
                         {question.title}
                       </h4>
-                      <div className="flex items-center gap-3 mt-1 text-sm">
+                      <div className="flex items-center gap-3 mt-1 text-sm flex-wrap">
                         <span className={`font-medium ${getDifficultyColor(question.difficulty)}`}>
                           {question.difficulty}
                         </span>

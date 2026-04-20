@@ -443,20 +443,21 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
     // ✅ CRITICAL: Define all handlers BEFORE registering them
     const handleRoomStarted = ({ config, endsAt, leaderboard }) => {
       console.log("🎮 [DSALiveRoom] ✅✅✅ ROOM_STARTED EVENT RECEIVED ✅✅✅");
-      console.log("   config:", config);
-      console.log("   endsAt:", endsAt);
-      console.log("   leaderboard:", leaderboard);
+      console.log("   → Question Mode:", config?.questionMode || "unknown");
+      console.log("   → Time Limit:", config?.timeLimitSecs || "unknown", "seconds");
+      console.log("   → Ends At:", new Date(endsAt).toISOString());
+      console.log("   → Players:", leaderboard?.length || 0);
       // Set timer from endsAt or config
       const now = Date.now();
       const timeLimitSecs = config?.timeLimitSecs || Math.round((endsAt - now) / 1000);
       if (timeLimitSecs > 0) {
-        console.log("   Setting timer to", timeLimitSecs, "seconds");
+        console.log("   ⏱️ Setting timer to", timeLimitSecs, "seconds");
         setTimerTotal(timeLimitSecs);
         setTimerRemaining(timeLimitSecs);
       }
       // Update leaderboard
       if (leaderboard) {
-        console.log("   Updating leaderboard with", leaderboard.length, "players");
+        console.log("   📊 Leaderboard:", leaderboard.map(u => u.username).join(", "));
         setLeaderboard(leaderboard);
       }
       addEvent("Room started! Good luck. Waiting for question...");
@@ -554,18 +555,49 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(() => {
     if (isSubmitting || roomStatus !== "active") return;
+    
+    console.log("📤 [SUBMIT] Submitting code...");
+    console.log("   Language:", language);
+    console.log("   Code Length:", code.length, "characters");
+    
     setIsSubmitting(true);
     setSubmitResult(null);
+    const submitStartTime = Date.now();
 
-    socket.emit("code_submit", { sourceCode: code, language }, (result) => {
+    socket.emit("code_submit", { sourceCode: code, language, questionId: question?.id }, (result) => {
+      const elapsed = Date.now() - submitStartTime;
+      
+      console.log(`\n🔔 [SUBMIT_CALLBACK] Callback received after ${elapsed}ms`);
+      console.log("   Response:", result);
+      
       setIsSubmitting(false);
-      if (result.success) {
+      
+      if (result?.success) {
+        console.log("✅ [SUBMIT] Submission successful!");
+        if (result.passed) {
+          console.log("   ✅ Test cases passed!");
+          console.log("   Points:", result.points);
+          console.log("   First Blood:", result.isFirstBlood ? "YES! 🎯" : "No");
+        } else {
+          console.log("   ❌ Some test cases failed");
+          console.log("   Results:", result.testResults?.length || 0, "test cases");
+        }
         setSubmitResult(result);
       } else {
-        setSubmitResult({ error: result.error });
+        console.error("❌ [SUBMIT] Submission failed!");
+        console.error("   Error:", result?.error);
+        console.error("   Code:", result?.code);
+        setSubmitResult({ error: result?.error || "Unknown error" });
       }
     });
-  }, [code, language, isSubmitting, roomStatus]);
+
+    // Timeout warning
+    setTimeout(() => {
+      if (isSubmitting) {
+        console.warn("⚠️ [SUBMIT] Submission taking longer than expected (10s)");
+      }
+    }, 10000);
+  }, [code, language, isSubmitting, roomStatus, question?.id]);
 
   // ── Keyboard shortcut ────────────────────────────────────────────────────────
   useEffect(() => {

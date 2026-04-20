@@ -161,6 +161,8 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
     
     try {
       console.log("📝 [CREATE] Starting room creation...");
+      console.log("   userId:", userId);
+      console.log("   userName:", userName);
 
       // Step 1: Ensure socket is connected
       if (!socket.connected) {
@@ -170,7 +172,7 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
         // Wait for connection with timeout
         await new Promise((resolve, reject) => {
           const connectTimer = setTimeout(() => {
-            console.error("❌ [CREATE] Socket connection timeout");
+            console.error("❌ [CREATE] Socket connection timeout (5s)");
             reject(new Error("Socket connection timeout"));
           }, 5000);
 
@@ -194,34 +196,68 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
           socket.on("connect_error", onError);
         });
       } else {
-        console.log("ℹ️ [CREATE] Socket already connected");
+        console.log("ℹ️ [CREATE] Socket already connected, socket.id:", socket.id);
       }
 
-      // Step 2: Emit room_create event
-      console.log("📡 [CREATE] Emitting room_create...");
+      // Step 2: Emit room_create event with detailed logging
+      console.log("📡 [CREATE] Emitting room_create event...");
+      const startTime = Date.now();
+      let callbackCalled = false;
+
       socket.emit("room_create", { 
         username: userName, 
         avatar: "[U]", 
         userId 
       }, (response) => {
-        if (response && response.success) {
-          console.log("✅ [CREATE] Room created! Code:", response.roomCode);
+        const elapsed = Date.now() - startTime;
+        callbackCalled = true;
+        
+        console.log(`\n🔔 [CREATE_CALLBACK] Callback received after ${elapsed}ms`);
+        console.log("   Response:", response);
+
+        if (!response) {
+          console.error("❌ [CREATE] Response is null/undefined");
+          setSocketError("No response from server");
+          setIsCreating(false);
+          return;
+        }
+
+        if (response.success) {
+          console.log("✅ [CREATE] Room created successfully!");
+          console.log("   → Room Code:", response.roomCode);
+          console.log("   → Session ID:", response.sessionId);
+          console.log("   → Status: Ready for voting phase");
+          
           setRoomCode(response.roomCode);
           setCreatedRoomCode(response.roomCode);
           setIsInRoom(true);
           setIsHost(true);
-          setCurrentUser({ username: userName, id: socket.id });
+          setCurrentUser({ username: userName, id: socket.id, sessionId: response.sessionId });
+          setRoomStatus("lobby");
           setSocketError(null);
         } else {
           const errorMsg = response?.error || "Failed to create room";
-          console.error("❌ [CREATE] Failed:", errorMsg);
+          const errorCode = response?.code || "UNKNOWN_ERROR";
+          console.error("❌ [CREATE] Creation failed!");
+          console.error("   → Error:", errorMsg);
+          console.error("   → Code:", errorCode);
           setSocketError(errorMsg);
         }
         setIsCreating(false);
       });
+
+      // Timeout check for callback
+      setTimeout(() => {
+        if (!callbackCalled) {
+          console.warn("⚠️ [CREATE] Callback not received after 10 seconds");
+          console.warn("   → This might indicate server issue or event not being acknowledged");
+        }
+      }, 10000);
+
     } catch (error) {
       const errorMsg = String(error) || "Failed to connect and create room";
-      console.error("❌ [CREATE] Error:", errorMsg);
+      console.error("❌ [CREATE] Exception:", errorMsg);
+      console.error("   → Stack:", error.stack);
       setSocketError(errorMsg);
       setIsCreating(false);
     }
@@ -239,6 +275,8 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
 
     try {
       console.log("📝 [JOIN] Starting room join for code:", joinRoomCode);
+      console.log("   userId:", userId);
+      console.log("   userName:", userName);
 
       // Step 1: Ensure socket is connected
       if (!socket.connected) {
@@ -248,7 +286,7 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
         // Wait for connection with timeout
         await new Promise((resolve, reject) => {
           const connectTimer = setTimeout(() => {
-            console.error("❌ [JOIN] Socket connection timeout");
+            console.error("❌ [JOIN] Socket connection timeout (5s)");
             reject(new Error("Socket connection timeout"));
           }, 5000);
 
@@ -272,37 +310,73 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
           socket.on("connect_error", onError);
         });
       } else {
-        console.log("ℹ️ [JOIN] Socket already connected");
+        console.log("ℹ️ [JOIN] Socket already connected, socket.id:", socket.id);
       }
 
-      // Step 2: Emit room_join event
+      // Step 2: Emit room_join event with detailed logging
       console.log("📡 [JOIN] Emitting room_join for code:", joinRoomCode);
+      const startTime = Date.now();
+      let callbackCalled = false;
+
       socket.emit("room_join", { 
         roomCode: joinRoomCode, 
         username: userName, 
         avatar: "[U]", 
         userId 
       }, (response) => {
-        if (response && response.success) {
-          console.log("✅ [JOIN] Successfully joined room!", joinRoomCode);
-          console.log("   → socket.data.roomCode should now be set on server");
-          console.log("   → Waiting for owner to start game...");
+        const elapsed = Date.now() - startTime;
+        callbackCalled = true;
+
+        console.log(`\n🔔 [JOIN_CALLBACK] Callback received after ${elapsed}ms`);
+        console.log("   Response:", response);
+
+        if (!response) {
+          console.error("❌ [JOIN] Response is null/undefined");
+          setSocketError("No response from server");
+          setIsJoining(false);
+          return;
+        }
+
+        if (response.success) {
+          console.log("✅ [JOIN] Successfully joined room!");
+          console.log("   → Room Code:", joinRoomCode);
+          console.log("   → Session ID:", response.sessionId);
+          console.log("   → Status: Waiting for owner to start game...");
+          
           setRoomCode(joinRoomCode);
           setIsInRoom(true);
           setUsers(response.lobbyState?.users || []);
           setIsHost(response.lobbyState?.hostId === socket.id);
-          setCurrentUser({ username: userName, id: socket.id });
+          setCurrentUser({ 
+            username: userName, 
+            id: socket.id,
+            sessionId: response.sessionId
+          });
+          setRoomStatus("lobby");
           setSocketError(null);
         } else {
           const errorMsg = response?.error || "Failed to join room";
-          console.error("❌ [JOIN] Failed:", errorMsg);
+          const errorCode = response?.code || "UNKNOWN_ERROR";
+          console.error("❌ [JOIN] Failed to join!");
+          console.error("   → Error:", errorMsg);
+          console.error("   → Code:", errorCode);
           setSocketError(errorMsg);
         }
         setIsJoining(false);
       });
+
+      // Timeout check for callback
+      setTimeout(() => {
+        if (!callbackCalled) {
+          console.warn("⚠️ [JOIN] Callback not received after 10 seconds");
+          console.warn("   → This might indicate server issue or event not being acknowledged");
+        }
+      }, 10000);
+
     } catch (error) {
       const errorMsg = String(error) || "Failed to connect and join room";
-      console.error("❌ [JOIN] Error:", errorMsg);
+      console.error("❌ [JOIN] Exception:", errorMsg);
+      console.error("   → Stack:", error.stack);
       setSocketError(errorMsg);
       setIsJoining(false);
     }
@@ -310,25 +384,65 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
 
   // ── CAST VOTE ────────────────────────────────────────────────────────────────
   const handleVote = (type, value) => {
+    console.log("🗳️ [VOTE] Casting vote:", type, "=", value);
     if (type === "questionMode") {
       setMyQuestionModeVote(value);
     } else if (type === "timeLimit") {
       setMyTimeLimitVote(value);
     }
-    socket.emit("cast_vote", { type, value });
+    socket.emit("cast_vote", { type, value }, (response) => {
+      if (response?.success) {
+        console.log("✅ [VOTE] Vote recorded successfully");
+      } else {
+        console.warn("⚠️ [VOTE] Vote failed:", response?.error);
+      }
+    });
   };
 
   // ── START ROOM ───────────────────────────────────────────────────────────────
   const handleStartRoom = () => {
+    console.log("🎮 [START] Starting game...");
+    console.log("   Players:", users.length);
+    
     if (users.length < 2) {
-      alert("Need at least 2 players to start");
+      const msg = "Need at least 2 players to start";
+      console.error("❌ [START]", msg);
+      setSocketError(msg);
       return;
     }
+
+    console.log("📡 [START] Emitting room_start...");
+    const startTime = Date.now();
+    let callbackCalled = false;
+
     socket.emit("room_start", {}, (response) => {
-      if (!response.success) {
-        alert("Failed to start: " + response.error);
+      const elapsed = Date.now() - startTime;
+      callbackCalled = true;
+
+      console.log(`\n🔔 [START_CALLBACK] Callback received after ${elapsed}ms`);
+      console.log("   Response:", response);
+
+      if (response?.success) {
+        console.log("✅ [START] Game started successfully!");
+        console.log("   → Game will begin shortly");
+        console.log("   → Waiting for question assignment...");
+      } else {
+        const errorMsg = response?.error || "Failed to start game";
+        const errorCode = response?.code || "UNKNOWN_ERROR";
+        console.error("❌ [START] Failed to start!");
+        console.error("   → Error:", errorMsg);
+        console.error("   → Code:", errorCode);
+        setSocketError(errorMsg);
       }
     });
+
+    // Timeout check for callback
+    setTimeout(() => {
+      if (!callbackCalled) {
+        console.warn("⚠️ [START] Callback not received after 10 seconds");
+        console.warn("   → Server may be processing questions or experiencing delays");
+      }
+    }, 10000);
   };
 
   // ── LIVE ROOM VIEW ────────────────────────────────────────────────────────────

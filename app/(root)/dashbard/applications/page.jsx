@@ -153,7 +153,7 @@ export default function ApplicationsPage() {
       {/* Empty State */}
       {applications.length === 0 && (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">📄</div>
+          <div className="text-6xl mb-4">⊞</div>
           <h3 className="text-xl font-bold mb-2">No applications yet</h3>
           <p className="text-light-100 mb-6">Start applying to jobs and internships to track your progress here.</p>
           <Button className="btn-primary">

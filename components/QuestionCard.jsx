@@ -59,7 +59,7 @@ const QuestionCard = ({
             {/* Expected Answer */}
             <div>
               <h4 className="text-sm font-bold text-light-100 mb-3 uppercase tracking-wider">
-                📝 Expected Answer / Approach
+                Expected Answer / Approach
               </h4>
               <div className="bg-dark-300/50 border border-dark-400 rounded p-4 text-light-200 text-sm leading-relaxed whitespace-pre-wrap">
                 {question.expectedAnswer}
@@ -70,7 +70,7 @@ const QuestionCard = ({
             {question.tips && Array.isArray(question.tips) && question.tips.length > 0 && (
               <div>
                 <h4 className="text-sm font-bold text-light-100 mb-3 uppercase tracking-wider">
-                  💡 Tips for Success
+                  Tips for Success
                 </h4>
                 <ul className="space-y-2">
                   {question.tips.map((tip, tipIndex) => (

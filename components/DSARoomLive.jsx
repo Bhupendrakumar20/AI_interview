@@ -2,66 +2,82 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import {
-  calculatePoints,
-  formatTime,
-  getTimerColor,
-  calculateAccuracy,
-  JUDGE0_LANGUAGES,
-  getDifficultyColor,
-  SUBMISSION_STATUS,
-} from '@/lib/utils/dsa-room-utils';
+import { getDifficultyColor } from '@/lib/utils/dsa-room-utils';
 
 const DSARoomLive = ({
   roomId,
   userId,
   username,
   socket,
-  initialQuestions = [],
   initialParticipants = [],
   timeLimit = 30,
 }) => {
   // ─── STATE ────────────────────────────────────────────────────────────
   const [code, setCode] = useState('// Write your solution here\n');
   const [language, setLanguage] = useState('javascript');
-  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
-  const [questions, setQuestions] = useState(initialQuestions);
-  const [leaderboard, setLeaderboard] = useState(initialParticipants);
+  const [currentQuestionId, setCurrentQuestionId] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [questionsList, setQuestionsList] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('problem'); // problem | problems | review
   
+  const [leaderboard, setLeaderboard] = useState(initialParticipants);
   const [timeRemaining, setTimeRemaining] = useState(timeLimit * 60 * 1000);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lastSubmissionTime, setLastSubmissionTime] = useState(0);
-  
-  const [submissionStatus, setSubmissionStatus] = useState(null);
-  const [testResults, setTestResults] = useState(null);
-  const [showTestResults, setShowTestResults] = useState(false);
-  
   const [solvedQuestions, setSolvedQuestions] = useState([]);
-  const [participantStats, setParticipantStats] = useState({});
+  const [liveEvents, setLiveEvents] = useState([]);
   
   const roomStartTimeRef = useRef(null);
   const timerIntervalRef = useRef(null);
-  const lastSyncTimeRef = useRef(Date.now());
 
   // ─── EFFECTS ────────────────────────────────────────────────────────────
 
-  // Initialize room
+  // Fetch questions list on mount
   useEffect(() => {
     if (!socket) return;
 
-    // Handle room state initialization
-    socket.on('room_state_init', (data) => {
-      setQuestions(data.questions || []);
-      setLeaderboard(data.participants || []);
-      roomStartTimeRef.current = data.serverStartTime;
+    console.log("[DSA Room] Requesting LeetCode question list from socket server...");
+    socket.emit('get_question_list', { difficulty: 'Medium' }, (response) => {
+      console.log("[DSA Room] Question list response received:", response);
+      if (response?.success && response.questions) {
+        console.log(`[DSA Room] ✅ Loaded ${response.questions.length} LeetCode questions:`, response.questions.map(q => ({ id: q.id, title: q.title, source: q.source })));
+        setQuestionsList(response.questions);
+        if (response.questions.length > 0) {
+          console.log(`[DSA Room] First question: "${response.questions[0].title}" (${response.questions[0].id})`);
+          setCurrentQuestionId(response.questions[0].id);
+          fetchQuestionDetails(response.questions[0].id, response.questions[0].titleSlug);
+        }
+      } else {
+        console.error("[DSA Room] Failed to load questions:", response?.error || "Unknown error");
+      }
+      setQuestionsLoading(false);
     });
+  }, [socket]);
 
-    // Handle timer ticks
-    socket.on('timer_tick', (data) => {
-      const { serverTime, timeRemaining, secondsSinceStart } = data;
-      setTimeRemaining(Math.max(0, timeRemaining));
-      lastSyncTimeRef.current = serverTime;
+  // Fetch question details
+  const fetchQuestionDetails = (questionId, titleSlug) => {
+    if (!socket) return;
+
+    console.log(`[DSA Room] Fetching LeetCode question details: "${titleSlug}" (ID: ${questionId})...`);
+    socket.emit('get_question_details', { questionId, titleSlug }, (response) => {
+      console.log("[DSA Room] Question details response received:", response);
+      if (response?.success && response.question) {
+        console.log(`[DSA Room] ✅ Loaded LeetCode question: "${response.question.title}"`);
+        console.log(`[DSA Room] Description length: ${response.question.description?.length || 0} chars`);
+        console.log(`[DSA Room] Examples: ${response.question.examples?.length || 0}, Test cases: ${response.question.testCases?.length || 0}`);
+        setCurrentQuestion(response.question);
+        setCurrentQuestionId(questionId);
+        setCode('// Write your solution here\n');
+        setActiveTab('problem');
+      } else {
+        console.error("[DSA Room] Failed to load question details:", response?.error || "Unknown error");
+      }
     });
+  };
+
+  // Initialize socket listeners
+  useEffect(() => {
+    if (!socket) return;
 
     // Handle successful submissions
     socket.on('submission_result', (data) => {
@@ -69,13 +85,19 @@ const DSARoomLive = ({
       
       if (submitterId === userId) {
         if (status === 'passed') {
-          toast.success(`Question solved! +${points} points`);
+          toast.success(`✅ Accepted! +${points} points`);
           setSolvedQuestions((prev) => [...new Set([...prev, questionId])]);
         } else {
-          toast.error('Some test cases failed. Try again!');
+          toast.error('❌ Some test cases failed. Try again!');
         }
       }
-      
+
+      // Add live event
+      const username = leaderboard.find(p => p.userId === submitterId)?.username || 'Player';
+      if (status === 'passed') {
+        addLiveEvent(`🔴 ${username} solved this problem!`, 'success');
+      }
+
       // Update leaderboard
       setLeaderboard((prev) =>
         prev.map((p) =>
@@ -84,43 +106,33 @@ const DSARoomLive = ({
       );
     });
 
-    // Handle leaderboard updates
     socket.on('leaderboard_update', (updatedLeaderboard) => {
       setLeaderboard(updatedLeaderboard);
     });
 
-    // Handle user join/leave
     socket.on('user_joined', (data) => {
-      toast.info(`${data.username} joined the room`);
+      addLiveEvent(`🚀 ${data.username} joined the arena!`, 'info');
+      toast.info(`${data.username} joined`);
     });
 
     socket.on('user_left', (data) => {
-      toast.info(`${data.username} left the room`);
+      addLiveEvent(`👋 ${data.username} left`, 'warning');
       setLeaderboard((prev) => prev.filter((p) => p.userId !== data.userId));
     });
 
-    // Handle game end
-    socket.on('game_ended', (data) => {
-      toast.success('Room ended!');
-      // Redirect to results page (implement based on your routing)
-    });
-
     return () => {
-      socket.off('room_state_init');
-      socket.off('timer_tick');
       socket.off('submission_result');
       socket.off('leaderboard_update');
       socket.off('user_joined');
       socket.off('user_left');
-      socket.off('game_ended');
     };
-  }, [socket, userId]);
+  }, [socket, userId, leaderboard]);
 
   // Timer countdown
   useEffect(() => {
     if (timeRemaining <= 0) {
       clearInterval(timerIntervalRef.current);
-      toast.error('Time limit reached!');
+      toast.error('⏰ Time limit reached!');
       return;
     }
 
@@ -140,7 +152,12 @@ const DSARoomLive = ({
     };
   }, []);
 
-  // ─── HANDLERS ────────────────────────────────────────────────────────────
+  // ─── HELPERS ────────────────────────────────────────────────────────────
+
+  const addLiveEvent = (message, type = 'info') => {
+    const eventId = Date.now();
+    setLiveEvents((prev) => [{ id: eventId, message, type }, ...prev].slice(0, 10));
+  };
 
   const handleCodeSubmit = async () => {
     if (!code.trim()) {
@@ -153,284 +170,472 @@ const DSARoomLive = ({
       return;
     }
 
+    if (!currentQuestion) {
+      toast.error('Select a problem first');
+      return;
+    }
+
     setIsSubmitting(true);
-    setSubmissionStatus(SUBMISSION_STATUS.PENDING);
 
     try {
-      const currentQuestion = questions[currentQuestionIdx];
-      const submissionTime = Date.now() - roomStartTimeRef.current;
-
-      // Emit to socket
-      socket.emit('code_submit', {
-        userId,
-        roomId,
-        questionId: currentQuestion.questionId,
-        code,
-        language,
-        submittedAt: Date.now(),
-        timeFromStart: submissionTime,
-      });
-
-      setLastSubmissionTime(submissionTime);
-
-      // Simulate Judge0 response (in real implementation, backend handles this)
-      await simulateJudge0Response();
+      socket.emit(
+        'code_submit',
+        {
+          questionId: currentQuestionId,
+          sourceCode: code,
+          language: language,
+        },
+        (response) => {
+          if (response.success) {
+            if (response.passed) {
+              toast.success(`✅ All tests passed! +${response.points} points`);
+              setSolvedQuestions((prev) => [...new Set([...prev, currentQuestionId])]);
+            } else {
+              toast.error('❌ Some test cases failed');
+            }
+          } else {
+            toast.error(response.error || 'Submission failed');
+          }
+          setIsSubmitting(false);
+        }
+      );
     } catch (error) {
       console.error('Submission error:', error);
       toast.error('Failed to submit code');
-    } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const simulateJudge0Response = async () => {
-    // This would come from the server via Socket.io
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Simulated response
-    setTestResults({
-      totalTests: 5,
-      passed: 4,
-      failed: 1,
-      failedTests: [{ input: '[4,1,2,1,2]', expected: '4', actual: '2' }],
-    });
-
-    setShowTestResults(true);
   };
 
   const handleLanguageChange = (newLang) => {
     setLanguage(newLang);
     setCode('// Write your solution here\n');
-    toast.info(`Switched to ${newLang}`);
   };
 
-  const handleNextQuestion = () => {
-    if (currentQuestionIdx < questions.length - 1) {
-      setCurrentQuestionIdx((prev) => prev + 1);
-      setCode('// Write your solution here\n');
-      setTestResults(null);
-      setShowTestResults(false);
-    }
-  };
-
-  const handlePreviousQuestion = () => {
-    if (currentQuestionIdx > 0) {
-      setCurrentQuestionIdx((prev) => prev - 1);
-      setCode('// Write your solution here\n');
-      setTestResults(null);
-      setShowTestResults(false);
-    }
+  const getRankedLeaderboard = () => {
+    return [...leaderboard].sort((a, b) => (b.points || 0) - (a.points || 0));
   };
 
   // ─── RENDER ────────────────────────────────────────────────────────────
 
-  const currentQuestion = questions[currentQuestionIdx] || {};
-  const timerColor = getTimerColor(timeRemaining, timeLimit * 60 * 1000);
+  const rankedLeaderboard = getRankedLeaderboard();
+  const currentUserRank = rankedLeaderboard.findIndex((p) => p.userId === userId) + 1;
+  const timerMinutes = Math.floor(timeRemaining / 60000);
+  const timerSeconds = Math.floor((timeRemaining % 60000) / 1000);
+  const timerColor = timeRemaining > 300000 ? 'text-cyan-400' : timeRemaining > 60000 ? 'text-yellow-400' : 'text-red-400';
 
   return (
-    <div className="h-screen bg-slate-950 flex flex-col">
-      {/* Top Bar: Timer + Room ID + User */}
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+    <div className="h-screen bg-slate-950 flex flex-col overflow-hidden">
+      {/* ─── TOP BAR ─────────────────────────────────────────────────────── */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-cyan-500/20 px-6 py-4 flex items-center justify-between">
         <div>
-          <p className="text-xs text-slate-400">DSA Room</p>
-          <p className="text-lg font-bold text-white">Code: {roomId.slice(0, 8)}</p>
+          <p className="text-xs text-cyan-400 font-semibold">DSA COMPETITIVE ARENA</p>
+          <p className="text-lg font-mono font-bold text-white">Room: {roomId.slice(0, 8)}</p>
         </div>
-        <div className={`text-center text-4xl font-black font-mono ${timerColor}`}>
-          {formatTime(timeRemaining)}
+        <div className={`text-center font-mono font-black text-5xl ${timerColor} transition-colors duration-300`}>
+          {timerMinutes}:{timerSeconds.toString().padStart(2, '0')}
         </div>
         <div className="text-right">
-          <p className="text-xs text-slate-400">You</p>
+          <p className="text-xs text-slate-400">YOU</p>
           <p className="text-lg font-bold text-white">{username}</p>
+          {currentUserRank > 0 && (
+            <p className="text-xs text-cyan-400 font-semibold mt-1">Rank: #{currentUserRank}</p>
+          )}
         </div>
       </div>
 
-      {/* Main Layout: Editor + Leaderboard */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Editor Section */}
-        <div className="flex-1 flex flex-col border-r border-slate-800 overflow-hidden">
-          {/* Question Info */}
-          <div className="bg-slate-900 border-b border-slate-800 p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-xl font-bold text-white">
-                    {currentQuestion.title || 'Loading...'}
-                  </h2>
-                  <span
-                    className={`text-xs font-semibold px-3 py-1 rounded-full ${getDifficultyColor(
-                      currentQuestion.difficulty
-                    )}`}
-                  >
-                    {currentQuestion.difficulty}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-400">
-                  Question {currentQuestionIdx + 1} of {questions.length}
-                </p>
-              </div>
-              {solvedQuestions.includes(currentQuestion.questionId) && (
-                <div className="text-2xl">✅</div>
-              )}
-            </div>
+      {/* ─── MAIN LAYOUT: 3-COLUMN ───────────────────────────────────────── */}
+      <div className="flex flex-1 gap-4 p-4 overflow-hidden">
+        
+        {/* ═══ LEFT COLUMN: PROBLEM PANEL ═══════════════════════════════ */}
+        <div className="w-80 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
+          
+          {/* Header */}
+          <div className="bg-gradient-to-r from-slate-800 to-slate-800 px-6 py-4 border-b border-cyan-500/20">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              ◇ PROBLEM DETAILS
+            </h2>
+          </div>
 
-            {/* Question Description */}
-            <div className="bg-slate-800 rounded-lg p-4 mb-4 max-h-32 overflow-y-auto">
-              <p className="text-sm text-slate-300 leading-relaxed">
-                {currentQuestion.description || ''}
-              </p>
-            </div>
+          {/* Tabs */}
+          <div className="flex border-b border-slate-800">
+            {['problem', 'problems', 'review'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 px-4 py-3 text-sm font-semibold transition-all border-b-2 ${
+                  activeTab === tab
+                    ? 'bg-slate-800 text-cyan-400 border-b-cyan-400'
+                    : 'text-slate-400 border-b-transparent hover:text-white'
+                }`}
+              >
+                {tab === 'problem' && 'Problem'}
+                {tab === 'problems' && 'Problems'}
+                {tab === 'review' && 'Review'}
+              </button>
+            ))}
+          </div>
 
-            {/* Examples */}
-            {currentQuestion.examples && currentQuestion.examples.length > 0 && (
-              <div className="bg-slate-800 rounded-lg p-4 mb-4">
-                <p className="text-xs font-semibold text-slate-400 mb-2 uppercase">Examples</p>
-                <div className="space-y-2">
-                  {currentQuestion.examples.slice(0, 2).map((ex, idx) => (
-                    <div key={idx} className="font-mono text-xs text-slate-300">
-                      <p>Input: {ex.input}</p>
-                      <p>Output: {ex.output}</p>
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            {/* Problem Tab */}
+            {activeTab === 'problem' && (
+              <>
+                {!currentQuestion ? (
+                  <div className="flex items-center justify-center h-full text-slate-400">
+                    <p>Select a problem to view</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Title & Difficulty */}
+                    <div>
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="text-white font-bold text-base pr-2">
+                          {currentQuestion.title}
+                        </h3>
+                        {solvedQuestions.includes(currentQuestionId) && (
+                          <span className="text-2xl flex-shrink-0">✅</span>
+                        )}
+                      </div>
+                      <span
+                        className={`inline-block text-xs font-semibold px-3 py-1 rounded-full ${getDifficultyColor(
+                          currentQuestion.difficulty
+                        )}`}
+                      >
+                        {currentQuestion.difficulty}
+                      </span>
                     </div>
-                  ))}
-                </div>
+
+                    {/* Tags */}
+                    {currentQuestion.tags && currentQuestion.tags.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 mb-2 uppercase">Topics</p>
+                        <div className="flex flex-wrap gap-2">
+                          {currentQuestion.tags.slice(0, 4).map((tag, idx) => (
+                            <span
+                              key={idx}
+                              className="text-xs bg-slate-800 text-cyan-300 px-2 py-1 rounded border border-cyan-500/30"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    {currentQuestion.description && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 mb-3 uppercase">Description</p>
+                        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                          {currentQuestion.description.substring(0, 500)}
+                          {currentQuestion.description.length > 500 && '...'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Examples */}
+                    {currentQuestion.examples && currentQuestion.examples.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 mb-3 uppercase">Examples</p>
+                        <div className="space-y-3">
+                          {currentQuestion.examples.map((ex, idx) => (
+                            <div key={idx} className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+                              <p className="text-xs text-slate-400 mb-2">
+                                <span className="text-cyan-400">Input:</span> <code className="text-slate-300">{ex.input}</code>
+                              </p>
+                              <p className="text-xs text-slate-400">
+                                <span className="text-cyan-400">Output:</span> <code className="text-green-400">{ex.output}</code>
+                              </p>
+                              {ex.explanation && (
+                                <p className="text-xs text-slate-400 mt-2 italic">{ex.explanation}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Constraints */}
+                    {currentQuestion.constraints && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 mb-3 uppercase">Constraints</p>
+                        <ul className="space-y-2 text-sm text-slate-300">
+                          {(Array.isArray(currentQuestion.constraints) 
+                            ? currentQuestion.constraints 
+                            : typeof currentQuestion.constraints === 'string'
+                            ? currentQuestion.constraints.split('\n').filter(c => c.trim())
+                            : []
+                          ).map((constraint, idx) => (
+                            <li key={idx} className="flex gap-2">
+                              <span className="text-cyan-400">•</span>
+                              <span>{constraint}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Problems Tab */}
+            {activeTab === 'problems' && (
+              <div className="space-y-2">
+                {questionsLoading ? (
+                  <p className="text-slate-400 text-sm text-center py-4">Loading problems...</p>
+                ) : questionsList.length === 0 ? (
+                  <p className="text-slate-400 text-sm text-center py-4">No problems available</p>
+                ) : (
+                  questionsList.map((q) => (
+                    <button
+                      key={q.id}
+                      onClick={() => fetchQuestionDetails(q.id, q.title)}
+                      className={`w-full text-left px-4 py-3 rounded-lg transition-all border ${
+                        currentQuestionId === q.id
+                          ? 'bg-cyan-500/20 border-cyan-500/50 ring-1 ring-cyan-500/30'
+                          : 'bg-slate-800 border-slate-700 hover:bg-slate-700/50 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="text-sm font-semibold text-white truncate pr-2">
+                          {q.title}
+                        </h4>
+                        {solvedQuestions.includes(q.id) && (
+                          <span className="text-green-400 text-lg flex-shrink-0">✓</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-semibold px-2 py-1 rounded ${getDifficultyColor(
+                            q.difficulty
+                          )}`}
+                        >
+                          {q.difficulty}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Review Tab */}
+            {activeTab === 'review' && (
+              <div className="space-y-2">
+                {solvedQuestions.length === 0 ? (
+                  <p className="text-slate-400 text-sm text-center py-4">No solved problems yet</p>
+                ) : (
+                  questionsList
+                    .filter((q) => solvedQuestions.includes(q.id))
+                    .map((q) => (
+                      <div
+                        key={q.id}
+                        className="bg-slate-800 rounded-lg p-3 border border-green-500/30"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-white">{q.title}</h4>
+                          <span className="text-green-400 text-lg">✓</span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">{q.difficulty}</p>
+                      </div>
+                    ))
+                )}
               </div>
             )}
           </div>
+        </div>
 
-          {/* Editor */}
-          <div className="flex-1 overflow-hidden bg-slate-900 p-6">
-            <div className="flex gap-2 mb-4">
-              {/* Language Selector */}
-              <select
-                value={language}
-                onChange={(e) => handleLanguageChange(e.target.value)}
-                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm font-semibold hover:bg-slate-700 transition"
-              >
-                {Object.keys(JUDGE0_LANGUAGES).map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang.toUpperCase()}
-                  </option>
-                ))}
-              </select>
+        {/* ═══ MIDDLE COLUMN: CODE EDITOR ═══════════════════════════════ */}
+        <div className="flex-1 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
+          
+          {/* Editor Header */}
+          <div className="bg-gradient-to-r from-slate-800 to-slate-800 px-6 py-4 border-b border-cyan-500/20 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-cyan-400 font-semibold">CODE EDITOR</p>
+              {currentQuestion && (
+                <p className="text-sm text-slate-300 mt-1">{currentQuestion.title}</p>
+              )}
+            </div>
+            <select
+              value={language}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+              className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-xs font-semibold hover:bg-slate-600 transition"
+            >
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="java">Java</option>
+              <option value="cpp">C++</option>
+              <option value="csharp">C#</option>
+            </select>
+          </div>
+
+          {/* Code Editor with Line Numbers */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Line Numbers */}
+            <div className="bg-slate-800 text-slate-500 text-xs font-mono p-4 pr-2 select-none border-r border-slate-700 overflow-y-auto">
+              {code.split('\n').map((_, idx) => (
+                <div key={idx} className="text-right pr-3">
+                  {idx + 1}
+                </div>
+              ))}
             </div>
 
-            {/* Code Editor (Fallback: large textarea) */}
+            {/* Code Textarea */}
             <textarea
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="w-full h-[calc(100%-2.5rem)] font-mono text-sm bg-slate-800 text-slate-100 border border-slate-700 rounded p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="flex-1 font-mono text-sm bg-slate-850 text-slate-100 p-4 focus:outline-none resize-none"
               placeholder="// Write your solution here..."
               spellCheck="false"
+              style={{
+                backgroundColor: '#0f0d2e',
+                color: '#e0e0e0',
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+              }}
             />
           </div>
 
-          {/* Test Results */}
-          {showTestResults && testResults && (
-            <div className="bg-slate-900 border-t border-slate-800 p-6 max-h-40 overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-white">Test Results</h3>
-                <span className={`text-sm font-semibold ${testResults.failed === 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {testResults.passed}/{testResults.totalTests} Passed
-                </span>
-              </div>
-              {testResults.failed > 0 && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded p-3 text-sm text-red-300">
-                  <p className="font-semibold mb-2">Failed Test Case:</p>
-                  <code className="block text-xs">{JSON.stringify(testResults.failedTests[0])}</code>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Submit Button */}
-          <div className="bg-slate-900 border-t border-slate-800 p-6 flex gap-3">
-            <button
-              onClick={handlePreviousQuestion}
-              disabled={currentQuestionIdx === 0}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-semibold rounded transition"
-            >
-              ← Previous
-            </button>
-
+          <div className="bg-slate-800 border-t border-slate-700 px-6 py-4">
             <button
               onClick={handleCodeSubmit}
-              disabled={isSubmitting || timeRemaining <= 0}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 text-white font-bold rounded transition"
+              disabled={isSubmitting || timeRemaining <= 0 || !currentQuestion}
+              className="w-full px-6 py-3 bg-gradient-to-r from-cyan-600 to-cyan-700 hover:shadow-lg hover:shadow-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg transition flex items-center justify-center gap-2"
             >
-              {isSubmitting ? '⚡ Submitting...' : '✦ Submit Code'}
-            </button>
-
-            <button
-              onClick={handleNextQuestion}
-              disabled={currentQuestionIdx === questions.length - 1}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-semibold rounded transition"
-            >
-              Next →
+              {isSubmitting ? (
+                <>⚡ SUBMITTING...</>
+              ) : (
+                <>▶ SUBMIT SOLUTION</>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Right: Leaderboard */}
-        <div className="w-80 flex flex-col bg-slate-900 border-l border-slate-800 overflow-hidden">
-          <div className="bg-slate-800 px-6 py-4 border-b border-slate-700">
-            <h2 className="text-lg font-bold text-white">🏆 Leaderboard</h2>
-            <p className="text-xs text-slate-400 mt-1">{leaderboard.length} participants</p>
+        {/* ═══ RIGHT COLUMN: LEADERBOARD & EVENTS ═══════════════════════ */}
+        <div className="w-80 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
+          
+          {/* Header */}
+          <div className="bg-gradient-to-r from-slate-800 to-slate-800 px-6 py-4 border-b border-cyan-500/20">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              🏆 LEADERBOARD
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">{leaderboard.length} competitors</p>
           </div>
 
-          {/* Leaderboard List */}
-          <div className="flex-1 overflow-y-auto">
-            {leaderboard.map((participant) => (
-              <div
-                key={participant.userId}
-                className={`px-6 py-4 border-b border-slate-800 ${
-                  participant.userId === userId ? 'bg-blue-500/10' : 'hover:bg-slate-800/50'
-                } transition`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-slate-400 w-8">#{participant.rank || '?'}</span>
-                    <div>
-                      <p className="font-semibold text-white text-sm">{participant.username}</p>
-                      <p className="text-xs text-slate-500">{participant.questionsCorrect || 0} solved</p>
+          {/* Leaderboard + Events Tabs */}
+          <div className="flex border-b border-slate-800">
+            <button
+              onClick={() => setActiveTab('leaderboard')}
+              className={`flex-1 px-4 py-3 text-sm font-semibold transition-all border-b-2 ${
+                activeTab !== 'review' && activeTab !== 'problems'
+                  ? 'bg-slate-800 text-cyan-400 border-b-cyan-400'
+                  : 'text-slate-400 border-b-transparent hover:text-white'
+              }`}
+            >
+              Rankings
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('events');
+              }}
+              className={`flex-1 px-4 py-3 text-sm font-semibold transition-all border-b-2 ${
+                activeTab === 'events'
+                  ? 'bg-slate-800 text-cyan-400 border-b-cyan-400'
+                  : 'text-slate-400 border-b-transparent hover:text-white'
+              }`}
+            >
+              Events
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            {(activeTab === 'leaderboard' || (activeTab !== 'events' && activeTab !== 'problem' && activeTab !== 'problems' && activeTab !== 'review')) && (
+              <div className="space-y-3">
+                {rankedLeaderboard.length === 0 ? (
+                  <p className="text-slate-400 text-sm text-center py-4">No participants</p>
+                ) : (
+                  rankedLeaderboard.map((player, idx) => {
+                    const isCurrentUser = player.userId === userId;
+                    const rank = idx + 1;
+                    let rankColor = 'bg-slate-700 text-slate-300';
+                    let rankBg = '';
+
+                    if (rank === 1) {
+                      rankColor = 'bg-yellow-500/90 text-white';
+                      rankBg = 'bg-yellow-500/10 border-yellow-500/30';
+                    } else if (rank === 2) {
+                      rankColor = 'bg-slate-400 text-slate-900';
+                      rankBg = 'bg-slate-400/10 border-slate-400/30';
+                    } else if (rank === 3) {
+                      rankColor = 'bg-orange-600/90 text-white';
+                      rankBg = 'bg-orange-600/10 border-orange-600/30';
+                    } else {
+                      rankBg = 'bg-slate-800/50 border-slate-700';
+                    }
+
+                    return (
+                      <div
+                        key={player.userId}
+                        className={`p-4 rounded-lg border transition-all ${rankBg} ${
+                          isCurrentUser ? 'ring-2 ring-cyan-400/50 ring-offset-2 ring-offset-slate-900' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <span className={`text-lg font-black w-8 h-8 rounded-full flex items-center justify-center ${rankColor}`}>
+                              {rank}
+                            </span>
+                            <div>
+                              <p className="text-sm font-semibold text-white">
+                                {player.username}
+                                {isCurrentUser && <span className="text-cyan-400 text-xs ml-2">(YOU)</span>}
+                              </p>
+                              {player.solvedAt && (
+                                <p className="text-xs text-slate-400">
+                                  Solved in {Math.floor((Date.now() - player.solvedAt) / 1000)}s
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-cyan-400">{player.points || 0}</p>
+                            <p className="text-xs text-slate-400">pts</p>
+                          </div>
+                        </div>
+                        {player.lastProblemSolved && (
+                          <p className="text-xs text-slate-400 ml-11">{player.lastProblemSolved}</p>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {activeTab === 'events' && (
+              <div className="space-y-2">
+                {liveEvents.length === 0 ? (
+                  <p className="text-slate-400 text-sm text-center py-4">Waiting for events...</p>
+                ) : (
+                  liveEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className={`p-3 rounded-lg text-xs animate-fade-in ${
+                        event.type === 'success'
+                          ? 'bg-green-500/10 border border-green-500/30 text-green-300'
+                          : event.type === 'info'
+                          ? 'bg-blue-500/10 border border-blue-500/30 text-blue-300'
+                          : 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-300'
+                      }`}
+                    >
+                      {event.message}
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-black text-yellow-400">{participant.points || 0}</p>
-                    <p className="text-xs text-slate-500">pts</p>
-                  </div>
-                </div>
-
-                {/* Badges */}
-                <div className="flex gap-1 flex-wrap">
-                  {participant.firstBloodQuestions && participant.firstBloodQuestions.length > 0 && (
-                    <span className="text-xs px-2 py-1 bg-purple-500/30 text-purple-300 rounded-full">
-                      ⚡ First Blood x{participant.firstBloodQuestions.length}
-                    </span>
-                  )}
-                </div>
+                  ))
+                )}
               </div>
-            ))}
-          </div>
-
-          {/* Stats Footer */}
-          <div className="bg-slate-800 border-t border-slate-700 p-6">
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Your Rank:</span>
-                <span className="font-bold text-white">
-                  #{leaderboard.find((p) => p.userId === userId)?.rank || '?'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Your Points:</span>
-                <span className="font-bold text-yellow-400">
-                  {leaderboard.find((p) => p.userId === userId)?.points || 0}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Solved:</span>
-                <span className="font-bold text-green-400">{solvedQuestions.length}</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

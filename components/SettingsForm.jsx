@@ -10,6 +10,11 @@ import {
   updateSettingsAction,
 } from "@/lib/actions/profile.action";
 import { logout, changePassword } from "@/lib/actions/auth.action";
+import {
+  changeUserEmail,
+  sendVerificationEmail,
+  checkEmailVerification,
+} from "@/lib/actions/email.action";
 
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -28,12 +33,20 @@ export default function SettingsForm({ user }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  // Email change state
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
+
   // Loading states
   const [saving, setSaving] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [sendingVerification, setSendingVerification] = useState(false);
 
   // ✅ SAVE SETTINGS
   const handleSave = async (e) => {
@@ -97,6 +110,70 @@ export default function SettingsForm({ user }) {
       setPasswordError("❌ Something went wrong while changing password!");
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  // ✅ CHANGE EMAIL
+  const handleChangeEmail = async (e) => {
+    e?.preventDefault();
+    setEmailError("");
+
+    // Validation
+    if (!newEmail) {
+      setEmailError("Please enter a new email address");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+
+    if (newEmail === user?.email) {
+      setEmailError("New email must be different from current email");
+      return;
+    }
+
+    try {
+      setChangingEmail(true);
+
+      const res = await changeUserEmail(newEmail);
+
+      if (!res?.success) {
+        setEmailError(res?.error || "Failed to change email");
+        return;
+      }
+
+      toast.success("✅ Verification link sent to your new email!");
+      toast.message("📧 Please check " + newEmail + " and click the verification link");
+      setShowEmailForm(false);
+      setNewEmail("");
+    } catch (error) {
+      setEmailError("❌ Something went wrong while changing email!");
+    } finally {
+      setChangingEmail(false);
+    }
+  };
+
+  // ✅ SEND VERIFICATION EMAIL
+  const handleSendVerification = async (e) => {
+    e?.preventDefault();
+
+    try {
+      setSendingVerification(true);
+
+      const res = await sendVerificationEmail();
+
+      if (!res?.success) {
+        toast.error(res?.error || "Failed to send verification email");
+        return;
+      }
+
+      toast.success(res?.message || "Verification email sent!");
+    } catch (error) {
+      toast.error("❌ Something went wrong while sending verification email!");
+    } finally {
+      setSendingVerification(false);
     }
   };
 
@@ -334,6 +411,91 @@ export default function SettingsForm({ user }) {
       </div>
 
       {/* ========================================
+          EMAIL SECTION
+      ======================================== */}
+      <div className="border-t border-dark-300 pt-8">
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-light-100">Email Management</h2>
+          <p className="text-sm text-light-400 mb-6">
+            Update your email address or verify your current email
+          </p>
+        </div>
+
+        {/* Current Email Display */}
+        <div className="mb-6 p-4 bg-dark-200/50 rounded-lg border border-dark-300">
+          <p className="text-sm text-light-400">Current Email</p>
+          <p className="text-light-100 font-medium">{user?.email}</p>
+        </div>
+
+        {!showEmailForm ? (
+          <Button
+            type="button"
+            className="btn-secondary w-full md:w-fit"
+            onClick={() => setShowEmailForm(true)}
+            disabled={changingEmail || sendingVerification}
+          >
+            Change Email Address
+          </Button>
+        ) : (
+          <form onSubmit={handleChangeEmail} className="space-y-4 max-w-md">
+            {/* New Email */}
+            <div>
+              <label className="text-sm font-medium text-light-100 block mb-2">
+                New Email Address
+              </label>
+              <Input
+                type="email"
+                placeholder="Enter your new email address"
+                value={newEmail}
+                onChange={(e) => {
+                  setNewEmail(e.target.value);
+                  setEmailError("");
+                }}
+                disabled={changingEmail}
+              />
+            </div>
+
+            {/* Error Message */}
+            {emailError && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-sm text-red-400">{emailError}</p>
+              </div>
+            )}
+
+            {/* Info Message */}
+            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-md">
+              <p className="text-sm text-blue-300">
+                📧 A verification link will be sent to your new email. You must click it to confirm the change.
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <Button
+                type="submit"
+                className="btn-primary"
+                disabled={changingEmail}
+              >
+                {changingEmail ? "Sending..." : "Send Verification Email"}
+              </Button>
+              <Button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setShowEmailForm(false);
+                  setNewEmail("");
+                  setEmailError("");
+                }}
+                disabled={changingEmail}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* ========================================
           LOGOUT SECTION
       ======================================== */}
       <div className="border-t border-dark-300 pt-8">
@@ -350,7 +512,7 @@ export default function SettingsForm({ user }) {
           onClick={handleLogout}
           disabled={loggingOut}
         >
-          {loggingOut ? "Logging out..." : "🚪 Logout"}
+          {loggingOut ? "Logging out..." : "Logout"}
         </Button>
       </div>
 
@@ -371,7 +533,7 @@ export default function SettingsForm({ user }) {
           onClick={clearHistory}
           disabled={clearing}
         >
-          {clearing ? "Clearing..." : "🗑️ Clear Interview History"}
+          {clearing ? "Clearing..." : "Clear Interview History"}
         </Button>
       </div>
 

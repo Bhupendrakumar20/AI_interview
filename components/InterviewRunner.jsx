@@ -315,7 +315,7 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                   onClick={speakQuestion}
                   className="rounded-full border border-input px-3 py-1 text-sm flex items-center gap-1 hover:bg-dark-200"
                 >
-                  {isSpeaking ? "Playing..." : "🔊 Read aloud"}
+                  {isSpeaking ? "Playing..." : "Read aloud"}
                 </button>
               </div>
               <p className="text-light-100 text-sm md:text-base leading-relaxed">
@@ -348,7 +348,7 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                   className="btn-secondary flex items-center gap-2"
                   onClick={toggleVoiceToText}
                 >
-                  {isRecordingVoice ? "⏹ Stop Recording" : "🎙 Start Recording"}
+                  {isRecordingVoice ? "Stop Recording" : "Start Recording"}
                 </Button>
 
                 <div className="flex gap-2">
@@ -400,7 +400,7 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                 />
               ) : (
                 <div className="w-full rounded-2xl bg-black flex flex-col items-center justify-center gap-2 py-10">
-                  <span className="text-3xl">📷</span>
+                  <span className="text-3xl">♫</span>
                   <p className="text-sm text-light-100">Camera is off</p>
                 </div>
               )}

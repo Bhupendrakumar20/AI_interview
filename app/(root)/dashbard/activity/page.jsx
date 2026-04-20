@@ -16,7 +16,7 @@ export default async function ActivityPage() {
       title: "Completed Frontend Developer Interview",
       description: "Scored 85/100 - Excellent communication skills noted",
       time: "2 hours ago",
-      icon: "🎤",
+      icon: "[Interview]",
       color: "bg-purple-500/20",
       action: "View Feedback"
     },
@@ -26,7 +26,7 @@ export default async function ActivityPage() {
       title: "Applied for Software Engineer Internship",
       description: "Google Summer Internship 2024 - Status: Under Review",
       time: "1 day ago",
-      icon: "💼",
+      icon: "[Application]",
       color: "bg-blue-500/20",
       action: "Track Application"
     },
@@ -36,7 +36,7 @@ export default async function ActivityPage() {
       title: "Earned React Advanced Certificate",
       description: "Completed Advanced React Patterns course with 95% score",
       time: "3 days ago",
-      icon: "📜",
+      icon: "[Certificate]",
       color: "bg-yellow-500/20",
       action: "View Certificate"
     },
@@ -46,7 +46,7 @@ export default async function ActivityPage() {
       title: "Completed DSA Mock Test",
       description: "Score: 92% - Improved by 15% from last attempt",
       time: "1 week ago",
-      icon: "📝",
+      icon: "[Test]",
       color: "bg-green-500/20",
       action: "Review Answers"
     },
@@ -56,7 +56,7 @@ export default async function ActivityPage() {
       title: "Booked Mentorship Session",
       description: "With Ankit Kumar (Google) - Scheduled for March 25",
       time: "2 weeks ago",
-      icon: "👥",
+      icon: "[Mentorship]",
       color: "bg-pink-500/20",
       action: "Join Session"
     }
@@ -83,28 +83,28 @@ export default async function ActivityPage() {
           title="Total Interviews"
           value={interviews.length}
           change="+3 this month"
-          icon="🎤"
+          icon="[Interview]"
           trend="up"
         />
         <StatsCard
           title="Average Score"
           value={averageScore}
           change="+8% improvement"
-          icon="⭐"
+          icon="★"
           trend="up"
         />
         <StatsCard
           title="Applications"
           value={8}
           change="+2 active"
-          icon="📄"
+          icon="[Application]"
           trend="up"
         />
         <StatsCard
           title="Certificates"
           value={3}
           change="Earned 1 new"
-          icon="📜"
+          icon="[Certificate]"
           trend="up"
         />
       </div>

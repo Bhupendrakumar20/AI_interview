@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Bell, User, LogOut, Settings } from "lucide-react";
 import { logout } from "@/lib/actions/auth.action";
+import { db } from "@/firebase/client";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function TopBar({ user }) {
   const router = useRouter();
@@ -13,25 +16,89 @@ export default function TopBar({ user }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
-  // Listen for pending approvals from localStorage or context
+  /**
+   * Fetch pending approvals count from Firestore
+   * This ensures consistency across devices
+   */
+  const fetchPendingApprovalsFromFirestore = async () => {
+    if (!user?.uid) {
+      console.log('[TopBar] No user UID available');
+      return;
+    }
+
+    try {
+      console.log(`[TopBar] Fetching pending approvals for user: ${user.uid}`);
+      
+      // Query all DSA rooms where user is the owner
+      const roomsRef = collection(db, 'dsa_rooms');
+      const q = query(roomsRef, where('owner', '==', user.uid));
+      const roomsSnapshot = await getDocs(q);
+
+      console.log(`[TopBar] Found ${roomsSnapshot.docs.length} rooms owned by user`);
+
+      let totalPendingCount = 0;
+
+      // Check each room for pending requests
+      for (const roomDoc of roomsSnapshot.docs) {
+        const roomData = roomDoc.data();
+        const pendingRequests = roomData.pendingRequests || [];
+        console.log(`[TopBar] Room ${roomDoc.id}: ${pendingRequests.length} pending requests`);
+        totalPendingCount += pendingRequests.length;
+      }
+
+      console.log(`[TopBar] Total pending count: ${totalPendingCount}`);
+
+      if (totalPendingCount > 0) {
+        setPendingApprovalsCount(totalPendingCount);
+        localStorage.setItem('dsaPendingCount', totalPendingCount.toString());
+      } else {
+        setPendingApprovalsCount(0);
+        localStorage.removeItem('dsaPendingCount');
+      }
+
+      console.log(`✅ [TopBar] Updated pending approvals count: ${totalPendingCount}`);
+    } catch (error) {
+      console.error('[TopBar] Error fetching pending approvals:', error);
+      // Fall back to localStorage if Firestore fails
+      const stored = localStorage.getItem('dsaPendingCount');
+      if (stored) {
+        setPendingApprovalsCount(parseInt(stored));
+        console.log(`[TopBar] Using localStorage fallback: ${stored}`);
+      }
+    }
+  };
+
+  // Fetch pending approvals on mount and when user changes
+  useEffect(() => {
+    if (user?.uid) {
+      fetchPendingApprovalsFromFirestore();
+    }
+  }, [user?.uid]);
+
+  // Listen for real-time updates from localStorage
   useEffect(() => {
     const checkPendingApprovals = () => {
       const stored = localStorage.getItem('dsaPendingCount');
       if (stored) {
         setPendingApprovalsCount(parseInt(stored));
+      } else {
+        setPendingApprovalsCount(0);
       }
     };
 
-    checkPendingApprovals();
     window.addEventListener('storage', checkPendingApprovals);
-    // Check every 5 seconds for updates
-    const interval = setInterval(checkPendingApprovals, 5000);
+    // Refresh from Firestore every 10 seconds for accuracy
+    const interval = setInterval(() => {
+      if (user?.uid) {
+        fetchPendingApprovalsFromFirestore();
+      }
+    }, 10000);
 
     return () => {
       window.removeEventListener('storage', checkPendingApprovals);
       clearInterval(interval);
     };
-  }, []);
+  }, [user?.uid]);
 
   const handleLogout = async () => {
     try {
@@ -68,11 +135,11 @@ export default function TopBar({ user }) {
           {/* DSA Room Notifications Badge */}
           {pendingApprovalsCount > 0 && (
             <Link
-              href="/dsa-room"
+              href="/interview/buddy"
               className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all hover:shadow-lg hover:shadow-orange-500/20"
-              title="Pending DSA Room approvals"
+              title="Pending Interview Buddy DSA approvals"
             >
-              <span className="text-lg">🔔</span>
+              <Bell size={20} className="text-orange-400" />
               <span className="absolute top-0 right-0 w-5 h-5 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center transform translate-x-1 -translate-y-1">
                 {pendingApprovalsCount > 9 ? '9+' : pendingApprovalsCount}
               </span>
@@ -88,7 +155,7 @@ export default function TopBar({ user }) {
                 : "bg-dark-300 text-light-100 hover:bg-dark-300/80 hover:text-primary-200"
             }`}
           >
-            <span className="text-lg">⚙️</span>
+            <Settings size={18} />
             <span className="hidden md:inline text-sm font-medium">Settings</span>
           </Link>
 
@@ -118,7 +185,7 @@ export default function TopBar({ user }) {
                   onClick={() => setShowDropdown(false)}
                   className="flex items-center gap-2 px-4 py-2 text-sm text-light-100 hover:bg-dark-200 transition"
                 >
-                  <span>👤</span>
+                  <User size={18} />
                   <span>View Profile</span>
                 </Link>
 
@@ -127,7 +194,7 @@ export default function TopBar({ user }) {
                   onClick={() => setShowDropdown(false)}
                   className="flex items-center gap-2 px-4 py-2 text-sm text-light-100 hover:bg-dark-200 transition"
                 >
-                  <span>⚙️</span>
+                  <Settings size={18} />
                   <span>Settings</span>
                 </Link>
 
@@ -137,7 +204,7 @@ export default function TopBar({ user }) {
                   disabled={loggingOut}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition border-t border-dark-200 disabled:opacity-50"
                 >
-                  <span>🚪</span>
+                  <LogOut size={18} />
                   <span>{loggingOut ? "Logging out..." : "Logout"}</span>
                 </button>
               </div>

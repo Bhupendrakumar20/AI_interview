@@ -1,8 +1,10 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Brain, Radio, BarChart3, Code, Video, FileJson, Film, Trophy, Cpu } from "lucide-react";
 import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
+import HumanBuddySession from "./HumanBuddySession";
 import DSARoomLobby from "./DSARoomLobby";
 
 const InterviewBuddy = ({ userId }) => {
@@ -13,12 +15,17 @@ const InterviewBuddy = ({ userId }) => {
   const [selectedTopics, setSelectedTopics] = useState(["DSA", "System Design", "OOP"]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sessionCode, setSessionCode] = useState(null);
+  const [inviteLink, setInviteLink] = useState(null); // 🔗 NEW: Store invite link
   const [isLoading, setIsLoading] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [isInterviewActive, setIsInterviewActive] = useState(false);
+  const [isHumanBuddyActive, setIsHumanBuddyActive] = useState(false);
+  const [isSessionOwner, setIsSessionOwner] = useState(false); // 🔥 NEW: Track if user created or joined
   const [showResults, setShowResults] = useState(false);
   const [sessionResults, setSessionResults] = useState(null);
   const [dsaRoomActive, setDsaRoomActive] = useState(false);
+  const [modalTab, setModalTab] = useState("create"); // "create" or "join"
+  const [joinCode, setJoinCode] = useState("");
   const [stats, setStats] = useState({
     totalSessions: 0,
     completedSessions: 0,
@@ -75,16 +82,19 @@ const InterviewBuddy = ({ userId }) => {
 
       setActiveSessionId(data.sessionId);
       setSessionCode(data.sessionCode);
+      setInviteLink(data.inviteLink); // 🔗 NEW: Store invite link
 
       // If AI mode, start interview immediately
       if (currentMode === "ai") {
         setIsInterviewActive(true);
         setIsModalOpen(false);
         toast.success("AI Interview started! Questions are loading...");
-      } else {
-        // If human mode, show session code
-        setIsModalOpen(true);
-        toast.success("Session created! Share the code with your buddy.");
+      } else if (currentMode === "human") {
+        // If human mode, start human buddy session
+        setIsSessionOwner(true); // 🔥 User created the session, they are the owner
+        setIsHumanBuddyActive(true);
+        setIsModalOpen(false);
+        toast.success("Session created! Share the invite link with your buddy.");
       }
     } catch (error) {
       console.error("Error creating session:", error);
@@ -94,12 +104,35 @@ const InterviewBuddy = ({ userId }) => {
     }
   };
 
-  const handleJoinSession = async (code) => {
+  const handleJoinSession = async (inputCode) => {
     if (!userId) {
       toast.error("Please log in first");
       return;
     }
 
+    if (!inputCode || !inputCode.trim()) {
+      toast.error("Please paste a link or code");
+      return;
+    }
+
+    // 🔗 Extract code from link or use plain code
+    let sessionCode = inputCode.trim().toUpperCase();
+    
+    // Check if it's a link containing /interview/buddy/
+    if (inputCode.includes('/interview/buddy/')) {
+      // Extract code from link
+      const match = inputCode.match(/\/interview\/buddy\/(IB-[A-Z0-9]{5})/);
+      if (match && match[1]) {
+        sessionCode = match[1];
+        console.log(`🔗 [handleJoinSession] Extracted code from link: ${sessionCode}`);
+        
+        // Route to invite link instead of using join API
+        window.location.href = `/interview/buddy/${sessionCode}`;
+        return;
+      }
+    }
+
+    // Use join-session API for plain codes
     setIsLoading(true);
     try {
       const response = await fetch("/api/interview-buddy/join-session", {
@@ -107,7 +140,7 @@ const InterviewBuddy = ({ userId }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId,
-          sessionCode: code,
+          sessionCode: sessionCode,
         }),
       });
 
@@ -118,7 +151,11 @@ const InterviewBuddy = ({ userId }) => {
 
       const data = await response.json();
       setSessionCode(data.sessionCode);
-      toast.success("Joined session! Waiting for buddy...");
+      setActiveSessionId(data.sessionId);
+      setIsSessionOwner(false); // 🔥 User joined an existing session, they are NOT the owner
+      setIsHumanBuddyActive(true);
+      setIsModalOpen(false);
+      toast.success("Joined session! Starting buddy call...");
     } catch (error) {
       console.error("Error joining session:", error);
       toast.error(error.message || "Failed to join session");
@@ -128,10 +165,10 @@ const InterviewBuddy = ({ userId }) => {
   };
 
   const personas = [
-    { id: "hiring-manager", emoji: "💼", name: "Hiring Manager", style: "Technical depth" },
-    { id: "hr-partner", emoji: "🧑‍💼", name: "HR Partner", style: "Behavioral focus" },
-    { id: "startup-founder", emoji: "🚀", name: "Startup Founder", style: "Culture & vision" },
-    { id: "drill-sergeant", emoji: "🎖️", name: "Drill Sergeant", style: "High pressure" },
+    { id: "hiring-manager", icon: Briefcase, name: "Hiring Manager", style: "Technical depth" },
+    { id: "hr-partner", icon: Users, name: "HR Partner", style: "Behavioral focus" },
+    { id: "startup-founder", icon: Rocket, name: "Startup Founder", style: "Culture & vision" },
+    { id: "drill-sergeant", icon: Award, name: "Drill Sergeant", style: "High pressure" },
   ];
 
   const topics = [
@@ -178,55 +215,55 @@ const InterviewBuddy = ({ userId }) => {
   const features = [
     {
       type: "human",
-      icon: "🗂️",
+      icon: FolderOpen,
       title: "Co-Pilot Question Queue",
       desc: "Interviewer drags questions into a live queue. Tag-team mode lets partners pass the mic for panel simulation.",
     },
     {
       type: "human",
-      icon: "🟡",
+      icon: AlertCircle,
       title: "Signal Cards",
       desc: "Non-verbal cues: Yellow (off-topic), Red (move on), Green (excellent — elaborate). Non-disruptive to the flow.",
     },
     {
       type: "human",
-      icon: "📝",
+      icon: FileText,
       title: "Shared Live Notes",
       desc: "A mini-realtime doc both users type in during the session. Auto-formats into a structured Recap PDF at the end.",
     },
     {
       type: "ai",
-      icon: "🧠",
+      icon: Brain,
       title: "Adaptive AI Questioning",
       desc: "If your answer is weak, the AI re-prompts with a follow-up. 'Safe to fail' — retry your answer immediately.",
     },
     {
       type: "ai",
-      icon: "📡",
+      icon: Radio,
       title: "Live Sentiment Analysis",
       desc: "Real-time gauges for Confidence, Pacing, and Filler Words. On-screen STAR method nudges appear contextually.",
     },
     {
       type: "ai",
-      icon: "📊",
+      icon: BarChart3,
       title: "Radar Chart Report",
       desc: "Post-session breakdown: Clarity, Technical Accuracy, Behavioral Storytelling, Confidence. Color-coded transcript.",
     },
     {
       type: "shared",
-      icon: "💻",
+      icon: Code,
       title: "Integrated Code Editor",
       desc: "Full syntax-highlighted editor for coding rounds. Live or AI-observed. Supports multiple languages.",
     },
     {
       type: "shared",
-      icon: "🎬",
+      icon: Film,
       title: "Bookmarked Recording",
       desc: "Session recordings with automatic bookmarks at signal card moments, feedback events, and key question timestamps.",
     },
     {
       type: "shared",
-      icon: "📄",
+      icon: FileJson,
       title: "JD-Based Questions",
       desc: "Upload a job description. AI generates role-specific questions tailored to the exact requirements and company culture.",
     },
@@ -301,6 +338,27 @@ const InterviewBuddy = ({ userId }) => {
           }}
           onClose={() => setDsaRoomActive(false)}
         />
+      ) : isHumanBuddyActive && sessionCode && activeSessionId ? (
+        <HumanBuddySession
+          sessionId={activeSessionId}
+          sessionCode={sessionCode}
+          userId={userId}
+          username={`User_${userId?.slice(0, 8) || 'Guest'}`}
+          isOwner={isSessionOwner} // 🔥 Fixed: Use actual owner flag, not hardcoded true
+          onSessionEnd={() => {
+            setIsHumanBuddyActive(false);
+            setSessionCode(null);
+            setActiveSessionId(null);
+            setIsSessionOwner(false);
+            fetchStats();
+          }}
+          onClose={() => {
+            setIsHumanBuddyActive(false);
+            setSessionCode(null);
+            setActiveSessionId(null);
+            setIsSessionOwner(false);
+          }}
+        />
       ) : showResults && sessionResults ? (
         <AiBuddyResultsScreen
           sessionId={activeSessionId}
@@ -344,14 +402,14 @@ const InterviewBuddy = ({ userId }) => {
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
-            <button className="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition">
-              📋 View Past Reports
+            <button className="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition hover:shadow-md hover:shadow-slate-700/50">
+              View Past Reports
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-blue-500/30 transition"
+              className="px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-blue-500/40 hover:scale-105 transition"
             >
-              ✦ New Session
+              New Session
             </button>
           </div>
         </div>
@@ -372,7 +430,7 @@ const InterviewBuddy = ({ userId }) => {
 
       {/* MODE SELECTOR */}
       <div className="px-10 mb-8">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">🎯 Choose Your Mode</h2>
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">Choose Your Mode</h2>
         <div className="grid md:grid-cols-3 gap-4">
           {/* Human Mode Card */}
           <div
@@ -386,7 +444,9 @@ const InterviewBuddy = ({ userId }) => {
             <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
               {currentMode === "human" ? "✓" : ""}
             </div>
-            <div className="text-3xl mb-3">👥</div>
+            <div className="mb-3 text-blue-400">
+              <Users size={32} />
+            </div>
             <h3 className="text-lg font-bold mb-2">Human Buddy Mode</h3>
             <p className="text-sm text-slate-300 mb-3">
               Connect with a peer via video call. One plays Interviewer, one plays Candidate. Real pressure, real collaboration, shared notes.
@@ -412,7 +472,9 @@ const InterviewBuddy = ({ userId }) => {
             <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
               {currentMode === "ai" ? "✓" : ""}
             </div>
-            <div className="text-3xl mb-3">🤖</div>
+            <div className="mb-3 text-purple-400">
+              <Cpu size={32} />
+            </div>
             <h3 className="text-lg font-bold mb-2">AI Buddy Mode</h3>
             <p className="text-sm text-slate-300 mb-3">
               Your always-available AI interviewer. Adaptive questions, live sentiment analysis, on-screen coaching, and a granular performance report.
@@ -438,7 +500,9 @@ const InterviewBuddy = ({ userId }) => {
             <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
               {dsaRoomActive ? "✓" : ""}
             </div>
-            <div className="text-3xl mb-3">🏆</div>
+            <div className="mb-3 text-emerald-400">
+              <Trophy size={32} />
+            </div>
             <h3 className="text-lg font-bold mb-2">DSA Room Mode</h3>
             <p className="text-sm text-slate-300 mb-3">
               Multiplayer competitive coding. Solve problems in real-time, compete on live leaderboards, and earn speed bonuses with up to 10 players.
@@ -460,7 +524,7 @@ const InterviewBuddy = ({ userId }) => {
           {/* AI Persona */}
           {currentMode === "ai" && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">🎭 AI Persona</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">AI Persona</h3>
               <div className="grid grid-cols-2 gap-3">
                 {personas.map((persona) => (
                   <div
@@ -484,7 +548,7 @@ const InterviewBuddy = ({ userId }) => {
           {/* Human Invite */}
           {currentMode === "human" && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">🔗 Invite a Buddy</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Invite a Buddy</h3>
               <p className="text-sm text-slate-400 mb-4">
                 Generate a unique session code and share it with your interview partner. Once they join, roles are assigned in the lobby.
               </p>
@@ -500,18 +564,18 @@ const InterviewBuddy = ({ userId }) => {
                   onClick={copyCode}
                   className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition"
                 >
-                  📋 Copy
+                  Copy
                 </button>
               </div>
               <button className="w-full mt-3 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition">
-                🔗 Share Link Instead
+                Share Link Instead
               </button>
             </div>
           )}
 
           {/* Topics */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">📂 Topic Focus</h3>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Topic Focus</h3>
             <div className="flex flex-wrap gap-2">
               {topics.map((topic) => (
                 <button
@@ -532,7 +596,7 @@ const InterviewBuddy = ({ userId }) => {
           {/* Difficulty & Duration */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
             <div className="mb-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">⚡ Difficulty</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Difficulty</h3>
               <div className="flex gap-3">
                 {["Easy", "Medium", "Hard"].map((level) => (
                   <button
@@ -555,7 +619,7 @@ const InterviewBuddy = ({ userId }) => {
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">⏱ Session Duration</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">⧖ Session Duration</h3>
               <div className="flex items-center gap-4">
                 <input
                   type="range"
@@ -577,7 +641,7 @@ const InterviewBuddy = ({ userId }) => {
 
       {/* FEATURES GRID */}
       <div className="px-10 mb-8">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">✨ Key Features</h2>
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">Key Features</h2>
         <div className="grid md:grid-cols-3 gap-4">
           {features.map((feature, idx) => (
             <div
@@ -590,7 +654,9 @@ const InterviewBuddy = ({ userId }) => {
                   : "border-emerald-500/30 bg-emerald-500/5"
               }`}
             >
-              <div className="text-2xl mb-2">{feature.icon}</div>
+              <div className="text-2xl mb-2 text-slate-400">
+                <feature.icon size={24} />
+              </div>
               <h4 className="font-bold text-sm mb-1">{feature.title}</h4>
               <p className="text-xs text-slate-400 mb-3 leading-relaxed">{feature.desc}</p>
               <span
@@ -614,7 +680,7 @@ const InterviewBuddy = ({ userId }) => {
       {/* RECENT SESSIONS */}
       <div className="px-10 pb-12">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold flex items-center gap-2">🕘 Recent Sessions</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2">Recent Sessions</h2>
           <button className="px-4 py-2 text-sm font-medium hover:text-blue-400 transition">
             View All →
           </button>
@@ -648,7 +714,7 @@ const InterviewBuddy = ({ userId }) => {
                 </div>
                 <div className="flex gap-2">
                   <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
-                    📊
+                    Stats
                   </button>
                   <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
                     ▶️
@@ -665,139 +731,276 @@ const InterviewBuddy = ({ userId }) => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg mx-4 p-8 relative animate-in fade-in zoom-in-95">
             <button
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => {
+                setIsModalOpen(false);
+                setModalTab("create");
+                setJoinCode("");
+              }}
               className="absolute top-5 right-5 w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition text-slate-400"
             >
               ✕
             </button>
 
-            <h2 className="text-2xl font-black mb-2">Start New Session</h2>
+            <h2 className="text-2xl font-black mb-2">
+              {currentMode === "human" ? "Human Buddy Session" : "Start New Session"}
+            </h2>
+
+            {/* TABS FOR HUMAN MODE */}
+            {currentMode === "human" && (
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => {
+                    setModalTab("create");
+                    setJoinCode("");
+                  }}
+                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                    modalTab === "create"
+                      ? "bg-blue-500/30 border border-blue-500 text-blue-300"
+                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                  }`}
+                >
+                  Create Session
+                </button>
+                <button
+                  onClick={() => setModalTab("join")}
+                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                    modalTab === "join"
+                      ? "bg-purple-500/30 border border-purple-500 text-purple-300"
+                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                  }`}
+                >
+                  Join Session
+                </button>
+              </div>
+            )}
+
             <p className="text-sm text-slate-400 mb-6">
-              {currentMode === "human"
+              {currentMode === "ai"
+                ? "Your AI interviewer is ready. Confirm settings and go live instantly."
+                : modalTab === "create"
                 ? "Setting up a Human Buddy session. Share the code with your interview partner."
-                : "Your AI interviewer is ready. Confirm settings and go live instantly."}
+                : "Have an invite code or link? Paste it below to join your buddy's session."}
             </p>
 
-            {currentMode === "human" ? (
+            {/* CREATE SESSION TAB */}
+            {(currentMode === "ai" || modalTab === "create") && (
               <div className="space-y-4">
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      1
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">Share your session code</div>
-                      <div className="text-xs text-slate-400">
-                        Send this code or link to your buddy. They enter it on their PrepPath dashboard.
+                {currentMode === "human" && (
+                  <>
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          1
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">🔗 Share this invite link</div>
+                          <div className="text-xs text-slate-400">
+                            Your buddy just needs to click the link - no code to enter!
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
-                  <div className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 font-bold text-blue-400 text-center tracking-widest">
-                    {sessionCode || "IB-XXXXX"}
-                  </div>
-                  <button
-                    onClick={copyCode}
-                    disabled={!sessionCode || isLoading}
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? "⏳" : "📋"} Copy
-                  </button>
-                </div>
-
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      2
+                    {/* INVITE LINK */}
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-blue-400 break-all overflow-hidden">
+                        {inviteLink || "https://ai-interview.com/interview/buddy/IB-XXXXX"}
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (inviteLink) {
+                            navigator.clipboard.writeText(inviteLink);
+                            toast.success("Invite link copied!");
+                          }
+                        }}
+                        disabled={!inviteLink || isLoading}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {isLoading ? "Loading..." : "Copy Link"}
+                      </button>
                     </div>
-                    <div>
-                      <div className="text-sm font-bold">Assign roles in the Lobby</div>
-                      <div className="text-xs text-slate-400">
-                        Once both join, choose who is Interviewer and who is Candidate. The Interviewer gets the Co-Pilot panel.
+
+                    {/* SESSION CODE (BACKUP) */}
+                    <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-3">
+                      <div className="text-xs text-slate-500 mb-2">Or share the code:</div>
+                      <div className="flex gap-2">
+                        <div className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm font-bold text-blue-400 text-center tracking-widest">
+                          {sessionCode || "IB-XXXXX"}
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (sessionCode) {
+                              navigator.clipboard.writeText(sessionCode);
+                              toast.success("Code copied!");
+                            }
+                          }}
+                          disabled={!sessionCode}
+                          className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Copy
+                        </button>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      3
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">Go live</div>
-                      <div className="text-xs text-slate-400">
-                        Video, shared editor, signal cards, and live notes all activate when both participants are ready.
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          2
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Assign roles in the Lobby</div>
+                          <div className="text-xs text-slate-400">
+                            Once both join, choose who is Interviewer and who is Candidate.
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          3
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Go live</div>
+                          <div className="text-xs text-slate-400">
+                            Video, camera, mic, screen share, and shared notes all activate.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {currentMode === "ai" && (
+                  <>
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          1
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Confirm your persona & topic</div>
+                          <div className="text-xs text-slate-400">
+                            Selected: {personas.find((p) => p.id === selectedPersona)?.name} · {selectedTopics[0]} · {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} · {sessionDuration} min
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          2
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Optional: Upload a Job Description</div>
+                          <div className="text-xs text-slate-400">
+                            Drop a JD and AI generates tailored questions.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center text-slate-400 text-sm cursor-pointer hover:border-slate-600 transition">
+                      Drop JD here or <span className="text-blue-400">browse</span> &nbsp;·&nbsp; Optional
+                    </div>
+
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          3
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Allow microphone access</div>
+                          <div className="text-xs text-slate-400">
+                            Required for speech-to-text analysis.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-            ) : (
+            )}
+
+            {/* JOIN SESSION TAB */}
+            {currentMode === "human" && modalTab === "join" && (
               <div className="space-y-4">
                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      1
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">Confirm your persona & topic</div>
-                      <div className="text-xs text-slate-400">
-                        Selected: {personas.find((p) => p.id === selectedPersona)?.name} · {selectedTopics[0]} · {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} · {sessionDuration} min
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <div className="flex gap-3 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      2
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">Optional: Upload a Job Description</div>
-                      <div className="text-xs text-slate-400">
-                        Drop a JD and the AI generates questions tailored to that exact role and company.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center text-slate-400 text-sm cursor-pointer hover:border-slate-600 transition">
-                  📄 Drop JD here or <span className="text-blue-400">browse</span> &nbsp;·&nbsp; Optional
-                </div>
-
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                   <div className="flex gap-3">
-                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                      3
+                    <div className="w-6 h-6 rounded-full bg-linear-to-r from-purple-400 to-pink-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                      �
                     </div>
                     <div>
-                      <div className="text-sm font-bold">Allow microphone access</div>
+                      <div className="text-sm font-bold">Paste the invite link or code</div>
                       <div className="text-xs text-slate-400">
-                        Required for speech-to-text analysis and live sentiment feedback.
+                        Your buddy will share either an invite link or a code like "IB-7X4K9".
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Paste link (https://...) or code (IB-7X4K9)"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-center text-sm"
+                />
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-xs text-blue-300">
+                    ✓ If you have a link, we'll extract the code automatically
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-xs text-blue-300">
+                    ✓ Once you join, the session creator will assign your role (Interviewer or Interviewee).
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-xs text-blue-300">
+                    ✓ Video, camera, mic, and screen sharing will be available once both of you connect.
+                  </p>
                 </div>
               </div>
             )}
 
             <div className="flex gap-3 mt-8">
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setModalTab("create");
+                  setJoinCode("");
+                }}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition"
               >
                 Cancel
               </button>
               <button
-                onClick={handleStartSession}
-                disabled={isLoading}
+                onClick={() => {
+                  if (currentMode === "human" && modalTab === "join") {
+                    handleJoinSession(joinCode);
+                  } else {
+                    handleStartSession();
+                  }
+                }}
+                disabled={
+                  isLoading ||
+                  (currentMode === "human" && modalTab === "join" && !joinCode.trim())
+                }
                 className="flex-1 px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-blue-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "⏳ Loading..." : currentMode === "human" ? "🚀 Enter Lobby" : "🤖 Start AI Session"}
+                {isLoading
+                  ? "Loading..."
+                  : currentMode === "human"
+                  ? modalTab === "create"
+                    ? "Enter Lobby"
+                    : `Join Session`
+                  : "Start AI Session"}
               </button>
             </div>
           </div>

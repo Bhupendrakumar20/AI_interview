@@ -11,15 +11,40 @@ import DSALiveRoom from "./DSALiveRoom";
 let socketInstance = null;
 function getSocket() {
   if (!socketInstance) {
-    socketInstance = io(
-      process.env.NEXT_PUBLIC_SOCKET_IO_URL || "http://localhost:4001",
-      { autoConnect: false }
-    );
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || "http://localhost:4001";
+    console.log("🔌 Initializing socket connection to:", socketUrl);
+    
+    socketInstance = io(socketUrl, {
+      autoConnect: false,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      transports: ["websocket", "polling"],
+      forceNew: false,
+    });
+
+    // Add global error handlers
+    socketInstance.on("connect_error", (error) => {
+      console.error("❌ Socket connection error:", error);
+    });
+
+    socketInstance.on("error", (error) => {
+      console.error("❌ Socket error:", error);
+    });
+
+    socketInstance.on("connect", () => {
+      console.log("✅ Socket connected with ID:", socketInstance.id);
+    });
+
+    socketInstance.on("disconnect", (reason) => {
+      console.log("⚠️ Socket disconnected:", reason);
+    });
   }
   return socketInstance;
 }
 
-export default function DSARoomLobby({ userName, onClose }) {
+export default function DSARoomLobby({ userId, userName, onClose }) {
   // Tab state
   const [activeTab, setActiveTab] = useState("create"); // 'create' | 'join'
 
@@ -43,47 +68,153 @@ export default function DSARoomLobby({ userName, onClose }) {
   const [myQuestionModeVote, setMyQuestionModeVote] = useState("");
   const [myTimeLimitVote, setMyTimeLimitVote] = useState("");
 
+  // Socket state
+  const [socketError, setSocketError] = useState(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+
   const socket = getSocket();
+
+  // Setup socket event listeners on component mount
+  useEffect(() => {
+    const handleConnect = () => {
+      console.log("✅ Socket connected!");
+      setIsSocketConnected(true);
+      setSocketError(null);
+    };
+
+    const handleDisconnect = (reason) => {
+      console.warn("⚠️ Socket disconnected:", reason);
+      setIsSocketConnected(false);
+    };
+
+    const handleConnectError = (error) => {
+      console.error("❌ Socket connection error:", error);
+      setSocketError(String(error) || "Failed to connect to DSA Room server");
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("connect_error", handleConnectError);
+
+    // Check if already connected
+    if (socket.connected) {
+      setIsSocketConnected(true);
+    }
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("connect_error", handleConnectError);
+    };
+  }, [socket]);
 
   // ── CREATE ROOM ──────────────────────────────────────────────────────────────
   const handleCreateRoom = async () => {
     setIsCreating(true);
-    socket.connect();
+    setSocketError(null);
+    
+    try {
+      // Check if socket is already connected
+      if (!socket.connected) {
+        console.log("🔌 Connecting socket...");
+        socket.connect();
+        
+        // Wait for connection with timeout
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error("Socket connection timeout"));
+          }, 5000);
 
-    socket.emit("room_create", { username: userName, avatar: "👤" }, (response) => {
-      if (response.success) {
-        setRoomCode(response.roomCode);
-        setCreatedRoomCode(response.roomCode);
-        setIsInRoom(true);
-        setIsHost(true);
-        setCurrentUser({ username: userName, id: socket.id });
-        setupRoomListeners();
-      } else {
-        alert("Failed to create room: " + response.error);
+          socket.once("connect", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+
+          socket.once("connect_error", (error) => {
+            clearTimeout(timer);
+            reject(error);
+          });
+        });
       }
+
+      // Now emit the room_create event with userId
+      socket.emit("room_create", { username: userName, avatar: "[U]", userId }, (response) => {
+        if (response && response.success) {
+          setRoomCode(response.roomCode);
+          setCreatedRoomCode(response.roomCode);
+          setIsInRoom(true);
+          setIsHost(true);
+          setCurrentUser({ username: userName, id: socket.id });
+          setupRoomListeners();
+          setSocketError(null);
+        } else {
+          const errorMsg = response?.error || "Failed to create room";
+          setSocketError(errorMsg);
+          console.error("❌ Create room failed:", errorMsg);
+        }
+        setIsCreating(false);
+      });
+    } catch (error) {
+      const errorMsg = String(error) || "Failed to connect and create room";
+      setSocketError(errorMsg);
+      console.error("❌ Error creating room:", error);
       setIsCreating(false);
-    });
+    }
   };
 
   // ── JOIN ROOM ────────────────────────────────────────────────────────────────
   const handleJoinRoom = async () => {
     if (!joinRoomCode.trim()) return;
     setIsJoining(true);
-    socket.connect();
+    setSocketError(null);
 
-    socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "👤" }, (response) => {
-      if (response.success) {
-        setRoomCode(joinRoomCode);
-        setIsInRoom(true);
-        setUsers(response.lobbyState.users);
-        setIsHost(response.lobbyState.hostId === socket.id);
-        setCurrentUser({ username: userName, id: socket.id });
-        setupRoomListeners();
-      } else {
-        alert("Failed to join room: " + response.error);
+    try {
+      // Check if socket is already connected
+      if (!socket.connected) {
+        console.log("🔌 Connecting socket...");
+        socket.connect();
+
+        // Wait for connection with timeout
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error("Socket connection timeout"));
+          }, 5000);
+
+          socket.once("connect", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+
+          socket.once("connect_error", (error) => {
+            clearTimeout(timer);
+            reject(error);
+          });
+        });
       }
+
+      // Now emit the room_join event with userId
+      socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "[U]", userId }, (response) => {
+        if (response && response.success) {
+          setRoomCode(joinRoomCode);
+          setIsInRoom(true);
+          setUsers(response.lobbyState?.users || []);
+          setIsHost(response.lobbyState?.hostId === socket.id);
+          setCurrentUser({ username: userName, id: socket.id });
+          setupRoomListeners();
+          setSocketError(null);
+        } else {
+          const errorMsg = response?.error || "Failed to join room";
+          setSocketError(errorMsg);
+          console.error("❌ Join room failed:", errorMsg);
+        }
+        setIsJoining(false);
+      });
+    } catch (error) {
+      const errorMsg = String(error) || "Failed to connect and join room";
+      setSocketError(errorMsg);
+      console.error("❌ Error joining room:", error);
       setIsJoining(false);
-    });
+    }
   };
 
   // ── SETUP ROOM LISTENERS ──────────────────────────────────────────────────────
@@ -148,14 +279,37 @@ export default function DSARoomLobby({ userName, onClose }) {
             <p className="text-slate-400">Real-time competitive coding with friends</p>
           </div>
 
+          {/* Connection Status Alert */}
+          {socketError && (
+            <div className="mb-6 p-4 bg-red-950/50 border border-red-700 rounded-lg">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div className="flex-1">
+                  <h3 className="text-red-300 font-bold mb-1">Connection Error</h3>
+                  <p className="text-red-200 text-sm">{socketError}</p>
+                  <p className="text-red-300 text-xs mt-2">
+                    Make sure the DSA Room server is running. Check your internet connection or try again later.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Socket Status Indicator */}
+          <div className="mb-6 flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${isSocketConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+            <span className={`text-sm font-medium ${isSocketConnected ? "text-green-400" : "text-red-400"}`}>
+              {isSocketConnected ? "✓ Connected to DSA Server" : "✗ Disconnected from DSA Server"}
+            </span>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Create Room Card */}
             <div className="group relative p-8 rounded-3xl border-2 border-emerald-700/50 bg-linear-to-br from-emerald-950/40 to-slate-900/60 hover:border-emerald-600 transition-all duration-300">
               <div className="absolute inset-0 rounded-3xl bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-all duration-300" />
 
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-6">
-                  <div className="text-5xl">🆕</div>
+                  <div className="text-5xl">◆</div>
                   <span className="px-3 py-1 text-xs font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 rounded-full">
                     CREATE
                   </span>
@@ -192,11 +346,11 @@ export default function DSARoomLobby({ userName, onClose }) {
                 >
                   {isCreating ? (
                     <>
-                      <span className="animate-spin">⚙️</span> Creating Room...
+                      <span className="animate-spin">⊙</span> Creating Room...
                     </>
                   ) : (
                     <>
-                      <span>👑</span> Create as Owner
+                      <span>Owner</span> Create as Owner
                     </>
                   )}
                 </button>
@@ -209,7 +363,7 @@ export default function DSARoomLobby({ userName, onClose }) {
 
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-6">
-                  <div className="text-5xl">🚪</div>
+                  <div className="text-5xl">✫</div>
                   <span className="px-3 py-1 text-xs font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-500/40 rounded-full">
                     JOIN
                   </span>
@@ -270,7 +424,7 @@ export default function DSARoomLobby({ userName, onClose }) {
                       </>
                     ) : (
                       <>
-                        <span>📨</span> Request to Join
+                        <span>→</span> Request to Join
                       </>
                     )}
                   </button>
@@ -285,10 +439,10 @@ export default function DSARoomLobby({ userName, onClose }) {
 
           {/* Features Overview */}
           <div className="grid md:grid-cols-2 gap-6 mt-12 pt-8 border-t border-slate-700/50">
-            <h3 className="col-span-full text-xl font-bold text-slate-200 mb-2">✨ Platform Features</h3>
+            <h3 className="col-span-full text-xl font-bold text-slate-200 mb-2">Platform Features</h3>
 
             <div className="group p-6 bg-linear-to-br from-purple-950/30 to-slate-900/50 border border-purple-700/30 rounded-2xl hover:border-purple-600 transition-all duration-300">
-              <div className="text-4xl mb-3">👥</div>
+              <div className="text-4xl mb-3">◉</div>
               <div className="text-sm font-bold text-purple-300">Member Verification</div>
               <div className="text-xs text-slate-400 mt-2">
                 Owner verifies and approves joining members
@@ -296,19 +450,19 @@ export default function DSARoomLobby({ userName, onClose }) {
             </div>
 
             <div className="group p-6 bg-linear-to-br from-amber-950/30 to-slate-900/50 border border-amber-700/30 rounded-2xl hover:border-amber-600 transition-all duration-300">
-              <div className="text-4xl mb-3">🔐</div>
+              <div className="text-4xl mb-3">◊</div>
               <div className="text-sm font-bold text-amber-300">Owner Control</div>
               <div className="text-xs text-slate-400 mt-2">Complete room and game settings management</div>
             </div>
 
             <div className="group p-6 bg-linear-to-br from-pink-950/30 to-slate-900/50 border border-pink-700/30 rounded-2xl hover:border-pink-600 transition-all duration-300">
-              <div className="text-4xl mb-3">⏱️</div>
+              <div className="text-4xl mb-3">⧖</div>
               <div className="text-sm font-bold text-pink-300">Server-Synced Timer</div>
               <div className="text-xs text-slate-400 mt-2">Fair play environment with anti-cheat validation</div>
             </div>
 
             <div className="group p-6 bg-linear-to-br from-blue-950/30 to-slate-900/50 border border-blue-700/30 rounded-2xl hover:border-blue-600 transition-all duration-300">
-              <div className="text-4xl mb-3">📊</div>
+              <div className="text-4xl mb-3">≫</div>
               <div className="text-sm font-bold text-blue-300">Live Leaderboard</div>
               <div className="text-xs text-slate-400 mt-2">Real-time rankings and scoring during gameplay</div>
             </div>
@@ -333,17 +487,17 @@ export default function DSARoomLobby({ userName, onClose }) {
     <div className="min-h-screen bg-slate-950 p-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">🗳️ Voting Phase</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Voting Phase</h1>
           <p className="text-slate-400">Room: {roomCode}</p>
         </div>
 
         {/* Players List */}
         <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 mb-6">
-          <h2 className="text-lg font-bold text-white mb-4">👥 Players ({users.length})</h2>
+          <h2 className="text-lg font-bold text-white mb-4">Players ({users.length})</h2>
           <div className="space-y-2">
             {users.map((u) => (
               <div key={u.id} className="flex items-center gap-2 px-3 py-2 bg-slate-800 rounded">
-                <span>{u.id === currentUser?.id ? "👤" : "👨"}</span>
+                <span>{u.id === currentUser?.id ? "[Me]" : "[U]"}</span>
                 <span className="flex-1">{u.username}</span>
                 {u.id === currentUser?.id && <span className="text-xs text-blue-400">YOU</span>}
               </div>
@@ -355,7 +509,7 @@ export default function DSARoomLobby({ userName, onClose }) {
         <div className="space-y-6">
           {/* Question Mode Vote */}
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-white mb-4">📋 Question Mode</h3>
+            <h3 className="text-lg font-bold text-white mb-4">Question Mode</h3>
             <div className="grid grid-cols-2 gap-4">
               {["same", "different"].map((mode) => (
                 <button
@@ -378,7 +532,7 @@ export default function DSARoomLobby({ userName, onClose }) {
 
           {/* Time Limit Vote */}
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-white mb-4">⏱️ Time Limit</h3>
+            <h3 className="text-lg font-bold text-white mb-4">Time Limit</h3>
             <div className="grid grid-cols-3 gap-4">
               {["1800", "2700", "3600"].map((time) => (
                 <button
@@ -404,7 +558,7 @@ export default function DSARoomLobby({ userName, onClose }) {
             onClick={handleStartRoom}
             className="w-full mt-8 px-6 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition"
           >
-            🚀 Start Game
+            Start Game
           </button>
         )}
 

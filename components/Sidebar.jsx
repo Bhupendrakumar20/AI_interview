@@ -38,7 +38,7 @@ const Sidebar = ({ user }) => {
     { label: "Internships", href: "/internships", icon: "briefcase" },
     { label: "Jobs", href: "/jobs", icon: "briefcase" },
     { label: "Competitions", href: "/competitions", icon: "trophy" },
-    { label: "Mock Tests", href: "/mock-test/companies", icon: "clipboard" },
+    { label: "Mock Tests", href: "/mock-test", icon: "clipboard" },
     { label: "Mock Interviews", href: "/interview", icon: "phone" },
     { label: "Mentorship", href: "/mentorship", icon: "users" },
     { label: "100 Days to Code", href: "/100-days-of-code", icon: "zap" },
@@ -110,10 +110,10 @@ const Sidebar = ({ user }) => {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
+                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 group hover:scale-[1.02]",
                     isActive
-                      ? "bg-primary-200 text-dark-100 font-semibold shadow-md"
-                      : "hover:bg-dark-200 text-light-200 hover:text-light-50"
+                      ? "bg-primary-200 text-dark-100 font-semibold shadow-md hover:shadow-lg"
+                      : "hover:bg-dark-200 text-light-200 hover:text-light-50 hover:shadow-md hover:shadow-primary-200/10"
                   )}
                 >
                   <div className={cn(
@@ -142,10 +142,10 @@ const Sidebar = ({ user }) => {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all duration-200 group",
+                        "flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all duration-300 group hover:scale-[1.02]",
                         isActive
-                          ? "bg-primary-200/20 text-primary-100 font-semibold"
-                          : "hover:bg-dark-200 text-light-300 hover:text-light-100"
+                          ? "bg-primary-200/20 text-primary-100 font-semibold hover:bg-primary-200/30"
+                          : "hover:bg-dark-200 text-light-300 hover:text-light-100 hover:shadow-md hover:shadow-primary-200/5"
                       )}
                     >
                       <span className="text-xs opacity-60">›</span>

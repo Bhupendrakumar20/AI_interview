@@ -74,7 +74,7 @@ const InternshipCard = ({ internship }) => {
   return (
     <div 
       className={cn(
-        "card-border group hover:border-primary-200/30 transition-all",
+        "card-border group hover:border-primary-200/30 hover:shadow-lg hover:shadow-primary-200/20 transition-all duration-300 hover:-translate-y-1",
         applicationStatus.status !== "closed" && internship.applyLink && "cursor-pointer"
       )}
       onClick={handleCardClick}
@@ -99,7 +99,7 @@ const InternshipCard = ({ internship }) => {
         <div className="space-y-3 mb-4 flex-1">
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-1">
-              <span>📍</span>
+              <span className="text-slate-400">Location:</span>
               <span className={cn("line-clamp-1",
                 internship.isRemote && "text-success-100 font-medium"
               )}>
@@ -108,7 +108,7 @@ const InternshipCard = ({ internship }) => {
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <span>⏱️</span>
+              <span className="text-slate-400">Duration:</span>
               <span>{internship.duration}</span>
             </div>
           </div>
@@ -120,7 +120,7 @@ const InternshipCard = ({ internship }) => {
           <div className="text-sm text-light-100">
             <div className="flex items-center gap-2">
               <span className={cn(
-                "px-2 py-1 rounded text-xs",
+                "px-2 py-1 rounded text-xs transition-all duration-300",
                 applicationStatus.status === "closed" && "bg-red-500/20 text-red-500",
                 applicationStatus.status === "urgent" && "bg-yellow-500/20 text-yellow-500",
                 applicationStatus.status === "open" && "bg-green-500/20 text-green-500"

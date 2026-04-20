@@ -120,7 +120,7 @@ export default function RecentPage() {
       {/* Empty State */}
       {recentItems.length === 0 && (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">👀</div>
+          <div className="text-6xl mb-4">◦</div>
           <h3 className="text-xl font-bold mb-2">No recent items</h3>
           <p className="text-light-100 mb-6">Start browsing jobs, courses, and mentors to see them here.</p>
           <div className="flex justify-center gap-4">
@@ -136,19 +136,19 @@ export default function RecentPage() {
           <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <button className="p-4 bg-dark-200 rounded-lg text-center hover:bg-dark-300">
-              <div className="text-2xl mb-2">💼</div>
+              <div className="text-2xl mb-2">◇</div>
               <div className="text-sm">Apply to Jobs</div>
             </button>
             <button className="p-4 bg-dark-200 rounded-lg text-center hover:bg-dark-300">
-              <div className="text-2xl mb-2">📚</div>
+              <div className="text-2xl mb-2">◈</div>
               <div className="text-sm">Continue Course</div>
             </button>
             <button className="p-4 bg-dark-200 rounded-lg text-center hover:bg-dark-300">
-              <div className="text-2xl mb-2">👥</div>
+              <div className="text-2xl mb-2">◉</div>
               <div className="text-sm">Book Session</div>
             </button>
             <button className="p-4 bg-dark-200 rounded-lg text-center hover:bg-dark-300">
-              <div className="text-2xl mb-2">🏆</div>
+              <div className="text-2xl mb-2">★</div>
               <div className="text-sm">Join Competition</div>
             </button>
           </div>
@@ -159,7 +159,7 @@ export default function RecentPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">📈</div>
+            <div className="text-2xl mb-2">↗</div>
             <div className="text-lg font-bold">{recentItems.length}</div>
             <div className="text-sm text-light-100">Items Viewed</div>
           </div>
@@ -173,7 +173,7 @@ export default function RecentPage() {
         </div>
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">🎯</div>
+            <div className="text-2xl mb-2">▲</div>
             <div className="text-lg font-bold">Jobs</div>
             <div className="text-sm text-light-100">Most Viewed Category</div>
           </div>

@@ -13,9 +13,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  experimental: {
-    turbopack: false,
-  },
+  turbopack: {},
 };
 
 export default nextConfig;

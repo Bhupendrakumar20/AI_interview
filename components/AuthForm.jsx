@@ -141,6 +141,17 @@ const AuthForm = ({ type }) => {
               type="password"
             />
 
+            {isSignIn && (
+              <div className="text-right">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-primary-200 hover:text-primary-100 font-semibold transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
+
             <Button className="btn" type="submit">
               {isSignIn ? "Sign In" : "Create an Account"}
             </Button>

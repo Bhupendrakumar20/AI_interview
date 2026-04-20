@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Socket Server Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: monospace; margin: 20px; background: #1e1e1e; color: #00ff00; }
+        .log { background: #000; padding: 20px; border-radius: 5px; margin: 10px 0; white-space: pre-wrap; }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .warning { color: #ffaa00; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔌 Socket Server Diagnostic Test</h1>
+    
+    <button onclick="testConnection()">Test Socket Connection</button>
+    <button onclick="clearLog()">Clear Log</button>
+    
+    <div class="log" id="log">
+        <span class="warning">[WAITING] Click "Test Socket Connection" to start...</span>
+    </div>
+
+    <script>
+        const logEl = document.getElementById('log');
+        
+        function log(msg, type = 'info') {
+            const classMap = { error: 'error', success: 'success', warning: 'warning', info: 'warning' };
+            const prefix = {
+                error: '❌',
+                success: '✅',
+                warning: '⚠️',
+                info: 'ℹ️'
+            }[type];
+            
+            const html = `<div class="${classMap[type]}">${prefix} ${msg}</div>`;
+            logEl.innerHTML += html;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${msg}`);
+        }
+
+        function clearLog() {
+            logEl.innerHTML = '';
+        }
+
+        function testConnection() {
+            clearLog();
+            log('Starting connection test...', 'warning');
+            
+            const socketUrl = 'https://ai-interview-socket.onrender.com';
+            log(`📍 Socket URL: ${socketUrl}`, 'info');
+            log(`📍 Namespace: /interview-buddy`, 'info');
+            
+            try {
+                const socket = io(`${socketUrl}/interview-buddy`, {
+                    path: '/socket.io/',
+                    transports: ['websocket', 'polling'],
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    reconnectionAttempts: 5,
+                });
+
+                socket.on('connect', () => {
+                    log(`Socket connected! ID: ${socket.id}`, 'success');
+                    
+                    // Test join_session
+                    const testData = {
+                        userId: 'test-user-' + Date.now(),
+                        username: 'Test User',
+                        sessionCode: 'IB-TEST-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
+                        isCreator: true
+                    };
+                    
+                    log(`🔑 Sending test join_session:`, 'info');
+                    log(`   - userId: ${testData.userId}`, 'info');
+                    log(`   - username: ${testData.username}`, 'info');
+                    log(`   - sessionCode: ${testData.sessionCode}`, 'info');
+                    
+                    socket.emit('join_session', testData);
+                });
+
+                socket.on('session_joined', (data) => {
+                    log(`✅ Received session_joined!`, 'success');
+                    log(`📊 Data: ${JSON.stringify(data, null, 2)}`, 'success');
+                    socket.disconnect();
+                });
+
+                socket.on('error', (data) => {
+                    log(`❌ Socket error: ${JSON.stringify(data)}`, 'error');
+                    socket.disconnect();
+                });
+
+                socket.on('connect_error', (error) => {
+                    log(`❌ Connection error: ${error.message}`, 'error');
+                });
+
+                socket.on('disconnect', () => {
+                    log(`🔌 Socket disconnected`, 'warning');
+                });
+
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    if (socket.connected) {
+                        log(`⏱️ Test timeout - disconnecting`, 'warning');
+                        socket.disconnect();
+                    }
+                }, 10000);
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto test on page load
+        log('Page loaded. Ready to test socket connection.', 'warning');
+    </script>
+</body>
+</html>

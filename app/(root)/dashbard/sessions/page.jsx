@@ -168,21 +168,21 @@ export default function SessionsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">🎯</div>
+            <div className="text-2xl mb-2">▲</div>
             <h3 className="font-semibold mb-2">Set Clear Goals</h3>
             <p className="text-sm text-light-100">Define what you want to achieve in each session</p>
           </div>
         </div>
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">📝</div>
+            <div className="text-2xl mb-2">✍</div>
             <h3 className="font-semibold mb-2">Take Notes</h3>
             <p className="text-sm text-light-100">Document feedback and action items</p>
           </div>
         </div>
         <div className="card-border">
           <div className="card p-4">
-            <div className="text-2xl mb-2">🔄</div>
+            <div className="text-2xl mb-2">⟳</div>
             <h3 className="font-semibold mb-2">Regular Practice</h3>
             <p className="text-sm text-light-100">Consistency is key to improvement</p>
           </div>

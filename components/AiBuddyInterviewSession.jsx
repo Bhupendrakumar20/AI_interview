@@ -35,24 +35,24 @@ const AiBuddyInterviewSession = ({
         // Calculate question count based on duration
         const questionCount = Math.max(3, Math.ceil(duration / 10));
         
-        // Get questions from question bank
-        const newQuestions = getInterviewQuestions(
+        // Get questions from LeetCode API (NOW ASYNC)
+        const newQuestions = await getInterviewQuestions(
           selectedTopics,
           difficulty.toLowerCase(),
           questionCount
         );
 
-        console.log('Loaded questions:', newQuestions);
+        console.log('[Interview Buddy] Loaded LeetCode questions:', newQuestions);
 
         if (newQuestions.length === 0) {
-          toast.error('No questions found for selected topics');
+          toast.error('No LeetCode questions found for selected topics');
           onClose?.();
           return;
         }
 
         setQuestions(newQuestions);
         setSessionStarted(true);
-        toast.success('Interview Started! Click the speaker icon to hear the question.');
+        toast.success('Interview Started with LeetCode Questions! Click the speaker icon to hear the question.');
         
         // Auto-read first question
         setTimeout(() => {
@@ -61,8 +61,8 @@ const AiBuddyInterviewSession = ({
           }
         }, 500);
       } catch (error) {
-        console.error('Interview init error:', error);
-        toast.error('Failed to initialize interview');
+        console.error('[Interview Buddy] Init error:', error);
+        toast.error('Failed to initialize interview with LeetCode questions');
         onClose?.();
       } finally {
         setLoading(false);
@@ -225,7 +225,7 @@ const AiBuddyInterviewSession = ({
       <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-4 z-50">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">🤖 AI Interview Session</h1>
+            <h1 className="text-2xl font-bold text-white">AI Interview Session</h1>
             <p className="text-slate-400 text-sm">Question {currentQuestionIndex + 1} of {questions.length}</p>
           </div>
 
@@ -284,12 +284,12 @@ const AiBuddyInterviewSession = ({
           >
             {isSpeaking ? (
               <>
-                <span className="inline-block animate-pulse">🔊</span>
+                <span className="inline-block animate-pulse">♪</span>
                 Reading...
               </>
             ) : (
               <>
-                <span>🔊</span>
+                <span>♪</span>
                 Read Question Aloud
               </>
             )}
@@ -391,7 +391,7 @@ const AiBuddyInterviewSession = ({
               onClick={handleSessionEnd}
               className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all"
             >
-              🏁 Finish Interview
+              Finish Interview
             </button>
           )}
         </div>

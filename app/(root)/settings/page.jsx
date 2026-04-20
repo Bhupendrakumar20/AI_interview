@@ -23,7 +23,7 @@ export default async function SettingsPage() {
 
       {/* Info Section */}
       <section className="bg-dark-200/50 border border-dark-300 rounded-lg p-6">
-        <h3 className="text-sm font-semibold text-light-100 mb-3">📝 Important Notes</h3>
+        <h3 className="text-sm font-semibold text-light-100 mb-3">Important Notes</h3>
         <ul className="text-sm text-light-400 space-y-2">
           <li>• Your account data is securely stored in Firebase</li>
           <li>• Clearing history will remove all interview records</li>

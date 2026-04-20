@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import InterviewCard from "@/components/InterviewCard";
 import InterviewSetup from "@/components/InterviewSetup";
+import ResumeRoundSection from "@/components/Resume RoundSection";
 
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import {
@@ -28,7 +29,7 @@ async function InterviewPage() {
         <div className="absolute inset-0 bg-linear-to-r from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
         <div className="relative flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-bold mb-2">🤝 Interview Buddy</h3>
+            <h3 className="text-2xl font-bold mb-2">Interview Buddy</h3>
             <p className="text-light-100 mb-4 max-w-md">
               Practice with a human partner or AI interviewer. Get real-time coaching, adaptive questions, and detailed performance reports.
             </p>
@@ -36,7 +37,7 @@ async function InterviewPage() {
               ✦ Try Interview Buddy
             </Link>
           </div>
-          <div className="text-6xl">🎯</div>
+          <div className="text-6xl">▲</div>
         </div>
       </section>
 
@@ -75,6 +76,9 @@ async function InterviewPage() {
           </div>
         </div>
       </section>
+
+      {/* Resume Round Section */}
+      <ResumeRoundSection />
 
       {/* Your Interviews */}
       <section className="flex flex-col gap-4 mt-2">

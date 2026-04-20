@@ -189,21 +189,21 @@ function LeaderboardPanel({ entries, currentUserId, firstBlood }) {
     <div className="flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-700">
         <div className="flex justify-between items-center">
-          <span className="font-bold text-white">🏆 Leaderboard</span>
+          <span className="font-bold text-white">Leaderboard</span>
           <span className="text-xs text-slate-400">{entries.length} players</span>
         </div>
       </div>
 
       {firstBlood && (
         <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/30 text-xs text-red-400">
-          🩸 <strong>First Blood</strong> — {firstBlood.username} solved in{" "}
+          <strong>First Blood</strong> \u2014 {firstBlood.username} solved in{" "}
           {formatTime(firstBlood.timeTakenSecs)}!
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto">
         {entries.map((entry, idx) => {
-          const medals = ["🥇", "🥈", "🥉"];
+          const medals = ["1st", "2nd", "3rd"];
           const rankStr = idx < 3 ? medals[idx] : `#${idx + 1}`;
           const isSolved = entry.status === "solved";
           const isMe = entry.userId === currentUserId;
@@ -229,7 +229,7 @@ function LeaderboardPanel({ entries, currentUserId, firstBlood }) {
                   {entry.username} {isMe && <span className="text-xs text-blue-400">YOU</span>}
                 </div>
                 <div className="text-xs text-slate-400">
-                  {isSolved ? `✓ ${formatTime(entry.timeTakenSecs)} · ${entry.language}` : "⌨ Coding…"}
+                  {isSolved ? `✓ ${formatTime(entry.timeTakenSecs)} · ${entry.language}` : "Coding…"}
                 </div>
               </div>
               <span
@@ -261,8 +261,8 @@ function SubmitResult({ result, onDismiss }) {
     >
       <div className="flex items-center justify-between mb-2">
         <span className="font-bold">
-          {allPassed ? "✅ All test cases passed!" : "❌ Wrong Answer"}
-          {result.isFirstBlood && " 🩸 First Blood +50"}
+          {allPassed ? "All test cases passed!" : "Wrong Answer"}
+          {result.isFirstBlood && " First Blood +50"}
           {allPassed && result.points && ` +${result.points} pts`}
         </span>
         <button onClick={onDismiss} className="text-slate-400 hover:text-slate-200">
@@ -340,11 +340,11 @@ function PostMatchDashboard({ data, submissions, userId }) {
     <div className="min-h-screen bg-slate-950 p-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">🏁 Match Over</h1>
+          <h1 className="text-4xl font-bold text-white mb-2">Match Over</h1>
           <div className="text-slate-400 text-sm space-y-1">
             <div>
               {data.summary.totalParticipants} Players · {data.summary.totalSolved} Solved
-              {data.summary.firstBlood && ` · 🩸 First Blood: ${data.summary.firstBlood}`}
+              {data.summary.firstBlood && ` · First Blood: ${data.summary.firstBlood}`}
             </div>
           </div>
         </div>
@@ -357,7 +357,7 @@ function PostMatchDashboard({ data, submissions, userId }) {
             </div>
             <div className="divide-y divide-slate-700">
               {data.leaderboard.map((entry, i) => {
-                const medals = ["🥇", "🥈", "🥉"];
+                const medals = ["1st", "2nd", "3rd"];
                 return (
                   <div
                     key={entry.userId}
@@ -396,7 +396,7 @@ function PostMatchDashboard({ data, submissions, userId }) {
 
           {/* Code Review */}
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-4">
-            <div className="font-bold text-white mb-4">👁 Code Review</div>
+            <div className="font-bold text-white mb-4">Code Review</div>
             <CodeReviewPanel submissions={submissions} />
           </div>
         </div>
@@ -437,7 +437,7 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
       setQuestion(q);
       setTimerTotal(config.timeLimitSecs);
       setTimerRemaining(config.timeLimitSecs);
-      addEvent("🚀 Room started! Good luck.");
+      addEvent("Room started! Good luck.");
     });
 
     socket.on("timer_tick", ({ remaining }) => {
@@ -448,7 +448,7 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
     socket.on("leaderboard_update", ({ leaderboard: lb, event: ev }) => {
       setLeaderboard(lb);
       if (ev.type === "solve" || ev.type === "first_blood") {
-        addEvent(`${ev.isFirstBlood ? "🩸" : "✅"} ${ev.username} solved! +${ev.points} pts`);
+        addEvent(`${ev.isFirstBlood ? "FIRST BLOOD" : "SOLVED"} ${ev.username} solved! +${ev.points} pts`);
       }
     });
 
@@ -458,11 +458,11 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
     });
 
     socket.on("user_judging", ({ username: uname }) => {
-      addEvent(`⚙ ${uname} submitted — judging…`);
+      addEvent(`${uname} submitted — judging…`);
     });
 
     socket.on("user_left", ({ username: uname }) => {
-      addEvent(`👋 ${uname} disconnected.`);
+      addEvent(`${uname} disconnected.`);
     });
 
     socket.on("room_ended", ({ leaderboard: lb, codeReview, summary }) => {
@@ -470,7 +470,7 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
       setLeaderboard(lb);
       setReviewSubmissions(codeReview);
       setPostMatch({ leaderboard: lb, summary });
-      addEvent("🏁 Room ended! Check results.");
+      addEvent("Room ended! Check results.");
     });
 
     socket.emit("set_language", { language: "javascript" });
@@ -590,7 +590,7 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
             firstBlood={firstBlood}
           />
           <div className="border-t border-slate-700 p-3 flex-shrink-0">
-            <div className="text-xs font-bold text-slate-400 mb-2">📡 Live Events</div>
+            <div className="text-xs font-bold text-slate-400 mb-2">Live Events</div>
             <EventFeed events={events} />
           </div>
         </div>

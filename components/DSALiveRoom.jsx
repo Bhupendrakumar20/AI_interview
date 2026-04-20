@@ -434,10 +434,20 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
     socket.connect();
 
     socket.on("room_started", ({ question: q, config }) => {
+      console.log("Room started:", { q, config });
       setQuestion(q);
-      setTimerTotal(config.timeLimitSecs);
-      setTimerRemaining(config.timeLimitSecs);
+      if (config?.timeLimitSecs) {
+        setTimerTotal(config.timeLimitSecs);
+        setTimerRemaining(config.timeLimitSecs);
+      }
       addEvent("Room started! Good luck.");
+    });
+
+    // ✅ FIXED: Listen for individual question assignment (for non-owners)
+    socket.on("question_assigned", ({ question: q }) => {
+      console.log("Question received:", q);
+      setQuestion(q);
+      addEvent(`Question loaded: ${q?.title || "Unknown"}`);
     });
 
     socket.on("timer_tick", ({ remaining }) => {
@@ -477,6 +487,7 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
 
     return () => {
       socket.off("room_started");
+      socket.off("question_assigned");
       socket.off("timer_tick");
       socket.off("leaderboard_update");
       socket.off("first_blood");

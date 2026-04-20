@@ -215,6 +215,10 @@ dsaRoomNamespace.on('connection', (socket) => {
         pendingRequests: [],
         status: 'lobby',
         questionMode: 'same',
+        votes: {
+          questionMode: {},
+          timeLimit: {},
+        },
         createdAt: new Date(),
       });
 
@@ -446,6 +450,15 @@ dsaRoomNamespace.on('connection', (socket) => {
         userId: request.userId,
         username: request.username,
         joinedAt: new Date(),
+      });
+
+      // ✅ Update lobby with new members list (for DSARoomLobbyProd listeners)
+      const updatedUsers = [
+        { userId: room.ownerId, username: room.ownerUsername, isOwner: true },
+        ...room.approvedMembers.map((m) => ({ userId: m.userId, username: m.username, isOwner: false })),
+      ];
+      dsaRoomNamespace.to(`room_${roomId}`).emit('lobby_update', {
+        users: updatedUsers,
       });
 
       // Update members list for owner
@@ -713,10 +726,56 @@ dsaRoomNamespace.on('connection', (socket) => {
         }
       });
 
+      // ✅ Also emit room_started for DSARoomLobbyProd listeners
+      dsaRoomNamespace.to(`room_${roomId}`).emit('room_started', {
+        roomId,
+        startTime,
+      });
+
       console.log(`[start_game] ✓ Game started successfully`);
     } catch (error) {
       console.error('[start_game] Error:', error);
       socket.emit('error', { message: 'Failed to start game: ' + error.message });
+    }
+  });
+
+  // ─── CAST VOTE ─────────────────────────────────────────────────────────
+
+  socket.on('cast_vote', (data) => {
+    try {
+      const { roomId, type, value } = data;
+      console.log(`[cast_vote] Room ${roomId}: ${type} = ${value}`);
+
+      const room = rooms.get(roomId);
+      if (!room) {
+        console.error(`[cast_vote] Room not found: ${roomId}`);
+        return;
+      }
+
+      // Only accept votes during lobby phase
+      if (room.status !== 'lobby') {
+        console.warn(`[cast_vote] Room not in lobby phase (status: ${room.status})`);
+        return;
+      }
+
+      // Record vote
+      const socketId = socket.id;
+      if (type === 'questionMode') {
+        room.votes.questionMode[socketId] = value;
+      } else if (type === 'timeLimit') {
+        room.votes.timeLimit[socketId] = value;
+      }
+
+      // Broadcast vote update to room
+      dsaRoomNamespace.to(`room_${roomId}`).emit('vote_update', {
+        questionModeVotes: room.votes.questionMode,
+        timeLimitVotes: room.votes.timeLimit,
+        totalUsers: (room.approvedMembers?.length || 0) + 1, // +1 for owner
+      });
+
+      console.log(`[cast_vote] ✓ Vote recorded (${Object.keys(room.votes.questionMode).length} questionMode votes)`);
+    } catch (error) {
+      console.error('[cast_vote] Error:', error);
     }
   });
 
@@ -776,6 +835,14 @@ dsaRoomNamespace.on('connection', (socket) => {
         callback?.({ success: false, error: 'Question not found' });
         return;
       }
+
+      // ✅ Notify room that user is being judged
+      dsaRoomNamespace.to(`room_${roomId}`).emit('user_judging', {
+        userId,
+        username,
+        questionId,
+        questionTitle: question.title,
+      });
 
       const verdict = await judgeSubmission(sourceCode, language, question);
       if (!verdict.passed) {
@@ -967,6 +1034,8 @@ dsaRoomNamespace.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const roomId = socket.data.roomId;
     const userId = socket.data.userId;
+    const username = socket.data.username;
+    const socketId = socket.id;
 
     if (roomId && userId) {
       const room = rooms.get(roomId);
@@ -974,17 +1043,302 @@ dsaRoomNamespace.on('connection', (socket) => {
         room.participants = room.participants.filter((id) => id !== userId);
         room.participantCount--;
 
+        // Emit user_left event
         dsaRoomNamespace.to(`room_${roomId}`).emit('user_left', {
           userId,
-          username: socket.data.username,
+          username,
           participantCount: room.participantCount,
         });
+
+        // ✅ Remove from approved members and update lobby
+        room.approvedMembers = room.approvedMembers.filter(m => m.userId !== userId);
+        const updatedUsers = [
+          { userId: room.ownerId, username: room.ownerUsername, isOwner: true },
+          ...room.approvedMembers.map((m) => ({ userId: m.userId, username: m.username, isOwner: false })),
+        ];
+        dsaRoomNamespace.to(`room_${roomId}`).emit('lobby_update', {
+          users: updatedUsers,
+        });
+
+        // ✅ Handle host transfer if owner left
+        if (userId === room.ownerId && room.approvedMembers.length > 0) {
+          const newHost = room.approvedMembers[0];
+          room.ownerId = newHost.userId;
+          room.ownerUsername = newHost.username;
+          
+          dsaRoomNamespace.to(`room_${roomId}`).emit('host_transferred', {
+            newHostId: newHost.userId,
+            newHostName: newHost.username,
+          });
+        }
       }
 
       userRooms.delete(userId);
+      userSockets.delete(userId);
+      socketUsers.delete(socketId);
     }
 
-    console.log(`[disconnect] User ${socket.id} disconnected`);
+    console.log(`[disconnect] User ${socketId} disconnected`);
+  });
+
+  // ─── GET QUESTION LIST ────────────────────────────────────────────
+
+  socket.on('get_question_list', ({ difficulty = 'Medium' }, callback) => {
+    try {
+      console.log(`[get_question_list] Fetching ${difficulty} questions...`);
+      
+      // Import questions from 100-days constant
+      import('../constants/hundredDaysOfCode.js').then(({ HUNDRED_DAYS_DSA, getAllDays }) => {
+        try {
+          const allDays = getAllDays?.() || Object.values(HUNDRED_DAYS_DSA);
+          const questions = allDays
+            .flatMap(day => day.questions || [])
+            .filter(q => !difficulty || q.difficulty === difficulty)
+            .slice(0, 5) // Return top 5 for performance
+            .map(q => ({
+              id: q.id,
+              title: q.title,
+              difficulty: q.difficulty,
+              topic: q.topic,
+              source: 'babbar',
+              tags: [q.topic] || [],
+            }));
+
+          console.log(`[get_question_list] ✅ Loaded ${questions.length} questions`);
+          callback?.({
+            success: true,
+            questions,
+          });
+        } catch (importErr) {
+          console.error('[get_question_list] Import error:', importErr);
+          callback?.({
+            success: false,
+            error: 'Failed to load questions',
+            questions: [],
+          });
+        }
+      }).catch(importErr => {
+        console.error('[get_question_list] Module load error:', importErr);
+        callback?.({
+          success: false,
+          error: 'Failed to load questions module',
+          questions: [],
+        });
+      });
+    } catch (error) {
+      console.error('[get_question_list] Error:', error);
+      callback?.({
+        success: false,
+        error: 'Failed to fetch questions: ' + error.message,
+        questions: [],
+      });
+    }
+  });
+
+  // ─── GET QUESTION DETAILS ────────────────────────────────────────
+
+  socket.on('get_question_details', ({ questionId, titleSlug }, callback) => {
+    try {
+      console.log(`[get_question_details] Fetching question ${questionId}...`);
+
+      // Import questions from 100-days constant
+      import('../constants/hundredDaysOfCode.js').then(({ HUNDRED_DAYS_DSA, getAllDays }) => {
+        try {
+          const allDays = getAllDays?.() || Object.values(HUNDRED_DAYS_DSA);
+          
+          // Find the question in all days
+          let foundQuestion = null;
+          for (const day of allDays) {
+            const q = (day.questions || []).find(q => q.id === questionId);
+            if (q) {
+              foundQuestion = q;
+              break;
+            }
+          }
+
+          if (!foundQuestion) {
+            console.error(`[get_question_details] Question not found: ${questionId}`);
+            return callback?.({
+              success: false,
+              error: 'Question not found',
+            });
+          }
+
+          // Import test cases
+          import('../constants/dsaTestCaseBank.js').then(({ getQuestionTestCases }) => {
+            try {
+              const testCases = getQuestionTestCases?.(foundQuestion) || [];
+              
+              const response = {
+                success: true,
+                question: {
+                  id: foundQuestion.id,
+                  title: foundQuestion.title,
+                  difficulty: foundQuestion.difficulty,
+                  description: foundQuestion.description || 'See problem statement URL',
+                  topic: foundQuestion.topic,
+                  tags: [foundQuestion.topic] || [],
+                  examples: [], // Not in constant, but OK
+                  testCases: testCases.slice(0, 3), // First 3 test cases
+                  constraints: [], // Not in constant
+                  source: 'babbar',
+                  problemStatementUrl: foundQuestion.problemStatementUrl,
+                  leetcodeUrl: foundQuestion.leetcodeUrl,
+                },
+              };
+
+              console.log(`[get_question_details] ✅ Loaded question: "${foundQuestion.title}"`);
+              callback?.(response);
+            } catch (err) {
+              console.error('[get_question_details] Test case fetch error:', err);
+              // Return without test cases
+              callback?.({
+                success: true,
+                question: {
+                  id: foundQuestion.id,
+                  title: foundQuestion.title,
+                  difficulty: foundQuestion.difficulty,
+                  description: foundQuestion.description || 'See problem statement URL',
+                  topic: foundQuestion.topic,
+                  tags: [foundQuestion.topic] || [],
+                  testCases: [],
+                  source: 'babbar',
+                },
+              });
+            }
+          }).catch(testErr => {
+            // Return without test cases
+            console.error('[get_question_details] Test case module error:', testErr);
+            callback?.({
+              success: true,
+              question: {
+                id: foundQuestion.id,
+                title: foundQuestion.title,
+                difficulty: foundQuestion.difficulty,
+                description: foundQuestion.description || 'See problem statement URL',
+                topic: foundQuestion.topic,
+                tags: [foundQuestion.topic] || [],
+                testCases: [],
+                source: 'babbar',
+              },
+            });
+          });
+        } catch (err) {
+          console.error('[get_question_details] Question fetch error:', err);
+          callback?.({
+            success: false,
+            error: 'Failed to find question: ' + err.message,
+          });
+        }
+      }).catch(importErr => {
+        console.error('[get_question_details] Module load error:', importErr);
+        callback?.({
+          success: false,
+          error: 'Failed to load questions module',
+        });
+      });
+    } catch (error) {
+      console.error('[get_question_details] Error:', error);
+      callback?.({
+        success: false,
+        error: 'Failed to fetch question details: ' + error.message,
+      });
+    }
+  });
+
+  // ─── GET ROOM STATE ──────────────────────────────────────────────────
+
+  socket.on('get_room_state', (data) => {
+    try {
+      const { roomId } = data;
+      console.log(`[get_room_state] Fetching state for room ${roomId}`);
+
+      const room = rooms.get(roomId);
+      if (!room) {
+        console.log(`[get_room_state] Room not found: ${roomId}`);
+        socket.emit('room_state', {
+          success: false,
+          message: 'Room not found',
+        });
+        return;
+      }
+
+      const userData = socketUsers.get(socket.id);
+      
+      // Send current room state
+      socket.emit('room_state', {
+        success: true,
+        roomId,
+        roomCode: room.roomCode,
+        ownerId: room.ownerId,
+        ownerUsername: room.ownerUsername,
+        status: room.status,
+        approvedMembers: room.approvedMembers || [],
+        pendingRequests: room.pendingRequests || [],
+        currentUser: userData || {
+          userId: userData?.userId,
+          username: userData?.username,
+          isOwner: userData?.userId === room.ownerId,
+        },
+        gameData: room.status === 'playing' ? {
+          questions: room.questions || [],
+          leaderboard: room.leaderboard || [],
+          startTime: room.startTime,
+          questionMode: room.questionMode,
+        } : null,
+      });
+
+      console.log(`[get_room_state] ✅ Room state sent to ${userData?.username || 'user'}`);
+    } catch (error) {
+      console.error('[get_room_state] Error:', error);
+      socket.emit('room_state', {
+        success: false,
+        message: 'Failed to get room state: ' + error.message,
+      });
+    }
+  });
+
+  // ─── SET LANGUAGE ────────────────────────────────────────────────────
+
+  socket.on('set_language', (data) => {
+    try {
+      const { language } = data;
+      const userData = socketUsers.get(socket.id);
+      
+      if (!userData) {
+        console.log('[set_language] User data not found for socket');
+        return;
+      }
+
+      console.log(`[set_language] ${userData.username} set language to ${language}`);
+
+      // Store language preference in user socket data
+      if (!socket.data.preferences) {
+        socket.data.preferences = {};
+      }
+      socket.data.preferences.language = language;
+
+      // Update in userData as well
+      const updatedUserData = socketUsers.get(socket.id);
+      if (updatedUserData) {
+        updatedUserData.language = language;
+        socketUsers.set(socket.id, updatedUserData);
+      }
+
+      // Optionally broadcast to room so others know
+      const roomId = userData.roomId;
+      if (roomId) {
+        dsaRoomNamespace.to(`room_${roomId}`).emit('user_language_changed', {
+          userId: userData.userId,
+          username: userData.username,
+          language,
+        });
+      }
+
+      console.log(`[set_language] ✅ Language preference saved`);
+    } catch (error) {
+      console.error('[set_language] Error:', error);
+    }
   });
 });
 

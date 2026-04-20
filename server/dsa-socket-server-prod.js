@@ -52,9 +52,15 @@ const PISTON_LANGUAGES = {
 const roomStore = new Map();
 const userRoomMap = new Map(); // Track userId -> roomCode (user can only be in ONE room)
 const userSocketMap = new Map(); // Track userId -> socket.id for cleanup on disconnect
+const sessionMap = new Map(); // Track sessionId -> { userId, socketId, roomCode, createdAt }
 
 function generateRoomCode() {
   return "DSA-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+}
+
+function generateSessionId() {
+  // Generate unique session ID: SESS-<timestamp>-<random>
+  return "SESS-" + Date.now() + "-" + Math.random().toString(36).substring(2, 10);
 }
 
 function getRoom(code) {
@@ -281,10 +287,25 @@ function registerSocketHandlers(io) {
     console.log(`[Socket] Connected: ${socket.id}`);
 
     // ── CREATE ROOM ──────────────────────────────────────────────────────────
-    socket.on("room_create", ({ username, avatar, userId }, callback) => {      if (!userId) {
+    socket.on("room_create", ({ username, avatar, userId }, callback) => {
+      // ✅ Validate userId is provided
+      if (!userId) {
         return callback?.({ success: false, error: "User ID required" });
       }
+
+      // ✅ Check if this userId is already in another room
+      const existingRoomCode = userRoomMap.get(userId);
+      if (existingRoomCode) {
+        console.error(`[Block] User (${userId}) tried to create room but already in room ${existingRoomCode}`);
+        return callback({
+          success: false,
+          error: `User is already in room: ${existingRoomCode}. Cannot create or join multiple rooms simultaneously.`,
+        });
+      }
+
       const code = generateRoomCode();
+      const sessionId = generateSessionId(); // ✅ Create unique session ID
+
       roomStore.set(code, {
         code,
         hostId: socket.id,
@@ -304,7 +325,8 @@ function registerSocketHandlers(io) {
       const room = getRoom(code);
       room.users[socket.id] = {
         id: socket.id,
-        userId: userId, // ✅ ADD userId to user object (CRITICAL - was missing!)
+        userId: userId,
+        sessionId: sessionId, // ✅ Add session ID to user object
         username,
         avatar,
         solvedAt: null,
@@ -312,12 +334,18 @@ function registerSocketHandlers(io) {
         language: "javascript",
       };
       socket.data.roomCode = code;
-      socket.data.userId = userId; // Store userId on socket for disconnect cleanup
+      socket.data.userId = userId;
+      socket.data.sessionId = sessionId; // ✅ Store session ID on socket
       userRoomMap.set(userId, code); // Track this user in this room
       userSocketMap.set(userId, socket.id); // Map userId to socket.id
+      sessionMap.set(sessionId, { userId, socketId: socket.id, roomCode: code, createdAt: Date.now() }); // ✅ Track session
 
-      callback({ success: true, roomCode: code });
-      console.log(`[Room] Created: ${code} by ${username} (userId: ${userId})`);
+      callback({
+        success: true,
+        roomCode: code,
+        sessionId: sessionId, // ✅ Return session ID to client
+      });
+      console.log(`[Room] Created: ${code} by ${username} (userId: ${userId}, sessionId: ${sessionId})`);
     });
 
     // ── JOIN ROOM ────────────────────────────────────────────────────────────
@@ -375,10 +403,13 @@ function registerSocketHandlers(io) {
         delete room.votes.timeLimit[userByUsername.id];
       }
 
+      const sessionId = generateSessionId(); // ✅ Create unique session ID for this join
+
       socket.join(roomCode);
       room.users[socket.id] = {
         id: socket.id,
-        userId: userId, // ✅ Add userId to user object for tracking
+        userId: userId,
+        sessionId: sessionId, // ✅ Add session ID to user object
         username,
         avatar,
         solvedAt: null,
@@ -386,12 +417,15 @@ function registerSocketHandlers(io) {
         language: "javascript",
       };
       socket.data.roomCode = roomCode;
-      socket.data.userId = userId; // Store userId on socket for disconnect cleanup
+      socket.data.userId = userId;
+      socket.data.sessionId = sessionId; // ✅ Store session ID on socket
       userRoomMap.set(userId, roomCode); // ✅ Track userId -> roomCode
       userSocketMap.set(userId, socket.id); // ✅ Map userId to socket.id for cleanup
+      sessionMap.set(sessionId, { userId, socketId: socket.id, roomCode: roomCode, createdAt: Date.now() }); // ✅ Track session
 
       callback({
         success: true,
+        sessionId: sessionId, // ✅ Return session ID to client
         lobbyState: {
           roomCode,
           hostId: room.hostId,
@@ -854,6 +888,7 @@ function registerSocketHandlers(io) {
     socket.on("disconnect", () => {
       const roomCode = socket.data.roomCode;
       const userId = socket.data.userId; // ✅ Get userId from socket
+      const sessionId = socket.data.sessionId; // ✅ Get sessionId from socket
       const room = getRoom(roomCode);
       if (!room) return;
 
@@ -862,10 +897,13 @@ function registerSocketHandlers(io) {
       delete room.votes.questionMode[socket.id];
       delete room.votes.timeLimit[socket.id];
       
-      // ✅ CRITICAL: Clean up userId mappings on disconnect
+      // ✅ CRITICAL: Clean up userId and sessionId mappings on disconnect
       if (userId) {
         userRoomMap.delete(userId); // Remove userId -> roomCode mapping
         userSocketMap.delete(userId); // Remove userId -> socket.id mapping
+      }
+      if (sessionId) {
+        sessionMap.delete(sessionId); // ✅ Remove session tracking
       }
 
       io.to(roomCode).emit("user_left", {
@@ -884,6 +922,8 @@ function registerSocketHandlers(io) {
         roomStore.delete(roomCode);
         console.log(`[Room] Cleaned up empty room: ${roomCode}`);
       }
+      
+      console.log(`[Disconnect] User ${user?.username} (userId: ${userId}, sessionId: ${sessionId}) left room ${roomCode}`);
 
       console.log(`[Socket] Disconnected: ${socket.id}`);
     });

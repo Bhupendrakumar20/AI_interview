@@ -431,20 +431,32 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
 
   // ── Socket setup ────────────────────────────────────────────────────────────
   useEffect(() => {
-    socket.connect();
+    console.log("🎮 [DSALiveRoom] Component mounted, roomCode:", roomCode, "userId:", userId);
+    
+    if (!socket.connected) {
+      console.log("🔌 [DSALiveRoom] Socket not connected, connecting...");
+      socket.connect();
+    } else {
+      console.log("✅ [DSALiveRoom] Socket already connected");
+    }
 
     // ✅ CRITICAL: Define all handlers BEFORE registering them
     const handleRoomStarted = ({ config, endsAt, leaderboard }) => {
-      console.log("✅ [DSALiveRoom] Room started:", { config, endsAt, leaderboard });
+      console.log("🎮 [DSALiveRoom] ✅✅✅ ROOM_STARTED EVENT RECEIVED ✅✅✅");
+      console.log("   config:", config);
+      console.log("   endsAt:", endsAt);
+      console.log("   leaderboard:", leaderboard);
       // Set timer from endsAt or config
       const now = Date.now();
       const timeLimitSecs = config?.timeLimitSecs || Math.round((endsAt - now) / 1000);
       if (timeLimitSecs > 0) {
+        console.log("   Setting timer to", timeLimitSecs, "seconds");
         setTimerTotal(timeLimitSecs);
         setTimerRemaining(timeLimitSecs);
       }
       // Update leaderboard
       if (leaderboard) {
+        console.log("   Updating leaderboard with", leaderboard.length, "players");
         setLeaderboard(leaderboard);
       }
       addEvent("Room started! Good luck. Waiting for question...");
@@ -452,7 +464,14 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
 
     // ✅ CRITICAL: Listen for individual question assignment (for non-owners)
     const handleQuestionAssigned = ({ question: q }) => {
-      console.log("✅ [DSALiveRoom] Question received:", q);
+      console.log("❓ [DSALiveRoom] Question assigned:", q?.title);
+      if (!q) {
+        console.error("❌ [DSALiveRoom] Question is null!");
+        return;
+      }
+      console.log("   Question ID:", q.id);
+      console.log("   Difficulty:", q.difficulty);
+      console.log("   Source:", q.source);
       setQuestion(q);
       addEvent(`Question loaded: ${q?.title || "Unknown"}`);
     };
@@ -463,6 +482,7 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
     };
 
     const handleLeaderboardUpdate = ({ leaderboard: lb, event: ev }) => {
+      console.log("📊 [DSALiveRoom] Leaderboard updated:", ev?.username, "→", ev?.type);
       setLeaderboard(lb);
       if (ev.type === "solve" || ev.type === "first_blood") {
         addEvent(`${ev.isFirstBlood ? "FIRST BLOOD" : "SOLVED"} ${ev.username} solved! +${ev.points} pts`);
@@ -470,20 +490,25 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
     };
 
     const handleFirstBlood = (data) => {
+      console.log("🔴 [DSALiveRoom] First blood!", data?.username);
       setFirstBlood(data);
       setTimeout(() => setFirstBlood(null), 8000);
     };
 
     const handleUserJudging = ({ username: uname }) => {
+      console.log("⏳ [DSALiveRoom]", uname, "submitted code - judging...");
       addEvent(`${uname} submitted — judging…`);
     };
 
     const handleUserLeft = ({ username: uname }) => {
+      console.log("👤 [DSALiveRoom]", uname, "left the room");
       addEvent(`${uname} disconnected.`);
     };
 
     const handleRoomEnded = ({ leaderboard: lb, codeReview, summary }) => {
-      console.log("✅ [DSALiveRoom] Room ended");
+      console.log("🏁 [DSALiveRoom] Room ended! Final results:");
+      console.log("   Leaderboard:", lb);
+      console.log("   Code Review Submissions:", codeReview?.length || 0);
       setRoomStatus("ended");
       setLeaderboard(lb);
       setReviewSubmissions(codeReview);
@@ -491,7 +516,8 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
       addEvent("Room ended! Check results.");
     };
 
-    // ✅ CRITICAL: Register ALL listeners ONCE
+    // ✅ REGISTER ALL LISTENERS - with detailed logging
+    console.log("📡 [DSALiveRoom] Registering socket event listeners...");
     socket.on("room_started", handleRoomStarted);
     socket.on("question_assigned", handleQuestionAssigned);
     socket.on("timer_tick", handleTimerTick);
@@ -500,11 +526,13 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
     socket.on("user_judging", handleUserJudging);
     socket.on("user_left", handleUserLeft);
     socket.on("room_ended", handleRoomEnded);
+    console.log("✅ [DSALiveRoom] All listeners registered successfully");
 
     socket.emit("set_language", { language: "javascript" });
 
     // ✅ CRITICAL: Clean up ALL listeners on unmount (must pass handler reference)
     return () => {
+      console.log("🧹 [DSALiveRoom] Cleaning up socket listeners");
       socket.off("room_started", handleRoomStarted);
       socket.off("question_assigned", handleQuestionAssigned);
       socket.off("timer_tick", handleTimerTick);

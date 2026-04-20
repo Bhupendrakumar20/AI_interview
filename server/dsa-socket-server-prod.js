@@ -549,22 +549,29 @@ function registerSocketHandlers(io) {
     // ── START ROOM (Host only) ───────────────────────────────────────────────
     socket.on("room_start", async (_, callback) => {
       const room = getRoom(socket.data.roomCode);
-      if (!room) return callback?.({ success: false, error: "Room not found." });
-      if (room.hostId !== socket.id)
+      if (!room) {
+        console.error(`[Room Start] Room not found for code: ${socket.data.roomCode}`);
+        return callback?.({ success: false, error: "Room not found." });
+      }
+      
+      if (room.hostId !== socket.id) {
+        const hostUser = room.users[room.hostId];
+        const callerUser = room.users[socket.id];
+        console.error(`[Room Start] REJECTED - Only host can start. Host: ${hostUser?.username}, Caller: ${callerUser?.username}`);
         return callback?.({ success: false, error: "Only the host can start." });
-      if (Object.keys(room.users).length < 2)
+      }
+      
+      if (Object.keys(room.users).length < 2) {
+        console.error(`[Room Start] Not enough players: ${Object.keys(room.users).length} < 2`);
         return callback?.({ success: false, error: "Need at least 2 players." });
+      }
 
-      // Tally votes
-      const questionMode =
-        tallyVotes(room.votes.questionMode, ["same", "different"]) || "same";
-      const timeLimitSecs =
-        parseInt(tallyVotes(room.votes.timeLimit, ["1800", "2700", "3600"])) || 1800;
-
-      room.config = { questionMode, timeLimitSecs };
-      room.status = "active";
-
-      console.log(`[Room Start] ${socket.data.roomCode} | mode=${questionMode} | time=${timeLimitSecs}s | users=${Object.keys(room.users).length}`);
+      console.log(`\n🎮 [Room Start] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`   Room: ${socket.data.roomCode}`);
+      console.log(`   Host: ${room.users[socket.id].username}`);
+      console.log(`   Players: ${Object.keys(room.users).length}`);
+      console.log(`   ${Object.values(room.users).map(u => `• ${u.username}`).join("\n   ")}`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 
       // ✅ FIXED: Assign LeetCode questions to each player
       let sharedQuestion = null;
@@ -626,24 +633,50 @@ function registerSocketHandlers(io) {
 
       // ✅ Broadcast start event to all players
       const endsAt = Date.now() + timeLimitSecs * 1000;
+      console.log(`[Room Start] Broadcasting room_started to all sockets in room ${socket.data.roomCode}`);
+      console.log(`[Room Start] Room has ${Object.keys(room.users).length} users:`, Object.values(room.users).map(u => u.username).join(", "));
+      
+      // Broadcast to room using socket.io rooms
       io.to(socket.data.roomCode).emit("room_started", {
         config: room.config,
         endsAt: endsAt,
         leaderboard: initialLeaderboard,
       });
 
+      // EXTRA SAFETY: Also send directly to each socket to ensure delivery
+      console.log(`[Room Start] Sending room_started to each socket individually...`);
+      for (const socketId of Object.keys(room.users)) {
+        const targetSocket = io.sockets.sockets.get(socketId);
+        if (targetSocket) {
+          const userName = room.users[socketId].username;
+          console.log(`[Room Start]   → Sending to ${userName} (${socketId})`);
+          targetSocket.emit("room_started", {
+            config: room.config,
+            endsAt: endsAt,
+            leaderboard: initialLeaderboard,
+          });
+        } else {
+          console.warn(`[Room Start]   ⚠️ Socket ${socketId} not found!`);
+        }
+      }
+
+
       // Send individual questions to each player
       for (const [socketId, q] of Object.entries(assignedQuestions)) {
         const targetSocket = io.sockets.sockets.get(socketId);
         if (targetSocket) {
+          const userName = room.users[socketId].username;
+          console.log(`[Room] Sending question to ${userName}: "${q.title}" (${q.id})`);
           targetSocket.emit("question_assigned", { question: q });
-          console.log(`[Room] Question assigned to ${room.users[socketId].username}: ${q.title}`);
+        } else {
+          console.warn(`[Room] ⚠️ Socket ${socketId} not found when assigning question`);
         }
       }
 
       // ✅ FIXED: Initialize and start timer
       startRoomTimer(io, room, socket.data.roomCode);
       
+      // ✅ Return success immediately so client knows game started
       callback?.({ success: true, endsAt });
       console.log(`[Room] ✅ Started: ${socket.data.roomCode} | ${Object.keys(room.users).length} players | ${timeLimitSecs}s timer`);
     });

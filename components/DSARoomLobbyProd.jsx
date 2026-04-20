@@ -2,43 +2,31 @@
  * DSA Room Lobby — Complete Setup & Voting Phase
  * ──────────────────────────────────────────────
  * Room creation, joining, voting on game settings, and transition to live room
+ * 
+ * CRITICAL FIX: Ensures both owner and non-owner can enter the live room
+ * by guaranteeing socket connection, listener registration, and proper event handling
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import DSALiveRoom from "./DSALiveRoom";
 
 let socketInstance = null;
+let socketInitialized = false;
+
 function getSocket() {
   if (!socketInstance) {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || "http://localhost:4001";
-    console.log("🔌 Initializing socket connection to:", socketUrl);
+    console.log("🔌 [INIT] Creating socket connection to:", socketUrl);
     
     socketInstance = io(socketUrl, {
       autoConnect: false,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       transports: ["websocket", "polling"],
       forceNew: false,
-    });
-
-    // Add global error handlers
-    socketInstance.on("connect_error", (error) => {
-      console.error("❌ Socket connection error:", error);
-    });
-
-    socketInstance.on("error", (error) => {
-      console.error("❌ Socket error:", error);
-    });
-
-    socketInstance.on("connect", () => {
-      console.log("✅ Socket connected with ID:", socketInstance.id);
-    });
-
-    socketInstance.on("disconnect", (reason) => {
-      console.log("⚠️ Socket disconnected:", reason);
     });
   }
   return socketInstance;
@@ -73,54 +61,67 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
   const [isSocketConnected, setIsSocketConnected] = useState(false);
 
   const socket = getSocket();
+  const listenerSetupRef = useRef(false);
 
-  // Setup socket event listeners on component mount - IMMEDIATELY, not after join
+  // ─────────────────────────────────────────────────────────────────────
+  // CRITICAL: Setup socket event listeners on component mount
+  // This runs ONCE and sets up listeners BEFORE any room operations
+  // ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (listenerSetupRef.current) return; // Only setup listeners ONCE
+    listenerSetupRef.current = true;
+
+    console.log("🎯 [SETUP] Registering all socket event listeners...");
+
     const handleConnect = () => {
-      console.log("✅ Socket connected!");
+      console.log("✅ [CONNECT] Socket connected:", socket.id);
       setIsSocketConnected(true);
       setSocketError(null);
     };
 
     const handleDisconnect = (reason) => {
-      console.warn("⚠️ Socket disconnected:", reason);
+      console.warn("⚠️ [DISCONNECT] Socket disconnected:", reason);
       setIsSocketConnected(false);
     };
 
     const handleConnectError = (error) => {
-      console.error("❌ Socket connection error:", error);
+      console.error("❌ [ERROR] Socket connection error:", error);
       setSocketError(String(error) || "Failed to connect to DSA Room server");
     };
 
-    // ✅ CRITICAL FIX: These listeners MUST be registered ONCE per component lifetime
+    // ✅ CRITICAL: Lobby update listener
     const handleLobbyUpdate = ({ users: u }) => {
-      console.log("[DSA] Lobby update:", u);
-      setUsers(u);
+      console.log("[LOBBY] Users updated:", u?.length || 0, "users");
+      setUsers(u || []);
     };
 
+    // ✅ CRITICAL: Vote update listener
     const handleVoteUpdate = ({ questionModeVotes: qv, timeLimitVotes: tv }) => {
-      console.log("[DSA] Vote update:", { qv, tv });
-      setQuestionModeVotes(qv);
-      setTimeLimitVotes(tv);
+      console.log("[VOTE] Vote update received");
+      setQuestionModeVotes(qv || {});
+      setTimeLimitVotes(tv || {});
     };
 
-    // ✅ CRITICAL: room_started event listener - for BOTH owner and non-owners
+    // ✅ CRITICAL: room_started event listener - BOTH OWNER AND NON-OWNER
+    // This is the KEY event that triggers transition to DSALiveRoom
     const handleRoomStarted = (data) => {
-      console.log("[DSA] 🎮 Room started event received:", data);
+      console.log("🎮 [ROOM_STARTED] ✅✅✅ GAME STARTING EVENT RECEIVED ✅✅✅", data);
+      console.log("   → Setting roomStatus to 'active'");
+      console.log("   → Non-owner should now see DSALiveRoom");
       setRoomStatus("active");
     };
 
     const handleUserLeft = ({ users: u }) => {
-      console.log("[DSA] User left:", u);
-      setUsers(u);
+      console.log("[USER_LEFT] User left, updated users:", u?.length || 0);
+      setUsers(u || []);
     };
 
     const handleHostTransferred = ({ newHostId }) => {
-      console.log("[DSA] Host transferred to:", newHostId);
+      console.log("[HOST_TRANSFER] New host:", newHostId);
       setIsHost(newHostId === socket.id);
     };
 
-    // ✅ FIXED: Register ALL listeners ONCE on mount
+    // ✅ REGISTER ALL LISTENERS NOW - before socket.connect()
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("connect_error", handleConnectError);
@@ -130,13 +131,17 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
     socket.on("user_left", handleUserLeft);
     socket.on("host_transferred", handleHostTransferred);
 
+    console.log("✅ [SETUP] All listeners registered successfully");
+
     // Check if already connected
     if (socket.connected) {
+      console.log("ℹ️ [INFO] Socket already connected");
       setIsSocketConnected(true);
     }
 
-    // ✅ CRITICAL: Clean up ALL listeners on unmount
+    // Cleanup on unmount
     return () => {
+      console.log("🧹 [CLEANUP] Removing all socket listeners");
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("connect_error", handleConnectError);
@@ -145,8 +150,9 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
       socket.off("room_started", handleRoomStarted);
       socket.off("user_left", handleUserLeft);
       socket.off("host_transferred", handleHostTransferred);
+      listenerSetupRef.current = false;
     };
-  }, []);
+  }, [socket]); // Only depend on socket instance
 
   // ── CREATE ROOM ──────────────────────────────────────────────────────────────
   const handleCreateRoom = async () => {
@@ -154,32 +160,52 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
     setSocketError(null);
     
     try {
-      // Check if socket is already connected
+      console.log("📝 [CREATE] Starting room creation...");
+
+      // Step 1: Ensure socket is connected
       if (!socket.connected) {
-        console.log("🔌 Connecting socket...");
+        console.log("🔌 [CREATE] Socket not connected, connecting now...");
         socket.connect();
         
         // Wait for connection with timeout
         await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => {
+          const connectTimer = setTimeout(() => {
+            console.error("❌ [CREATE] Socket connection timeout");
             reject(new Error("Socket connection timeout"));
           }, 5000);
 
-          socket.once("connect", () => {
-            clearTimeout(timer);
+          const onConnect = () => {
+            clearTimeout(connectTimer);
+            console.log("✅ [CREATE] Socket connected, socket.id:", socket.id);
+            socket.off("connect", onConnect);
+            socket.off("connect_error", onError);
             resolve();
-          });
+          };
 
-          socket.once("connect_error", (error) => {
-            clearTimeout(timer);
+          const onError = (error) => {
+            clearTimeout(connectTimer);
+            console.error("❌ [CREATE] Connection error:", error);
+            socket.off("connect", onConnect);
+            socket.off("connect_error", onError);
             reject(error);
-          });
+          };
+
+          socket.on("connect", onConnect);
+          socket.on("connect_error", onError);
         });
+      } else {
+        console.log("ℹ️ [CREATE] Socket already connected");
       }
 
-      // Now emit the room_create event with userId
-      socket.emit("room_create", { username: userName, avatar: "[U]", userId }, (response) => {
+      // Step 2: Emit room_create event
+      console.log("📡 [CREATE] Emitting room_create...");
+      socket.emit("room_create", { 
+        username: userName, 
+        avatar: "[U]", 
+        userId 
+      }, (response) => {
         if (response && response.success) {
+          console.log("✅ [CREATE] Room created! Code:", response.roomCode);
           setRoomCode(response.roomCode);
           setCreatedRoomCode(response.roomCode);
           setIsInRoom(true);
@@ -188,52 +214,79 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
           setSocketError(null);
         } else {
           const errorMsg = response?.error || "Failed to create room";
+          console.error("❌ [CREATE] Failed:", errorMsg);
           setSocketError(errorMsg);
-          console.error("❌ Create room failed:", errorMsg);
         }
         setIsCreating(false);
       });
     } catch (error) {
       const errorMsg = String(error) || "Failed to connect and create room";
+      console.error("❌ [CREATE] Error:", errorMsg);
       setSocketError(errorMsg);
-      console.error("❌ Error creating room:", error);
       setIsCreating(false);
     }
   };
 
   // ── JOIN ROOM ────────────────────────────────────────────────────────────────
   const handleJoinRoom = async () => {
-    if (!joinRoomCode.trim()) return;
+    if (!joinRoomCode.trim()) {
+      setSocketError("Please enter a room code");
+      return;
+    }
+    
     setIsJoining(true);
     setSocketError(null);
 
     try {
-      // Check if socket is already connected
+      console.log("📝 [JOIN] Starting room join for code:", joinRoomCode);
+
+      // Step 1: Ensure socket is connected
       if (!socket.connected) {
-        console.log("🔌 Connecting socket...");
+        console.log("🔌 [JOIN] Socket not connected, connecting now...");
         socket.connect();
 
         // Wait for connection with timeout
         await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => {
+          const connectTimer = setTimeout(() => {
+            console.error("❌ [JOIN] Socket connection timeout");
             reject(new Error("Socket connection timeout"));
           }, 5000);
 
-          socket.once("connect", () => {
-            clearTimeout(timer);
+          const onConnect = () => {
+            clearTimeout(connectTimer);
+            console.log("✅ [JOIN] Socket connected, socket.id:", socket.id);
+            socket.off("connect", onConnect);
+            socket.off("connect_error", onError);
             resolve();
-          });
+          };
 
-          socket.once("connect_error", (error) => {
-            clearTimeout(timer);
+          const onError = (error) => {
+            clearTimeout(connectTimer);
+            console.error("❌ [JOIN] Connection error:", error);
+            socket.off("connect", onConnect);
+            socket.off("connect_error", onError);
             reject(error);
-          });
+          };
+
+          socket.on("connect", onConnect);
+          socket.on("connect_error", onError);
         });
+      } else {
+        console.log("ℹ️ [JOIN] Socket already connected");
       }
 
-      // Now emit the room_join event with userId
-      socket.emit("room_join", { roomCode: joinRoomCode, username: userName, avatar: "[U]", userId }, (response) => {
+      // Step 2: Emit room_join event
+      console.log("📡 [JOIN] Emitting room_join for code:", joinRoomCode);
+      socket.emit("room_join", { 
+        roomCode: joinRoomCode, 
+        username: userName, 
+        avatar: "[U]", 
+        userId 
+      }, (response) => {
         if (response && response.success) {
+          console.log("✅ [JOIN] Successfully joined room!", joinRoomCode);
+          console.log("   → socket.data.roomCode should now be set on server");
+          console.log("   → Waiting for owner to start game...");
           setRoomCode(joinRoomCode);
           setIsInRoom(true);
           setUsers(response.lobbyState?.users || []);
@@ -242,15 +295,15 @@ export default function DSARoomLobby({ userId, userName, onClose }) {
           setSocketError(null);
         } else {
           const errorMsg = response?.error || "Failed to join room";
+          console.error("❌ [JOIN] Failed:", errorMsg);
           setSocketError(errorMsg);
-          console.error("❌ Join room failed:", errorMsg);
         }
         setIsJoining(false);
       });
     } catch (error) {
       const errorMsg = String(error) || "Failed to connect and join room";
+      console.error("❌ [JOIN] Error:", errorMsg);
       setSocketError(errorMsg);
-      console.error("❌ Error joining room:", error);
       setIsJoining(false);
     }
   };

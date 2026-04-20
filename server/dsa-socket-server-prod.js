@@ -95,21 +95,47 @@ function tallyVotes(votes, options) {
 
 // Mock question fetcher (replace with DB query in production)
 async function fetchQuestionFromDB(difficulty = "medium", exclude = []) {
-  return {
-    id: "q_" + Math.random().toString(36).substring(2, 8),
-    title: "Two Sum",
-    difficulty: "Easy",
-    tags: ["Array", "Hash Table"],
-    description:
-      "Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.",
-    examples: [{ input: "nums = [2,7,11,15], target = 9", output: "[0,1]" }],
-    constraints: ["2 <= nums.length <= 10^4", "-10^9 <= nums[i] <= 10^9"],
-    hiddenTestCases: [
-      { stdin: "4\n2 7 11 15\n9", expectedOutput: "0 1" },
-      { stdin: "3\n3 2 4\n6", expectedOutput: "1 2" },
-      { stdin: "2\n3 3\n6", expectedOutput: "0 1" },
-    ],
-  };
+  // ✅ FIXED: Now uses LeetCode GraphQL API instead of hardcoded mock data
+  try {
+    const mappedDifficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
+    const problem = await getRandomProblem(mappedDifficulty);
+    
+    if (!problem) {
+      console.error("[Question Service] Failed to fetch LeetCode problem");
+      return null;
+    }
+
+    // ✅ VALIDATION: Ensure it's a LeetCode question
+    if (!problem.id.startsWith('lc_')) {
+      console.error("[Question Validation] Non-LeetCode question rejected:", problem.id);
+      return null;
+    }
+
+    // ✅ Create test cases from LeetCode examples
+    const testCases = (problem.examples || []).map((ex, idx) => ({
+      stdin: ex.input || "",
+      expectedOutput: ex.output || "",
+      description: ex.explanation || ""
+    })).slice(0, 3); // Limit to 3 test cases for execution
+
+    return {
+      id: problem.id, // lc_xxx format
+      title: problem.title,
+      titleSlug: problem.titleSlug,
+      difficulty: problem.difficulty,
+      tags: problem.tags || [],
+      description: problem.description,
+      examples: problem.examples,
+      constraints: typeof problem.constraints === 'string' ? problem.constraints.split('\n') : problem.constraints,
+      source: "leetcode",
+      url: problem.url,
+      testCases: testCases,
+      hiddenTestCases: testCases, // Use same test cases (would be different in production)
+    };
+  } catch (error) {
+    console.error("[Question Service] Error fetching LeetCode problem:", error.message);
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -538,34 +564,88 @@ function registerSocketHandlers(io) {
       room.config = { questionMode, timeLimitSecs };
       room.status = "active";
 
-      // Assign questions
+      console.log(`[Room Start] ${socket.data.roomCode} | mode=${questionMode} | time=${timeLimitSecs}s | users=${Object.keys(room.users).length}`);
+
+      // ✅ FIXED: Assign LeetCode questions to each player
       let sharedQuestion = null;
       if (questionMode === "same") {
+        console.log("[Room Start] Fetching shared LeetCode question...");
         sharedQuestion = await fetchQuestionFromDB("medium");
-      }
-
-      const assignedQuestions = {};
-      for (const uid of Object.keys(room.users)) {
-        const q = questionMode === "same" ? sharedQuestion : await fetchQuestionFromDB("medium");
-        room.questions[uid] = q;
-        assignedQuestions[uid] = { ...q, hiddenTestCases: undefined };
-      }
-
-      // Broadcast start event
-      for (const [uid, q] of Object.entries(assignedQuestions)) {
-        const targetSocket = io.sockets.sockets.get(uid);
-        if (targetSocket) {
-          targetSocket.emit("room_started", {
-            config: room.config,
-            question: q,
-            endsAt: Date.now() + timeLimitSecs * 1000,
-          });
+        if (!sharedQuestion) {
+          return callback?.({ success: false, error: "Failed to load LeetCode questions. Try again." });
         }
       }
 
+      const assignedQuestions = {};
+      const userIds = Object.keys(room.users);
+      
+      for (const socketId of userIds) {
+        let q;
+        if (questionMode === "same") {
+          q = sharedQuestion;
+        } else {
+          // Fetch different question for each player
+          q = await fetchQuestionFromDB("medium");
+          if (!q) {
+            console.warn("[Room Start] Failed to fetch question for", socketId, "using fallback");
+            q = sharedQuestion || await fetchQuestionFromDB("medium");
+          }
+        }
+        
+        // ✅ Store with test cases for execution
+        room.questions[socketId] = q;
+        
+        // ✅ Send question WITHOUT hidden test cases to client
+        assignedQuestions[socketId] = {
+          id: q.id,
+          title: q.title,
+          titleSlug: q.titleSlug,
+          difficulty: q.difficulty,
+          description: q.description,
+          examples: q.examples,
+          tags: q.tags,
+          constraints: q.constraints,
+          source: q.source,
+          url: q.url,
+          // DO NOT send hiddenTestCases to client
+        };
+      }
+
+      // ✅ Initialize leaderboard with all participants
+      const initialLeaderboard = userIds.map((socketId, idx) => ({
+        rank: idx + 1,
+        socketId: socketId,
+        userId: room.users[socketId].userId,
+        username: room.users[socketId].username,
+        avatar: room.users[socketId].avatar,
+        points: 0,
+        solvedAt: null,
+        lastProblemSolved: null,
+      }));
+      room.leaderboard = initialLeaderboard;
+
+      // ✅ Broadcast start event to all players
+      const endsAt = Date.now() + timeLimitSecs * 1000;
+      io.to(socket.data.roomCode).emit("room_started", {
+        config: room.config,
+        endsAt: endsAt,
+        leaderboard: initialLeaderboard,
+      });
+
+      // Send individual questions to each player
+      for (const [socketId, q] of Object.entries(assignedQuestions)) {
+        const targetSocket = io.sockets.sockets.get(socketId);
+        if (targetSocket) {
+          targetSocket.emit("question_assigned", { question: q });
+          console.log(`[Room] Question assigned to ${room.users[socketId].username}: ${q.title}`);
+        }
+      }
+
+      // ✅ FIXED: Initialize and start timer
       startRoomTimer(io, room, socket.data.roomCode);
-      callback?.({ success: true });
-      console.log(`[Room] Started: ${socket.data.roomCode} | mode=${questionMode} | time=${timeLimitSecs}s`);
+      
+      callback?.({ success: true, endsAt });
+      console.log(`[Room] ✅ Started: ${socket.data.roomCode} | ${Object.keys(room.users).length} players | ${timeLimitSecs}s timer`);
     });
 
     // ── SET LANGUAGE ─────────────────────────────────────────────────────────
@@ -577,36 +657,74 @@ function registerSocketHandlers(io) {
     });
 
     // ── CODE SUBMIT ──────────────────────────────────────────────────────────
-    socket.on("code_submit", async ({ sourceCode, language }, callback) => {
+    socket.on("code_submit", async ({ sourceCode, language, questionId }, callback) => {
       const roomCode = socket.data.roomCode;
       const room = getRoom(roomCode);
 
+      console.log(`[Code Submit] ${roomCode} | Player: ${room?.users[socket.id]?.username} | Question: ${questionId}`);
+
+      // ✅ Validation checks
       if (!room || room.status !== "active") {
+        console.error("[Code Submit] Room not active or not found");
         return callback?.({ success: false, error: "Room is not active." });
       }
 
       const user = room.users[socket.id];
-      if (!user) return callback?.({ success: false, error: "User not in room." });
-      if (user.solvedAt) return callback?.({ success: false, error: "Already solved!" });
+      if (!user) {
+        console.error("[Code Submit] User not in room");
+        return callback?.({ success: false, error: "User not in room." });
+      }
+      
+      if (user.solvedAt) {
+        console.warn("[Code Submit] User already solved", user.username);
+        return callback?.({ success: false, error: "You already solved this! Cannot submit twice." });
+      }
 
       const question = room.questions[socket.id];
-      if (!question) return callback?.({ success: false, error: "No question assigned." });
+      if (!question) {
+        console.error("[Code Submit] No question assigned to user");
+        return callback?.({ success: false, error: "No question assigned to you." });
+      }
 
-      io.to(roomCode).emit("user_judging", { userId: socket.id, username: user.username });
+      // ✅ Validate time hasn't expired
+      if (Date.now() > room.timerEndsAt) {
+        console.warn("[Code Submit] Time limit exceeded for", user.username);
+        return callback?.({ success: false, error: "Time limit exceeded!" });
+      }
+
+      if (!sourceCode || sourceCode.trim().length === 0) {
+        return callback?.({ success: false, error: "Code cannot be empty." });
+      }
+
+      // ✅ Notify others that this user is being judged
+      io.to(roomCode).emit("user_judging", { 
+        socketId: socket.id,
+        userId: user.userId,
+        username: user.username,
+        questionTitle: question.title,
+      });
 
       try {
-        const { passed, results } = await runAllTestCases(
-          sourceCode,
-          language,
-          question.hiddenTestCases
-        );
+        console.log(`[Code Submit] Running tests for ${user.username} on "${question.title}"...`);
+        
+        // ✅ Use the test cases from the question
+        const testCases = question.hiddenTestCases || question.testCases || [];
+        if (testCases.length === 0) {
+          console.warn("[Code Submit] No test cases available for question", question.id);
+          return callback?.({ success: false, error: "No test cases available for this problem." });
+        }
 
-        if (!room.submissions[socket.id]) room.submissions[socket.id] = [];
-        const timeTakenSecs = Math.floor(
-          (Date.now() - (room.timerEndsAt - room.config.timeLimitSecs * 1000)) / 1000
-        );
+        const { passed, results } = await runAllTestCases(sourceCode, language, testCases);
+
+        // ✅ Store submission for review phase
+        if (!room.submissions[socket.id]) {
+          room.submissions[socket.id] = [];
+        }
+        
+        const timeTakenSecs = Math.floor((Date.now() - (room.timerEndsAt - room.config.timeLimitSecs * 1000)) / 1000);
         room.submissions[socket.id].push({
           questionId: question.id,
+          questionTitle: question.title,
           sourceCode,
           language,
           passed,
@@ -616,35 +734,54 @@ function registerSocketHandlers(io) {
         });
 
         if (passed) {
-          const minutesRemaining = Math.floor(
-            Math.max(0, room.timerEndsAt - Date.now()) / 60000
-          );
+          console.log(`[Code Submit] ✅ ACCEPTED! ${user.username} solved "${question.title}"`);
+          
+          // ✅ Calculate points
+          const secondsRemaining = Math.max(0, (room.timerEndsAt - Date.now()) / 1000);
+          const minutesRemaining = Math.floor(secondsRemaining / 60);
           let points = POINTS.SOLVE_BASE + minutesRemaining * POINTS.SPEED_BONUS_PER_MINUTE_REMAINING;
           let isFirstBlood = false;
 
+          // Check for first blood
           if (!room.firstBloodClaimedBy) {
             room.firstBloodClaimedBy = socket.id;
             points += POINTS.FIRST_BLOOD_BONUS;
             isFirstBlood = true;
+            console.log(`[First Blood] ${user.username} claimed first blood! +${POINTS.FIRST_BLOOD_BONUS} bonus`);
           }
 
+          // ✅ Update user stats
           user.solvedAt = Date.now();
           user.points = points;
           user.language = language;
+          user.lastProblemSolved = question.title;
 
+          // ✅ Update leaderboard
           const leaderboard = computeLeaderboard(room);
           room.leaderboard = leaderboard;
 
-          callback?.({ success: true, passed: true, points, isFirstBlood, testResults: results });
+          // ✅ Send success response to submitter
+          callback?.({ 
+            success: true, 
+            passed: true, 
+            points, 
+            isFirstBlood,
+            message: isFirstBlood ? `🎯 First Blood! +${points} points!` : `✅ Accepted! +${points} points`,
+            testResults: results 
+          });
 
+          // ✅ Broadcast leaderboard update to all players
           io.to(roomCode).emit("leaderboard_update", {
             leaderboard,
             event: {
               type: isFirstBlood ? "first_blood" : "solve",
-              userId: socket.id,
+              socketId: socket.id,
+              userId: user.userId,
               username: user.username,
+              questionTitle: question.title,
               points,
               isFirstBlood,
+              timestamp: Date.now(),
             },
           });
 
@@ -652,21 +789,31 @@ function registerSocketHandlers(io) {
             io.to(roomCode).emit("first_blood", {
               username: user.username,
               avatar: user.avatar,
+              questionTitle: question.title,
+              points,
               timeTakenSecs,
             });
           }
 
+          // ✅ Check if all players solved
           const allSolved = Object.values(room.users).every((u) => u.solvedAt);
           if (allSolved) {
+            console.log(`[Room] All players solved! Ending room ${roomCode}`);
             clearInterval(room.timerInterval);
             setTimeout(() => endRoom(io, room, roomCode), 3000);
           }
         } else {
-          callback?.({ success: true, passed: false, testResults: results });
+          console.log(`[Code Submit] ❌ FAILED some test cases for ${user.username}`);
+          callback?.({ 
+            success: true, 
+            passed: false,
+            message: "❌ Some test cases failed. Try again!",
+            testResults: results 
+          });
         }
       } catch (err) {
-        console.error("[Judge0] Error:", err.message);
-        callback?.({ success: false, error: "Execution service unavailable." });
+        console.error("[Code Submit] Execution Error:", err.message);
+        callback?.({ success: false, error: `Execution error: ${err.message}` });
       }
     });
 

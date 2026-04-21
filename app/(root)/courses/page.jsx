@@ -237,19 +237,19 @@ export default function CoursesPage() {
       {/* Header */}
       <div className="sticky top-0 z-40 border-b border-dark-300 bg-dark-100/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <p className="text-sm text-light-400">Learn › <span className="text-light-200 font-medium">Courses</span></p>
-              <h1 className="text-3xl font-bold text-light-50 mt-2">Master Key Topics</h1>
+              <p className="text-xs md:text-sm text-light-400">Learn › <span className="text-light-200 font-medium">Courses</span></p>
+              <h1 className="text-2xl md:text-3xl font-bold text-light-50 mt-2">Master Key Topics</h1>
             </div>
-            <div className="flex gap-3">
-              <button className="px-4 py-2 rounded-lg bg-dark-300 hover:bg-dark-400 text-light-200 text-sm font-medium transition-colors">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <button className="px-3 sm:px-4 py-2 rounded-lg bg-dark-300 hover:bg-dark-400 text-light-200 text-xs sm:text-sm font-medium transition-colors">
                 My Certificates
               </button>
-              <button className="px-4 py-2 rounded-lg bg-dark-300 hover:bg-dark-400 text-light-200 text-sm font-medium transition-colors">
+              <button className="px-3 sm:px-4 py-2 rounded-lg bg-dark-300 hover:bg-dark-400 text-light-200 text-xs sm:text-sm font-medium transition-colors">
                 My Progress
               </button>
-              <button className="px-4 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 text-sm font-bold transition-colors">
+              <button className="px-3 sm:px-4 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 text-xs sm:text-sm font-bold transition-colors">
                 Suggest a Course
               </button>
             </div>
@@ -259,25 +259,25 @@ export default function CoursesPage() {
 
       {/* Hero Section */}
       <div className="border-b border-dark-300">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="bg-gradient-to-br from-dark-200 to-dark-300 border border-dark-300 rounded-2xl p-8">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 rounded-lg bg-primary-200/20 flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-primary-100" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+          <div className="bg-gradient-to-br from-dark-200 to-dark-300 border border-dark-300 rounded-xl sm:rounded-2xl p-5 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-4">
+              <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg bg-primary-200/20 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-5 sm:w-6 h-5 sm:h-6 text-primary-100" />
               </div>
-              <div className="inline-block bg-primary-200/20 border border-primary-200/40 rounded-full px-3 py-1">
+              <div className="inline-block bg-primary-200/20 border border-primary-200/40 rounded-full px-3 py-1 w-fit">
                 <span className="text-primary-100 text-xs font-bold uppercase tracking-wide">Complete Curriculum</span>
               </div>
             </div>
-            <h2 className="text-4xl font-bold text-light-50 mb-3">Master Coding Interviews</h2>
-            <p className="text-light-300 text-lg mb-6 max-w-2xl">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-light-50 mb-3">Master Coding Interviews</h2>
+            <p className="text-light-300 text-sm sm:text-base md:text-lg mb-6 max-w-2xl leading-relaxed">
               Structured paths with curated resources from the best teachers and platforms. Learn at your pace and master the fundamentals.
             </p>
-            <div className="flex gap-3 flex-wrap">
-              <button className="px-5 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 font-bold transition-colors">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <button className="px-4 sm:px-5 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 font-bold transition-colors text-sm sm:text-base">
                 Get Started Now
               </button>
-              <button className="px-5 py-2 rounded-lg border border-dark-300 hover:bg-dark-400 text-light-200 font-medium transition-colors">
+              <button className="px-4 sm:px-5 py-2 rounded-lg border border-dark-300 hover:bg-dark-400 text-light-200 font-medium transition-colors text-sm sm:text-base">
                 View All Resources
               </button>
             </div>
@@ -287,14 +287,14 @@ export default function CoursesPage() {
 
       {/* Filter Pills */}
       <div className="border-b border-dark-300 bg-dark-200/50">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex flex-wrap gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 overflow-x-auto">
+          <div className="flex flex-nowrap sm:flex-wrap gap-2 sm:gap-3">
             {['all', 'dsa', 'sysdes', 'dbms', 'nosql'].map((filter) => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
                 className={cn(
-                  'px-4 py-2 rounded-full text-sm font-semibold transition-all',
+                  'px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap',
                   activeFilter === filter
                     ? 'bg-primary-200/40 border border-primary-200 text-primary-100'
                     : 'bg-dark-300 border border-dark-400 text-light-300 hover:border-dark-300'
@@ -312,28 +312,28 @@ export default function CoursesPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="space-y-4 sm:space-y-6">
           {filteredCourses.map((course) => (
-            <div key={course.id} className="overflow-hidden border border-dark-300 rounded-xl hover:border-dark-200 transition-colors">
+            <div key={course.id} className="overflow-hidden border border-dark-300 rounded-lg sm:rounded-xl hover:border-dark-200 transition-colors">
               {/* Course Header */}
               <div
                 onClick={() => toggleCourse(course.id)}
-                className="p-6 cursor-pointer hover:bg-dark-300/50 transition-colors bg-dark-200/50"
+                className="p-4 sm:p-6 cursor-pointer hover:bg-dark-300/50 transition-colors bg-dark-200/50"
               >
-                <div className="flex items-start justify-between gap-6">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-lg bg-dark-300 flex items-center justify-center">
-                        <span className="text-lg font-bold text-primary-100">{course.badge.charAt(0)}</span>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3 mb-2">
+                      <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-lg bg-dark-300 flex items-center justify-center flex-shrink-0">
+                        <span className="text-base sm:text-lg font-bold text-primary-100">{course.badge.charAt(0)}</span>
                       </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-light-50">{course.title}</h3>
-                        <p className="text-sm text-light-400">{course.subtitle}</p>
+                      <div className="min-w-0">
+                        <h3 className="text-base sm:text-xl font-bold text-light-50 break-words">{course.title}</h3>
+                        <p className="text-xs sm:text-sm text-light-400 break-words">{course.subtitle}</p>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                     <div className={cn(
                       'text-xs font-bold px-3 py-1 rounded-full text-white',
                       course.colorClass === 'from-cyan-500 to-cyan-600' && 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-200',
@@ -353,7 +353,7 @@ export default function CoursesPage() {
 
               {/* Resources Grid */}
               {expandedCourse === course.id && (
-                <div className="border-t border-dark-300 bg-dark-300/30 p-6">
+                <div className="border-t border-dark-300 bg-dark-300/30 p-4 sm:p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {course.resources.map((resource, idx) => (
                       <a
@@ -390,15 +390,15 @@ export default function CoursesPage() {
         </div>
 
         {/* Stats */}
-        <div className="mt-16 grid grid-cols-4 gap-4">
+        <div className="mt-12 sm:mt-16 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {[
             { label: 'Total Courses', value: '4' },
             { label: 'Total Resources', value: '28+' },
             { label: 'Hours of Content', value: '200+' },
             { label: 'Success Rate', value: '95%' },
           ].map((stat, idx) => (
-            <div key={idx} className="bg-dark-300/50 border border-dark-300 rounded-lg p-6 text-center hover:border-primary-200/30 transition-colors">
-              <div className="text-2xl font-bold text-light-50">{stat.value}</div>
+            <div key={idx} className="bg-dark-300/50 border border-dark-300 rounded-lg p-4 sm:p-6 text-center hover:border-primary-200/30 transition-colors">
+              <div className="text-xl sm:text-2xl font-bold text-light-50">{stat.value}</div>
               <div className="text-xs text-light-400 mt-1">{stat.label}</div>
             </div>
           ))}

@@ -60,6 +60,24 @@ export default function CoursesPage() {
           type: 'Course',
           url: 'https://www.coursera.org/specializations/algorithms',
         },
+        {
+          name: 'Abdul Bari Algorithms - Complete Playlist',
+          desc: 'Algorithm Playlist - Insertion Sort, Bubble Sort & more',
+          type: 'Playlist',
+          url: 'https://www.youtube.com/watch?v=0IAPZzGSbME&list=PLDN4rrl48XKpZkf03iYFl-O29szjTrs_O',
+        },
+        {
+          name: 'Striver DSA Tutorial',
+          desc: 'Complete YouTube DSA Series',
+          type: 'Playlist',
+          url: 'https://www.youtube.com/watch?v=0bHoB32fuj0&list=PLgUwDviBIf0oF6QL8m22w1hIDC1vJ_BHz',
+        },
+        {
+          name: "Striver's A2Z DSA Sheet",
+          desc: 'Complete DSA Learning Path with Problems',
+          type: 'Resource',
+          url: 'https://takeuforward.org/dsa/strivers-a2z-sheet-learn-dsa-a-to-z',
+        },
       ]
     },
     {

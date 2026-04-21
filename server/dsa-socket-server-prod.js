@@ -1389,6 +1389,7 @@ function createDSARoomServer() {
       origin: [
         process.env.CLIENT_URL || "http://localhost:3000",
         "https://ai-interview-git-main-errorbhupendra481-gmailcoms-projects.vercel.app",
+        "https://ai-interview-five-sage.vercel.app"
       ],
       methods: ["GET", "POST"],
     },

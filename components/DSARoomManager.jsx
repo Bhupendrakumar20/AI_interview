@@ -529,16 +529,6 @@ const DSARoomManager = ({
                       <h3 className="text-2xl font-black text-emerald-300">{activeQuestion.title}</h3>
                       <p className="text-sm text-slate-300 mt-2">{activeQuestion.description}</p>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                        {activeQuestion.geeksforgeeksUrl && (
-                          <a
-                            href={activeQuestion.geeksforgeeksUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-cyan-300 hover:text-cyan-200"
-                          >
-                            Full Statement (GFG)
-                          </a>
-                        )}
                         {activeQuestion.leetcodeUrl && (
                           <a
                             href={activeQuestion.leetcodeUrl}

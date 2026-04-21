@@ -17,6 +17,29 @@ const axios = require("axios");
 const { getMixedProblems, fetchLeetCodeDetails, getRandomProblem } = require("../lib/dsa-question-service");
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SOCKET CALLBACK WRAPPER (For debugging)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function wrapCallback(callback, eventName, context = {}) {
+  if (!callback || typeof callback !== "function") {
+    console.warn(`[Callback Wrapper] No valid callback for ${eventName}`, context);
+    return;
+  }
+
+  return (data) => {
+    console.log(
+      `[Callback] 📤 Sending response to client for "${eventName}"`,
+      { success: data?.success, code: data?.code || "N/A", ...context }
+    );
+    try {
+      callback(data);
+    } catch (err) {
+      console.error(`[Callback] Error invoking callback for ${eventName}:`, err.message);
+    }
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ERROR HANDLING UTILITIES
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -407,6 +430,8 @@ function registerSocketHandlers(io) {
     // ── CREATE ROOM ──────────────────────────────────────────────────────────
     socket.on("room_create", ({ username, avatar, userId }, callback) => {
       try {
+        console.log(`\n[Room Create] 🎯 Handler called for user: ${userId}`);
+
         // ✅ Input validation
         validateInput(
           { username, avatar, userId },
@@ -479,19 +504,25 @@ function registerSocketHandlers(io) {
           createdAt: Date.now(),
         });
 
+        console.log(`[Room Create] ✅ Room created: ${code}`);
+        console.log(`[Room Create] 📤 Invoking callback with success response...`);
+        
         callback({
           success: true,
           roomCode: code,
           sessionId: sessionId,
         });
+
         console.log(
-          `[Room Create] ✅ Created: ${code} by ${username} (userId: ${userId}, sessionId: ${sessionId})`
+          `[Room Create] ✅ Callback invoked successfully for ${username} (${code}, ${sessionId})`
         );
       } catch (error) {
+        console.error(`[Room Create] ❌ Error occurred:`, error.message);
         const response = handleError(error, { event: "room_create", userId });
+        console.log(`[Room Create] 📤 Invoking callback with error response...`);
         callback?.(response);
+        console.log(`[Room Create] ✅ Error callback invoked`);
       }
-    });
     });
 
     // ── JOIN ROOM ────────────────────────────────────────────────────────────
@@ -588,6 +619,7 @@ function registerSocketHandlers(io) {
           createdAt: Date.now(),
         });
 
+        console.log(`[Room Join] 📤 Invoking callback with success response...`);
         callback({
           success: true,
           sessionId: sessionId,
@@ -598,14 +630,17 @@ function registerSocketHandlers(io) {
             status: room.status,
           },
         });
+        console.log(`[Room Join] ✅ Callback invoked successfully for ${username} (sessionId: ${sessionId})`);
 
         socket.to(roomCode).emit("lobby_update", { users: Object.values(room.users) });
-        console.log(`[Join] ✅ ${username} joined ${roomCode} (userId: ${userId})`);
+        console.log(`[Room Join] ✅ ${username} joined ${roomCode} (userId: ${userId})`);
       } catch (error) {
+        console.error(`[Room Join] ❌ Error occurred:`, error.message);
         const response = handleError(error, { event: "room_join", roomCode: roomCode });
+        console.log(`[Room Join] 📤 Invoking callback with error response...`);
         callback?.(response);
+        console.log(`[Room Join] ✅ Error callback invoked`);
       }
-    });
     });
 
     // ── CAST VOTE ────────────────────────────────────────────────────────────
@@ -640,16 +675,22 @@ function registerSocketHandlers(io) {
           totalUsers: Object.keys(room.users).length,
         });
 
+        console.log(`[Cast Vote] 📤 Invoking callback with success response...`);
         callback?.({ success: true });
+        console.log(`[Cast Vote] ✅ Vote recorded and callback invoked (type: ${type})`);
       } catch (error) {
+        console.error(`[Cast Vote] ❌ Error occurred:`, error.message);
         const response = handleError(error, { event: "cast_vote" });
+        console.log(`[Cast Vote] 📤 Invoking callback with error response...`);
         callback?.(response);
+        console.log(`[Cast Vote] ✅ Error callback invoked`);
       }
     });
 
     // ── GET QUESTION LIST (LeetCode ONLY via GraphQL API) ──────────────────
     socket.on("get_question_list", async ({ difficulty = "Medium" }, callback) => {
       try {
+        console.log(`[Questions] 🎯 Handler called - difficulty: ${difficulty}`);
         // ✅ Input validation
         validateInput(
           { difficulty },
@@ -707,6 +748,7 @@ function registerSocketHandlers(io) {
           );
         }
 
+        console.log(`[Questions] 📤 Invoking callback with ${leetcodeQuestions.length} questions...`);
         callback?.({
           success: true,
           questions: leetcodeQuestions,
@@ -714,46 +756,21 @@ function registerSocketHandlers(io) {
         });
 
         console.log(
-          `[Questions] ✅ Sent ${leetcodeQuestions.length} verified LeetCode problems`
+          `[Questions] ✅ Callback invoked successfully - Returned ${leetcodeQuestions.length} verified LeetCode problems`
         );
       } catch (error) {
+        console.error(`[Questions] ❌ Error occurred:`, error.message);
         const response = handleError(error, { event: "get_question_list" });
+        console.log(`[Questions] 📤 Invoking callback with error response...`);
         callback?.(response);
-      }
-    });
-            titleSlug: p.titleSlug,  // For fetching full details
-            url: p.url,  // Official LeetCode URL
-            acRate: p.acRate,
-          };
-        }).filter(q => q !== null);
-
-        if (leetcodeQuestions.length === 0) {
-          console.error("[LeetCode Questions] All questions failed validation");
-          return callback?.({
-            success: false,
-            error: "LeetCode questions validation failed.",
-            questions: [],
-          });
-        }
-
-        callback?.({
-          success: true,
-          questions: leetcodeQuestions,
-        });
-        console.log(`[LeetCode Questions] ✅ Successfully sent ${leetcodeQuestions.length} verified LeetCode problems`);
-      } catch (error) {
-        console.error("[LeetCode Questions] Error fetching from LeetCode API:", error.message);
-        callback?.({
-          success: false,
-          error: "Failed to connect to LeetCode API. LeetCode GraphQL service may be unavailable.",
-          questions: [],
-        });
+        console.log(`[Questions] ✅ Error callback invoked`);
       }
     });
 
     // ── GET QUESTION DETAILS (Full problem with description & test cases) ────
     socket.on("get_question_details", async ({ questionId, titleSlug }, callback) => {
       try {
+        console.log(`[Question Details] 🎯 Handler called - questionId: ${questionId}, titleSlug: ${titleSlug}`);
         // ✅ Input validation
         validateInput(
           { questionId, titleSlug },
@@ -798,6 +815,7 @@ function registerSocketHandlers(io) {
           );
         }
 
+        console.log(`[Question Details] 📤 Invoking callback with question details...`);
         callback?.({
           success: true,
           question: {
@@ -816,61 +834,18 @@ function registerSocketHandlers(io) {
         });
 
         console.log(
-          `[Question Details] ✅ Sent: "${details.title}" from LeetCode`
+          `[Question Details] ✅ Callback invoked successfully - Sent: "${details.title}" from LeetCode`
         );
       } catch (error) {
+        console.error(`[Question Details] ❌ Error occurred:`, error.message);
         const response = handleError(error, { event: "get_question_details" });
+        console.log(`[Question Details] 📤 Invoking callback with error response...`);
         callback?.(response);
-      }
-    });
-        
-        // FETCH FROM LEETCODE GRAPHQL API ONLY
-        const details = await fetchLeetCodeDetails(titleSlug);
-
-        if (!details) {
-          console.error("[LeetCode Details] LeetCode API returned null:", titleSlug);
-          return callback?.({
-            success: false,
-            error: "LeetCode API failed. The problem may not exist or the API is temporarily unavailable.",
-          });
-        }
-
-        // VALIDATE Response source is LeetCode
-        if (details.source !== "leetcode") {
-          console.error("[LeetCode Details] VALIDATION FAILED: Source is not LeetCode:", details.source);
-          return callback?.({
-            success: false,
-            error: "SECURITY ERROR: Received non-LeetCode content. Only LeetCode is allowed.",
-          });
-        }
-
-        // RETURN LEETCODE DATA ONLY
-        callback?.({
-          success: true,
-          question: {
-            id: details.id,
-            title: details.title,  // LeetCode title from GraphQL ONLY
-            titleSlug: details.titleSlug,
-            difficulty: details.difficulty,
-            description: details.description,  // LeetCode description from GraphQL ONLY
-            tags: details.tags || [],
-            examples: details.examples || [],
-            testCases: details.testCases || [],
-            url: details.url,
-            source: "leetcode",
-          },
-        });
-        console.log(`[LeetCode Details] Successfully sent LeetCode problem: "${details.title}" with full description and test cases`);
-      } catch (error) {
-        console.error("[LeetCode Details] Error fetching from LeetCode API:", error.message);
-        callback?.({
-          success: false,
-          error: "LeetCode API connection error. Please try another problem or check internet connectivity.",
-        });
+        console.log(`[Question Details] ✅ Error callback invoked`);
       }
     });
 
-    // ── START ROOM (Host only) ───────────────────────────────────────────────
+    // ── ROOM START ───────────────────────────────────────────────────────────
     socket.on("room_start", async (_, callback) => {
       try {
         const room = getRoom(socket.data.roomCode);
@@ -1072,62 +1047,27 @@ function registerSocketHandlers(io) {
         startRoomTimer(io, room, socket.data.roomCode);
 
         // ✅ Return success immediately so client knows game started
+        console.log(`[Room Start] 📤 Invoking callback with success response...`);
         callback?.({ success: true, endsAt });
         console.log(
-          `[Room] ✅ Started: ${socket.data.roomCode} | ${Object.keys(room.users).length} players | ${timeLimitSecs}s timer`
+          `[Room Start] ✅ Callback invoked successfully - Game started: ${socket.data.roomCode} | ${Object.keys(room.users).length} players | ${timeLimitSecs}s timer`
         );
       } catch (error) {
+        console.error(`[Room Start] ❌ Error occurred:`, error.message);
         const response = handleError(error, {
           event: "room_start",
           roomCode: socket.data.roomCode,
         });
+        console.log(`[Room Start] 📤 Invoking callback with error response...`);
         callback?.(response);
+        console.log(`[Room Start] ✅ Error callback invoked`);
       }
-    });
-        leaderboard: initialLeaderboard,
-      });
-
-      // EXTRA SAFETY: Also send directly to each socket to ensure delivery
-      console.log(`[Room Start] Sending room_started to each socket individually...`);
-      for (const socketId of Object.keys(room.users)) {
-        const targetSocket = io.sockets.sockets.get(socketId);
-        if (targetSocket) {
-          const userName = room.users[socketId].username;
-          console.log(`[Room Start]   → Sending to ${userName} (${socketId})`);
-          targetSocket.emit("room_started", {
-            config: room.config,
-            endsAt: endsAt,
-            leaderboard: initialLeaderboard,
-          });
-        } else {
-          console.warn(`[Room Start]   ⚠️ Socket ${socketId} not found!`);
-        }
-      }
-
-
-      // Send individual questions to each player
-      for (const [socketId, q] of Object.entries(assignedQuestions)) {
-        const targetSocket = io.sockets.sockets.get(socketId);
-        if (targetSocket) {
-          const userName = room.users[socketId].username;
-          console.log(`[Room] Sending question to ${userName}: "${q.title}" (${q.id})`);
-          targetSocket.emit("question_assigned", { question: q });
-        } else {
-          console.warn(`[Room] ⚠️ Socket ${socketId} not found when assigning question`);
-        }
-      }
-
-      // ✅ FIXED: Initialize and start timer
-      startRoomTimer(io, room, socket.data.roomCode);
-      
-      // ✅ Return success immediately so client knows game started
-      callback?.({ success: true, endsAt });
-      console.log(`[Room] ✅ Started: ${socket.data.roomCode} | ${Object.keys(room.users).length} players | ${timeLimitSecs}s timer`);
     });
 
     // ── SET LANGUAGE ─────────────────────────────────────────────────────────
     socket.on("set_language", ({ language }, callback) => {
       try {
+        console.log(`[Set Language] Handler called - language: ${language}`);
         const room = getRoom(socket.data.roomCode);
         if (!room) {
           throw new AppError("Room not found", 404, "ROOM_NOT_FOUND");
@@ -1149,16 +1089,22 @@ function registerSocketHandlers(io) {
         );
 
         room.users[socket.id].language = language;
+        console.log(`[Set Language] 📤 Invoking callback with success response...`);
         callback?.({ success: true });
+        console.log(`[Set Language] ✅ Callback invoked successfully - Language set to: ${language}`);
       } catch (error) {
+        console.error(`[Set Language] ❌ Error occurred:`, error.message);
         const response = handleError(error, { event: "set_language" });
+        console.log(`[Set Language] 📤 Invoking callback with error response...`);
         callback?.(response);
+        console.log(`[Set Language] ✅ Error callback invoked`);
       }
     });
 
     // ── CODE SUBMIT ──────────────────────────────────────────────────────────
     socket.on("code_submit", async ({ sourceCode, language, questionId }, callback) => {
       try {
+        console.log(`\n[Code Submit] 🎯 Handler called - questionId: ${questionId}, language: ${language}`);
         const roomCode = socket.data.roomCode;
         const room = getRoom(roomCode);
 
@@ -1298,6 +1244,7 @@ function registerSocketHandlers(io) {
             room.leaderboard = leaderboard;
 
             // ✅ Send success response to submitter
+            console.log(`[Code Submit] 📤 Invoking callback with ACCEPTED response...`);
             callback?.({
               success: true,
               passed: true,
@@ -1308,6 +1255,7 @@ function registerSocketHandlers(io) {
                 : `✅ Accepted! +${points} points`,
               testResults: results,
             });
+            console.log(`[Code Submit] ✅ Callback invoked successfully - ${user.username} solved problem`);
 
             // ✅ Broadcast leaderboard update to all players
             io.to(roomCode).emit("leaderboard_update", {
@@ -1345,12 +1293,14 @@ function registerSocketHandlers(io) {
             console.log(
               `[Code Submit] ❌ FAILED some test cases for ${user.username}`
             );
+            console.log(`[Code Submit] 📤 Invoking callback with FAILED response...`);
             callback?.({
               success: true,
               passed: false,
               message: "❌ Some test cases failed. Try again!",
               testResults: results,
             });
+            console.log(`[Code Submit] ✅ Callback invoked successfully - Test failed`);
           }
         } catch (execError) {
           console.error("[Code Submit] Execution Error:", execError.message);
@@ -1361,12 +1311,15 @@ function registerSocketHandlers(io) {
           );
         }
       } catch (error) {
+        console.error(`[Code Submit] ❌ Error occurred:`, error.message);
         const response = handleError(error, {
           event: "code_submit",
           roomCode: socket.data.roomCode,
           userId: socket.data.userId,
         });
+        console.log(`[Code Submit] 📤 Invoking callback with error response...`);
         callback?.(response);
+        console.log(`[Code Submit] ✅ Error callback invoked`);
       }
     });
 

@@ -446,6 +446,17 @@ const DSARoomManager = ({
     }
   };
 
+  const handleCodeChange = (value) => {
+    if (!activeQuestion) return;
+    setCodeByQuestion((prev) => ({
+      ...prev,
+      [activeQuestionId]: {
+        ...(prev[activeQuestionId] || {}),
+        [language]: value,
+      },
+    }));
+  };
+
   const handleSubmitCode = async () => {
     if (!socket || !activeQuestion) return;
 

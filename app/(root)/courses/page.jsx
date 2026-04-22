@@ -34,7 +34,19 @@ export default function CoursesPage() {
           name: 'Abdul Bari Algorithms',
           desc: 'YouTube - White-board Logic',
           type: 'Video',
-          url: 'https://www.youtube.com/c/abdul_bari',
+          url: 'https://youtu.be/0IAPZzGSbME?si=OTHB8ejj_-8qhZoT',
+        },
+        {
+          name: 'Striver DSA Playlist',
+          desc: 'YouTube - Complete DSA Series',
+          type: 'Video',
+          url: 'https://www.youtube.com/channel/UCvEKHATlVq84hm1jduTYm8g',
+        },
+        {
+          name: "Striver's A2Z DSA Sheet",
+          desc: 'Complete DSA Learning Resource',
+          type: 'Resource',
+          url: 'https://takeuforward.org/dsa/strivers-a2z-sheet-learn-dsa-a-to-z',
         },
         {
           name: 'MIT OpenCourseWare (6.006)',

@@ -15,6 +15,7 @@ const http = require("http");
 const express = require("express");
 const axios = require("axios");
 const { getMixedProblems, fetchLeetCodeDetails, getRandomProblem } = require("../lib/dsa-question-service");
+const { db } = require("../firebase/admin"); // Add Firestore support
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -50,8 +51,11 @@ const PISTON_LANGUAGES = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const roomStore = new Map();
+const roomIdStore = new Map(); // Store rooms by roomId (for DSARoomManager compatibility)
+const roomIdToRoomCodeMap = new Map(); // Map roomId -> roomCode for cross-compatibility
 const userRoomMap = new Map(); // Track userId -> roomCode (user can only be in ONE room)
 const userSocketMap = new Map(); // Track userId -> socket.id for cleanup on disconnect
+const userSockets = new Map(); // userId -> socketId mapping (for targeted messaging)
 
 function generateRoomCode() {
   return "DSA-" + Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -82,6 +86,74 @@ function computeLeaderboard(room) {
       language: u.language,
     }))
     .sort((a, b) => b.points - a.points || (a.solvedAt ?? Infinity) - (b.solvedAt ?? Infinity));
+}
+
+// Fetch room data from Firestore for DSARoomManager compatibility
+async function fetchRoomFromFirestore(roomId) {
+  try {
+    const roomDoc = await db.collection('dsa_rooms').doc(roomId).get();
+    if (!roomDoc.exists) {
+      console.log(`[Firestore] Room not found: ${roomId}`);
+      return null;
+    }
+
+    const roomData = roomDoc.data();
+    
+    // Fetch participants to get member list and owner username
+    const participantsSnapshot = await db
+      .collection('dsa_room_participants')
+      .where('roomId', '==', roomId)
+      .get();
+
+    const approvedMembers = [];
+    const pendingRequests = [];
+    let ownerUsername = 'Owner'; // Default fallback
+
+    participantsSnapshot.forEach((doc) => {
+      const participant = doc.data();
+      
+      // Get owner username (from createdBy field in room)
+      if (participant.userId === roomData.createdBy) {
+        ownerUsername = participant.username;
+      }
+      
+      if (participant.status === 'active' && participant.userId !== roomData.createdBy) {
+        // Don't include owner in approvedMembers (they're separate)
+        approvedMembers.push({
+          userId: participant.userId,
+          username: participant.username,
+          joinedAt: participant.joinedAt,
+        });
+      } else if (participant.status === 'pending') {
+        pendingRequests.push({
+          id: doc.id,
+          userId: participant.userId,
+          username: participant.username,
+          requestedAt: participant.joinedAt,
+        });
+      }
+    });
+
+    return {
+      roomId,
+      roomCode: roomData.roomCode,
+      ownerId: roomData.createdBy,
+      ownerUsername: ownerUsername,
+      ownerSocketId: null,
+      approvedMembers,
+      pendingRequests,
+      status: roomData.status || 'lobby',
+      questionMode: roomData.questionMode,
+      questions: [],
+      leaderboard: [],
+      startTime: null,
+      gameStartedAt: null,
+      createdAt: roomData.createdAt,
+    };
+  } catch (error) {
+    console.error(`[Firestore] Error fetching room ${roomId}:`, error.message);
+    return null;
+  }
 }
 
 function tallyVotes(votes, options) {
@@ -646,6 +718,182 @@ function registerSocketHandlers(io) {
       
       callback?.({ success: true, endsAt });
       console.log(`[Room] ✅ Started: ${socket.data.roomCode} | ${Object.keys(room.users).length} players | ${timeLimitSecs}s timer`);
+    });
+
+    // ── JOIN ROOM SOCKET (for DSARoomManager compatibility) ──────────────────
+    socket.on("join_room_socket", async (data) => {
+      try {
+        const { roomId, userId, username } = data;
+        
+        if (!roomId || !userId) {
+          console.log('[join_room_socket] Missing roomId or userId');
+          socket.emit('error', { message: 'Missing room or user info' });
+          return;
+        }
+
+        // Try to get room from in-memory store, then fetch from Firestore
+        let room = roomIdStore.get(roomId);
+        if (!room) {
+          console.log(`[join_room_socket] Room not in memory, fetching from Firestore: ${roomId}`);
+          room = await fetchRoomFromFirestore(roomId);
+          if (!room) {
+            console.log(`[join_room_socket] Room not found: ${roomId}`);
+            socket.emit('error', { message: 'Room not found' });
+            return;
+          }
+          roomIdStore.set(roomId, room);
+        }
+
+        // Register this socket with user info
+        socket.socketData = { userId, username, roomId };
+        userSockets.set(userId, socket.id);
+
+        // Join the socket room for broadcasts
+        socket.join(`room_${roomId}`);
+        console.log(`[join_room_socket] ${username} (${socket.id}) joined socket room for ${roomId}`);
+        
+        // Send room state immediately
+        socket.emit('room_state', {
+          success: true,
+          roomId,
+          members: room.approvedMembers || [],
+          pending: room.pendingRequests || [],
+        });
+
+        // If game has already started, send game_starting immediately
+        if (room.status === 'playing' && room.questions && room.questions.length > 0) {
+          console.log(`[join_room_socket] Game already in progress! Sending game_starting to ${username}`);
+          socket.emit('game_starting', {
+            roomId,
+            questions: room.questions,
+            leaderboard: room.leaderboard,
+            startTime: room.startTime,
+            questionMode: room.questionMode,
+          });
+        }
+      } catch (error) {
+        console.error('[join_room_socket] Error:', error);
+        socket.emit('error', { message: 'Failed to join room: ' + error.message });
+      }
+    });
+
+    // ── GET ROOM STATE (for DSARoomManager compatibility) ───────────────────
+    socket.on("get_room_state", async (data) => {
+      try {
+        const { roomId } = data;
+        if (!roomId) {
+          console.log('[get_room_state] Missing roomId');
+          socket.emit('error', { message: 'Missing roomId' });
+          return;
+        }
+
+        // Try to get room from in-memory store, then fetch from Firestore
+        let room = roomIdStore.get(roomId);
+        if (!room) {
+          console.log(`[get_room_state] Room not in memory, fetching from Firestore: ${roomId}`);
+          room = await fetchRoomFromFirestore(roomId);
+          if (!room) {
+            console.log(`[get_room_state] Room not found: ${roomId}`);
+            socket.emit('error', { message: 'Room not found' });
+            return;
+          }
+          roomIdStore.set(roomId, room);
+        }
+
+        socket.emit('room_state', {
+          success: true,
+          roomId,
+          members: room.approvedMembers || [],
+          pending: room.pendingRequests || [],
+        });
+      } catch (error) {
+        console.error('[get_room_state] Error:', error);
+        socket.emit('error', { message: 'Failed to get room state: ' + error.message });
+      }
+    });
+
+    // ── START GAME (for DSARoomManager - uses client-provided questions) ────
+    socket.on("start_game", (data) => {
+      try {
+        const { roomId, questionMode, startTime, questions: clientQuestions } = data;
+        console.log(`[start_game] Owner starting game for room ${roomId}`);
+        console.log(`[start_game] Received ${clientQuestions?.length || 0} questions from client`);
+
+        const room = roomIdStore.get(roomId);
+        if (!room) {
+          console.error(`[start_game] Room not found: ${roomId}`);
+          socket.emit('error', { message: 'Room not found' });
+          return;
+        }
+
+        // Validate questions
+        const questions = Array.isArray(clientQuestions) ? clientQuestions : [];
+        if (questions.length === 0) {
+          socket.emit('error', { message: 'No questions received' });
+          return;
+        }
+
+        // Build leaderboard with owner + approved members
+        const leaderboard = [
+          {
+            userId: room.ownerId,
+            username: room.ownerUsername,
+            points: 0,
+            solved: 0,
+            isOwner: true,
+            status: 'idle',
+          },
+          ...((room.approvedMembers || []).map((m) => ({
+            userId: m.userId,
+            username: m.username,
+            points: 0,
+            solved: 0,
+            isOwner: false,
+            status: 'idle',
+          }))),
+        ];
+
+        // Store game data in room
+        room.questions = questions;
+        room.leaderboard = leaderboard;
+        room.questionMode = questionMode;
+        room.startTime = startTime;
+        room.status = 'playing';
+        room.gameStartedAt = new Date();
+
+        console.log(`[start_game] Leaderboard has ${leaderboard.length} players: ${leaderboard.map(p => p.username).join(', ')}`);
+
+        // Get all sockets currently in the room
+        const roomSockets = io.sockets.adapter.rooms.get(`room_${roomId}`);
+        const socketCount = roomSockets ? roomSockets.size : 0;
+        console.log(`[start_game] Currently in socket room: ${socketCount} members`);
+
+        // Broadcast game starting to all in room
+        const broadcastData = {
+          roomId,
+          questions,
+          leaderboard,
+          startTime,
+          questionMode,
+        };
+        
+        console.log(`[start_game] BROADCASTING game_starting with ${questions.length} questions to room_${roomId}`);
+        io.to(`room_${roomId}`).emit('game_starting', broadcastData);
+        
+        // Also send directly to approved members in case they haven't joined socket room yet
+        (room.approvedMembers || []).forEach((member) => {
+          const memberSocket = userSockets.get(member.userId);
+          if (memberSocket) {
+            console.log(`[start_game] Sending game_starting directly to ${member.username} (socket: ${memberSocket})`);
+            io.to(memberSocket).emit('game_starting', broadcastData);
+          }
+        });
+
+        console.log(`[start_game] ✓ Game started successfully`);
+      } catch (error) {
+        console.error('[start_game] Error:', error);
+        socket.emit('error', { message: 'Failed to start game: ' + error.message });
+      }
     });
 
     // ── SET LANGUAGE ─────────────────────────────────────────────────────────

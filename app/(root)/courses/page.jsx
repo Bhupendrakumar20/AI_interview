@@ -237,19 +237,19 @@ export default function CoursesPage() {
       {/* Header */}
       <div className="sticky top-0 z-40 border-b border-dark-300 bg-dark-100/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
             <div>
-              <p className="text-sm text-light-400">Learn › <span className="text-light-200 font-medium">Courses</span></p>
-              <h1 className="text-3xl font-bold text-light-50 mt-2">Master Key Topics</h1>
+              <p className="text-xs sm:text-sm text-light-400">Learn › <span className="text-light-200 font-medium">Courses</span></p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-light-50 mt-2">Master Key Topics</h1>
             </div>
-            <div className="flex gap-3">
-              <button className="px-4 py-2 rounded-lg bg-dark-300 hover:bg-dark-400 text-light-200 text-sm font-medium transition-colors">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <button className="px-3 sm:px-4 py-2 rounded-lg bg-dark-300 hover:bg-dark-400 text-light-200 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap">
                 My Certificates
               </button>
-              <button className="px-4 py-2 rounded-lg bg-dark-300 hover:bg-dark-400 text-light-200 text-sm font-medium transition-colors">
+              <button className="px-3 sm:px-4 py-2 rounded-lg bg-dark-300 hover:bg-dark-400 text-light-200 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap">
                 My Progress
               </button>
-              <button className="px-4 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 text-sm font-bold transition-colors">
+              <button className="px-3 sm:px-4 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap">
                 Suggest a Course
               </button>
             </div>
@@ -259,25 +259,25 @@ export default function CoursesPage() {
 
       {/* Hero Section */}
       <div className="border-b border-dark-300">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="bg-gradient-to-br from-dark-200 to-dark-300 border border-dark-300 rounded-2xl p-8">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 rounded-lg bg-primary-200/20 flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-primary-100" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+          <div className="bg-gradient-to-br from-dark-200 to-dark-300 border border-dark-300 rounded-2xl p-4 sm:p-6 md:p-8">
+            <div className="flex items-center gap-3 sm:gap-4 mb-4">
+              <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg bg-primary-200/20 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-5 sm:w-6 h-5 sm:h-6 text-primary-100" />
               </div>
-              <div className="inline-block bg-primary-200/20 border border-primary-200/40 rounded-full px-3 py-1">
+              <div className="inline-block bg-primary-200/20 border border-primary-200/40 rounded-full px-2 sm:px-3 py-1">
                 <span className="text-primary-100 text-xs font-bold uppercase tracking-wide">Complete Curriculum</span>
               </div>
             </div>
-            <h2 className="text-4xl font-bold text-light-50 mb-3">Master Coding Interviews</h2>
-            <p className="text-light-300 text-lg mb-6 max-w-2xl">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-light-50 mb-3">Master Coding Interviews</h2>
+            <p className="text-light-300 text-sm sm:text-base md:text-lg mb-6 max-w-2xl">
               Structured paths with curated resources from the best teachers and platforms. Learn at your pace and master the fundamentals.
             </p>
-            <div className="flex gap-3 flex-wrap">
-              <button className="px-5 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 font-bold transition-colors">
+            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+              <button className="px-4 sm:px-5 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 font-bold transition-colors text-sm sm:text-base">
                 Get Started Now
               </button>
-              <button className="px-5 py-2 rounded-lg border border-dark-300 hover:bg-dark-400 text-light-200 font-medium transition-colors">
+              <button className="px-4 sm:px-5 py-2 rounded-lg border border-dark-300 hover:bg-dark-400 text-light-200 font-medium transition-colors text-sm sm:text-base">
                 View All Resources
               </button>
             </div>
@@ -287,8 +287,8 @@ export default function CoursesPage() {
 
       {/* Filter Pills */}
       <div className="border-b border-dark-300 bg-dark-200/50">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex flex-wrap gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {['all', 'dsa', 'sysdes', 'dbms', 'nosql'].map((filter) => (
               <button
                 key={filter}
@@ -312,16 +312,16 @@ export default function CoursesPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="space-y-6">
           {filteredCourses.map((course) => (
             <div key={course.id} className="overflow-hidden border border-dark-300 rounded-xl hover:border-dark-200 transition-colors">
               {/* Course Header */}
               <div
                 onClick={() => toggleCourse(course.id)}
-                className="p-6 cursor-pointer hover:bg-dark-300/50 transition-colors bg-dark-200/50"
+                className="p-4 sm:p-6 cursor-pointer hover:bg-dark-300/50 transition-colors bg-dark-200/50"
               >
-                <div className="flex items-start justify-between gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-6">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 rounded-lg bg-dark-300 flex items-center justify-center">
@@ -333,9 +333,9 @@ export default function CoursesPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                     <div className={cn(
-                      'text-xs font-bold px-3 py-1 rounded-full text-white',
+                      'text-xs font-bold px-2 sm:px-3 py-1 rounded-full text-white whitespace-nowrap',
                       course.colorClass === 'from-cyan-500 to-cyan-600' && 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-200',
                       course.colorClass === 'from-violet-500 to-violet-600' && 'bg-violet-500/20 border border-violet-500/40 text-violet-200',
                       course.colorClass === 'from-orange-500 to-orange-600' && 'bg-orange-500/20 border border-orange-500/40 text-orange-200',
@@ -344,7 +344,7 @@ export default function CoursesPage() {
                       {course.resources.length} Resources
                     </div>
                     <ChevronDown className={cn(
-                      'w-5 h-5 text-light-400 transition-transform duration-300',
+                      'w-4 sm:w-5 h-4 sm:h-5 text-light-400 transition-transform duration-300 flex-shrink-0',
                       expandedCourse === course.id && 'rotate-180'
                     )} />
                   </div>
@@ -353,8 +353,8 @@ export default function CoursesPage() {
 
               {/* Resources Grid */}
               {expandedCourse === course.id && (
-                <div className="border-t border-dark-300 bg-dark-300/30 p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="border-t border-dark-300 bg-dark-300/30 p-4 sm:p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {course.resources.map((resource, idx) => (
                       <a
                         key={idx}
@@ -390,15 +390,15 @@ export default function CoursesPage() {
         </div>
 
         {/* Stats */}
-        <div className="mt-16 grid grid-cols-4 gap-4">
+        <div className="mt-12 sm:mt-16 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {[
             { label: 'Total Courses', value: '4' },
             { label: 'Total Resources', value: '28+' },
             { label: 'Hours of Content', value: '200+' },
             { label: 'Success Rate', value: '95%' },
           ].map((stat, idx) => (
-            <div key={idx} className="bg-dark-300/50 border border-dark-300 rounded-lg p-6 text-center hover:border-primary-200/30 transition-colors">
-              <div className="text-2xl font-bold text-light-50">{stat.value}</div>
+            <div key={idx} className="bg-dark-300/50 border border-dark-300 rounded-lg p-3 sm:p-6 text-center hover:border-primary-200/30 transition-colors">
+              <div className="text-xl sm:text-2xl font-bold text-light-50">{stat.value}</div>
               <div className="text-xs text-light-400 mt-1">{stat.label}</div>
             </div>
           ))}

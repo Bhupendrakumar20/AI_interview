@@ -347,18 +347,106 @@ const DSARoomManager = ({
     return activeQuestion?.starterCode?.[language] || DEFAULT_STARTER[language] || "// Write your solution\n";
   };
 
-  const handleCodeChange = (value) => {
-    if (!activeQuestion) return;
-    setCodeByQuestion((prev) => ({
-      ...prev,
-      [activeQuestionId]: {
-        ...(prev[activeQuestionId] || {}),
-        [language]: value,
-      },
-    }));
+  const getLanguageId = (lang) => {
+    const langMap = {
+      javascript: "javascript",
+      python: "python3",
+      cpp: "cpp",
+      java: "java",
+    };
+    return langMap[lang] || "javascript";
   };
 
-  const handleSubmitCode = () => {
+  const executePiston = async (code, testCases, lang) => {
+    try {
+      const languageId = getLanguageId(lang);
+      const results = [];
+      let passedCount = 0;
+
+      for (let i = 0; i < testCases.length; i++) {
+        const testCase = testCases[i];
+        
+        try {
+          const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              language: languageId,
+              version: "*",
+              files: [
+                {
+                  name: `solution.${languageId === "cpp" ? "cpp" : languageId === "java" ? "java" : languageId === "python3" ? "py" : "js"}`,
+                  content: code,
+                },
+              ],
+              stdin: testCase.input || "",
+            }),
+          });
+
+          if (!response.ok) {
+            results.push({
+              testCase: i + 1,
+              status: "ERROR",
+              error: "Piston API error",
+              expected: testCase.output,
+              actual: "ERROR",
+            });
+            continue;
+          }
+
+          const data = await response.json();
+          const output = data.run?.output?.trim() || "";
+          const expected = testCase.output?.trim() || "";
+          const passed = output === expected;
+
+          if (passed) passedCount++;
+
+          results.push({
+            testCase: i + 1,
+            status: passed ? "PASSED" : "FAILED",
+            expected,
+            actual: output,
+            runtime: data.run?.stdout ? "Executed" : "No output",
+          });
+        } catch (error) {
+          results.push({
+            testCase: i + 1,
+            status: "ERROR",
+            error: error.message,
+            expected: testCase.output,
+            actual: "ERROR",
+          });
+        }
+      }
+
+      return {
+        passed: passedCount === testCases.length,
+        passedCount,
+        totalCount: testCases.length,
+        testResults: results,
+      };
+    } catch (error) {
+      console.error("[Piston] Execution error:", error);
+      return {
+        passed: false,
+        passedCount: 0,
+        totalCount: testCases.length || 1,
+        testResults: [
+          {
+            testCase: 1,
+            status: "ERROR",
+            error: error.message,
+            expected: "N/A",
+            actual: "ERROR",
+          },
+        ],
+      };
+    }
+  };
+
+  const handleSubmitCode = async () => {
     if (!socket || !activeQuestion) return;
 
     const sourceCode = getCurrentCode();
@@ -370,36 +458,64 @@ const DSARoomManager = ({
     setIsSubmittingCode(true);
     setSubmissionResult(null);
 
-    socket.emit(
-      "code_submit",
-      {
-        roomId,
-        userId,
-        username,
-        questionId: activeQuestion.id || activeQuestionId,
-        sourceCode,
-        language,
-      },
-      (response) => {
+    try {
+      // Get test cases from the question
+      const testCases = activeQuestion.hiddenTestCases || [];
+      
+      if (testCases.length === 0) {
+        toast.error("No test cases available for this problem");
         setIsSubmittingCode(false);
-        if (!response?.success) {
-          toast.error(response?.error || "Submission failed");
-          return;
-        }
-
-        setSubmissionResult(response);
-        if (response.passed) {
-          toast.success(`All test cases passed! +${response.points || 0} pts`);
-          setQuestions((prev) =>
-            prev.map((q, idx) =>
-              idx === selectedQuestionIdx ? { ...q, solved: true } : q
-            )
-          );
-        } else {
-          toast.error("Some test cases failed");
-        }
+        return;
       }
-    );
+
+      // Execute code on Piston
+      console.log("[Piston] Executing code with", testCases.length, "test cases");
+      const executionResult = await executePiston(sourceCode, testCases, language);
+
+      console.log("[Piston] Execution result:", executionResult);
+
+      // Set submission result immediately
+      setSubmissionResult(executionResult);
+
+      if (executionResult.passed) {
+        toast.success(`All test cases passed! +100 pts`);
+        setQuestions((prev) =>
+          prev.map((q, idx) =>
+            idx === selectedQuestionIdx ? { ...q, solved: true } : q
+          )
+        );
+      } else {
+        toast.error(
+          `${executionResult.totalCount - executionResult.passedCount} test case(s) failed`
+        );
+      }
+
+      // Emit to socket for leaderboard and multiplayer updates
+      socket.emit(
+        "code_submit",
+        {
+          roomId,
+          userId,
+          username,
+          questionId: activeQuestion.id || activeQuestionId,
+          sourceCode,
+          language,
+          executionResult, // Include Piston result
+        },
+        (response) => {
+          console.log("[Socket] Code submit response:", response);
+          if (!response?.success) {
+            console.warn("[Socket] Submission failed:", response?.error);
+            // Don't show error twice - Piston result already shown
+          }
+        }
+      );
+    } catch (error) {
+      console.error("[Submit] Error:", error);
+      toast.error("Submission error: " + error.message);
+    } finally {
+      setIsSubmittingCode(false);
+    }
   };
 
   const copyCode = async () => {
@@ -614,14 +730,25 @@ const DSARoomManager = ({
                       ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
                       : "bg-red-500/10 border-red-500/30 text-red-300"
                   }`}>
-                    <div className="font-bold">
-                      {submissionResult.passed ? "All tests passed" : "Some test cases failed"}
+                    <div className="font-bold mb-2">
+                      {submissionResult.passed 
+                        ? "✓ All tests passed!" 
+                        : `✗ ${submissionResult.totalCount - submissionResult.passedCount}/${submissionResult.totalCount} test(s) failed`}
                     </div>
                     {submissionResult.testResults?.length > 0 && (
-                      <div className="mt-2 text-xs space-y-1">
+                      <div className="mt-2 text-xs space-y-2">
                         {submissionResult.testResults.map((result, idx) => (
-                          <div key={idx}>
-                            Test {result.testCase}: {result.status}
+                          <div key={idx} className="border-t border-current pt-1 opacity-80">
+                            <div className="font-semibold flex items-center gap-2">
+                              <span>{result.status === "PASSED" ? "✓" : "✗"}</span>
+                              Test Case {result.testCase}: {result.status}
+                            </div>
+                            {result.status !== "PASSED" && (
+                              <div className="mt-1 ml-4 space-y-1">
+                                <div>Expected: <span className="font-mono">{result.expected || "empty"}</span></div>
+                                <div>Got: <span className="font-mono">{result.actual || "error"}</span></div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

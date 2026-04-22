@@ -813,17 +813,24 @@ function registerSocketHandlers(io) {
     });
 
     // ── START GAME (for DSARoomManager - uses client-provided questions) ────
-    socket.on("start_game", (data) => {
+    socket.on("start_game", async (data) => {
       try {
         const { roomId, questionMode, startTime, questions: clientQuestions } = data;
         console.log(`[start_game] Owner starting game for room ${roomId}`);
         console.log(`[start_game] Received ${clientQuestions?.length || 0} questions from client`);
 
-        const room = roomIdStore.get(roomId);
+        // Try to get room from in-memory store, then fetch from Firestore
+        let room = roomIdStore.get(roomId);
         if (!room) {
-          console.error(`[start_game] Room not found: ${roomId}`);
-          socket.emit('error', { message: 'Room not found' });
-          return;
+          console.log(`[start_game] Room not in memory, fetching from Firestore: ${roomId}`);
+          room = await fetchRoomFromFirestore(roomId);
+          if (!room) {
+            console.error(`[start_game] Room not found: ${roomId}`);
+            socket.emit('error', { message: 'Room not found' });
+            return;
+          }
+          roomIdStore.set(roomId, room);
+          console.log(`[start_game] Room loaded from Firestore: ${roomId}`);
         }
 
         // Validate questions

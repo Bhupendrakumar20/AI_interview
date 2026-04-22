@@ -841,6 +841,12 @@ function registerSocketHandlers(io) {
         }
 
         // Build leaderboard with owner + approved members
+        console.log(`[start_game] Room owner: ${room.ownerId} (${room.ownerUsername})`);
+        console.log(`[start_game] Approved members in room: ${room.approvedMembers?.length || 0}`);
+        if (room.approvedMembers && room.approvedMembers.length > 0) {
+          console.log(`[start_game] Approved member list:`, room.approvedMembers.map(m => `${m.username} (${m.userId})`).join(', '));
+        }
+
         const leaderboard = [
           {
             userId: room.ownerId,
@@ -903,7 +909,86 @@ function registerSocketHandlers(io) {
       }
     });
 
-    // ── SET LANGUAGE ─────────────────────────────────────────────────────────
+    // ── APPROVE MEMBER (for DSARoomManager compatibility) ─────────────────────
+    socket.on("approve_member", async (data) => {
+      try {
+        const { requestId, memberId, roomId } = data;
+        console.log(`[approve_member] Owner approving ${memberId} for room ${roomId}`);
+
+        if (!roomId || !memberId) {
+          socket.emit('error', { message: 'Missing roomId or memberId' });
+          return;
+        }
+
+        // Get room from memory or Firestore
+        let room = roomIdStore.get(roomId);
+        if (!room) {
+          console.log(`[approve_member] Fetching room from Firestore: ${roomId}`);
+          room = await fetchRoomFromFirestore(roomId);
+          if (!room) {
+            socket.emit('error', { message: 'Room not found' });
+            return;
+          }
+          roomIdStore.set(roomId, room);
+        }
+
+        // Update Firestore to mark participant as 'active'
+        try {
+          const participantSnapshot = await db
+            .collection('dsa_room_participants')
+            .where('roomId', '==', roomId)
+            .where('userId', '==', memberId)
+            .limit(1)
+            .get();
+
+          if (!participantSnapshot.empty) {
+            const participantDoc = participantSnapshot.docs[0];
+            await participantDoc.ref.update({
+              status: 'active',
+              approvedAt: new Date(),
+            });
+            console.log(`[approve_member] Updated Firestore: ${memberId} status -> active`);
+          }
+        } catch (fsError) {
+          console.warn(`[approve_member] Firestore update error: ${fsError.message}`);
+        }
+
+        // Update in-memory room
+        const pendingIdx = room.pendingRequests.findIndex((r) => r.userId === memberId);
+        if (pendingIdx !== -1) {
+          const request = room.pendingRequests[pendingIdx];
+          room.pendingRequests.splice(pendingIdx, 1);
+          room.approvedMembers.push({
+            userId: memberId,
+            username: request.username,
+            joinedAt: new Date(),
+          });
+          console.log(`[approve_member] Updated memory: ${request.username} now approved`);
+        }
+
+        // Notify the approved member
+        const memberSocket = userSockets.get(memberId);
+        if (memberSocket) {
+          console.log(`[approve_member] Notifying approved member ${memberId} (socket: ${memberSocket})`);
+          io.to(memberSocket).emit('join_approved', {
+            roomId,
+            members: room.approvedMembers,
+            message: 'You have been approved to join!',
+          });
+        }
+
+        // Notify all room members of the new approved member
+        io.to(`room_${roomId}`).emit('member_joined', {
+          userId: memberId,
+          username: room.approvedMembers.find(m => m.userId === memberId)?.username,
+        });
+
+        console.log(`[approve_member] ✓ Member ${memberId} approved successfully`);
+      } catch (error) {
+        console.error('[approve_member] Error:', error);
+        socket.emit('error', { message: 'Failed to approve member: ' + error.message });
+      }
+    });
     socket.on("set_language", ({ language }) => {
       const room = getRoom(socket.data.roomCode);
       if (room && room.users[socket.id]) {

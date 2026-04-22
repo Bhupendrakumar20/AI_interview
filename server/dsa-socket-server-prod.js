@@ -970,7 +970,7 @@ function registerSocketHandlers(io) {
         const memberSocket = userSockets.get(memberId);
         if (memberSocket) {
           console.log(`[approve_member] Notifying approved member ${memberId} (socket: ${memberSocket})`);
-          io.to(memberSocket).emit('join_approved', {
+          io.to(memberSocket).emit('member_approved', {
             roomId,
             members: room.approvedMembers,
             message: 'You have been approved to join!',

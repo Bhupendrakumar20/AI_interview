@@ -31,7 +31,7 @@ const DSARoomManager = ({
   const [members, setMembers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
-  const [questionMode, setQuestionMode] = useState("same"); // same or different
+  const [questionMode, setQuestionMode] = useState("same");
   const [startCountdown, setStartCountdown] = useState(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [showLoadingArena, setShowLoadingArena] = useState(false);
@@ -45,16 +45,18 @@ const DSARoomManager = ({
   const [codeByQuestion, setCodeByQuestion] = useState({});
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
-  
-  // Track if countdown was actually initiated (to avoid false positives on initial null)
+
+  // ✅ FIX: Track approval state for non-owners
+  const [isApproved, setIsApproved] = useState(isOwner); // owner is always approved
+
   const countdownStartedRef = useRef(false);
 
-  // Listen for member updates
+  // ─────────────────────────────────────────────
+  // SOCKET LISTENERS
+  // ─────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
 
-    // Join socket room immediately so all members receive game_starting broadcast
-    // Pass userId and username since member might not be registered in server's socketUsers map yet
     console.log("[DSA Room] Joining socket room:", roomId, "as user:", userId);
     socket.emit("join_room_socket", { roomId, userId, username });
 
@@ -63,6 +65,14 @@ const DSARoomManager = ({
       setMembers(data.approved || []);
       setPendingRequests(data.pending || []);
       setPendingApprovals(data.pending || []);
+
+      // ✅ FIX: If non-owner appears in approved list, mark them approved
+      if (!isOwner) {
+        const selfInApproved = (data.approved || []).find((m) => m.userId === userId);
+        if (selfInApproved) {
+          setIsApproved(true);
+        }
+      }
     });
 
     socket.on("room_state", (data) => {
@@ -71,12 +81,24 @@ const DSARoomManager = ({
         setMembers(data.members || []);
         setPendingRequests(data.pending || []);
         setPendingApprovals(data.pending || []);
+
+        // ✅ FIX: Check approval status in room_state too
+        if (!isOwner) {
+          const selfInMembers = (data.members || []).find((m) => m.userId === userId);
+          if (selfInMembers) {
+            setIsApproved(true);
+          }
+        }
       }
     });
 
     socket.on("member_joined", (data) => {
       console.log("[DSA Room] New member:", data);
-      setMembers((prev) => [...prev, data]);
+      setMembers((prev) => {
+        // avoid duplicates
+        if (prev.find((m) => m.userId === data.userId)) return prev;
+        return [...prev, data];
+      });
       toast.success(`${data.username} joined the room`);
     });
 
@@ -86,32 +108,43 @@ const DSARoomManager = ({
       toast.info(`${data.username} requests to join`);
     });
 
+    // ✅ FIX: Listen for personal approval confirmation (server must emit this to the approved socket)
+    socket.on("member_approved", (data) => {
+      console.log("[DSA Room] ✓ I was approved!", data);
+      setIsApproved(true);
+      toast.success("You've been approved! Welcome to the room 🎉");
+
+      // Re-fetch fresh room state now that we're a real member
+      socket.emit("get_room_state", { roomId });
+    });
+
+    // ✅ FIX: Listen for rejection too so UI can reflect it
+    socket.on("member_rejected", (data) => {
+      console.log("[DSA Room] Request rejected", data);
+      toast.error("Your join request was rejected.");
+    });
+
     socket.on("game_starting", (data) => {
-      console.log("[DSA Room] ✓ Received game_starting event with", data.questions?.length || 0, "questions");
-      console.log("[DSA Room] Leaderboard has", data.leaderboard?.length || 0, "players");
-      // Clear fallback timeout if it was set
+      console.log("[DSA Room] ✓ game_starting:", data.questions?.length, "questions");
       if (socket.timeoutId) {
         clearTimeout(socket.timeoutId);
         socket.timeoutId = null;
       }
       setGameStarted(true);
-      setStartCountdown(5); // Start countdown for members too
+      setStartCountdown(5);
       setQuestions(data.questions || []);
       setLeaderboard(data.leaderboard || []);
       if (onGameStart) onGameStart(data);
     });
 
-    // Also listen for 'game_started' event from server (alternative event name)
     socket.on("game_started", (data) => {
-      console.log("[DSA Room] ✓ Received game_started event with", data.questions?.length || 0, "questions");
-      // Clear fallback timeout if it was set
+      console.log("[DSA Room] ✓ game_started:", data.questions?.length, "questions");
       if (socket.timeoutId) {
         clearTimeout(socket.timeoutId);
         socket.timeoutId = null;
       }
       setGameStarted(true);
-      setStartCountdown(5); // Start countdown for members too
-      // Note: game_started might not include questions/leaderboard, use default if needed
+      setStartCountdown(5);
       setQuestions(data.questions || []);
       setLeaderboard(data.leaderboard || []);
       if (onGameStart) onGameStart(data);
@@ -120,16 +153,11 @@ const DSARoomManager = ({
     socket.on("leaderboard_update", (data) => {
       console.log("[DSA Room] Leaderboard update:", data);
       if (data.leaderboard && Array.isArray(data.leaderboard)) {
-        // Update leaderboard with sorted data
         setLeaderboard(data.leaderboard);
-        
-        // Show toast notification for updated player
         if (data.updatedPlayer) {
           const player = data.updatedPlayer;
           if (player.status === "completed") {
-            toast.success(`${player.username} solved! +${player.points} pts`, {
-              duration: 3000,
-            });
+            toast.success(`${player.username} solved! +${player.points} pts`, { duration: 3000 });
           }
         }
       }
@@ -139,27 +167,13 @@ const DSARoomManager = ({
       console.log("[DSA Room] Submission notification:", data);
       if (data.type === "success") {
         toast.success(data.message, { duration: 5000 });
-        // Add to activity feed
         setGameActivity((prev) => [
-          {
-            id: `${Date.now()}_${Math.random()}`,
-            type: "success",
-            message: data.message,
-            timestamp: new Date(),
-            icon: data.icon,
-          },
+          { id: `${Date.now()}_${Math.random()}`, type: "success", message: data.message, timestamp: new Date(), icon: data.icon },
           ...prev,
-        ].slice(0, 10)); // Keep last 10 activities
+        ].slice(0, 10));
       } else {
-        // Quiet notification for wrong submissions
         setGameActivity((prev) => [
-          {
-            id: `${Date.now()}_${Math.random()}`,
-            type: "attempt",
-            message: data.message,
-            timestamp: new Date(),
-            icon: data.icon,
-          },
+          { id: `${Date.now()}_${Math.random()}`, type: "attempt", message: data.message, timestamp: new Date(), icon: data.icon },
           ...prev,
         ].slice(0, 10));
       }
@@ -169,61 +183,69 @@ const DSARoomManager = ({
       socket.off("members_list");
       socket.off("member_joined");
       socket.off("member_request");
+      socket.off("member_approved");   // ✅ cleanup
+      socket.off("member_rejected");   // ✅ cleanup
       socket.off("game_starting");
       socket.off("game_started");
       socket.off("leaderboard_update");
       socket.off("submission_notification");
       socket.off("room_state");
     };
-  }, [socket, roomId, userId, username, onGameStart]);
+  }, [socket, roomId, userId, username, onGameStart, isOwner]);
 
-  // Request room state when entering room (for newly approved members)
+  // ─────────────────────────────────────────────
+  // Request room state on mount
+  // ─────────────────────────────────────────────
   useEffect(() => {
     if (!socket || !roomId) return;
     console.log("[DSA Room] Requesting room state for:", roomId);
     socket.emit("get_room_state", { roomId });
   }, [socket, roomId]);
 
-  // Start countdown when owner initiates
+  // ─────────────────────────────────────────────
+  // ✅ FIX: Poll room state every 3s for non-owners who are not yet approved
+  // This is a safety net in case member_approved event is missed
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket || !roomId || isOwner || isApproved || gameStarted) return;
+
+    const interval = setInterval(() => {
+      console.log("[DSA Room] Polling room state (waiting for approval)...");
+      socket.emit("get_room_state", { roomId });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [socket, roomId, isOwner, isApproved, gameStarted]);
+
+  // ─────────────────────────────────────────────
+  // Countdown logic
+  // ─────────────────────────────────────────────
   useEffect(() => {
     if (startCountdown === null || startCountdown === undefined) return;
-    
-    // Mark that countdown has been initiated
     countdownStartedRef.current = true;
-    
     if (startCountdown <= 0) {
-      // Countdown complete - fully transition to game
-      console.log("[DSA Room] Countdown complete, entering arena");
-      // Make sure gameStarted is true even if socket event hasn't fired
-      setStartCountdown(null); // Reset countdown
+      setStartCountdown(null);
       return;
     }
-
     const timer = setTimeout(() => {
       setStartCountdown((prev) => {
-        if (prev === null || typeof prev !== 'number') return null;
+        if (prev === null || typeof prev !== "number") return null;
         return prev - 1;
       });
     }, 1000);
-
     return () => clearTimeout(timer);
   }, [startCountdown]);
 
   useEffect(() => {
     if (gameStarted && startCountdown === null) {
-      // Game started and countdown is done - show arena
       setShowLoadingArena(true);
     }
   }, [gameStarted, startCountdown]);
 
-  // Fallback: If countdown reaches 0 but gameStarted hasn't been set, set it now
-  // ONLY triggers if countdown was actually initiated (to avoid firing on initial null value)
   useEffect(() => {
-    if (!countdownStartedRef.current) return; // Countdown was never started
-    if (startCountdown !== null) return; // Countdown hasn't finished yet
-    if (gameStarted) return; // Game already started
-    
-    // Countdown finished but gameStarted event might not have fired
+    if (!countdownStartedRef.current) return;
+    if (startCountdown !== null) return;
+    if (gameStarted) return;
     const fallbackTimer = setTimeout(() => {
       console.log("[DSA Room] Fallback: Forcing game started after countdown");
       setGameStarted(true);
@@ -231,47 +253,41 @@ const DSARoomManager = ({
     return () => clearTimeout(fallbackTimer);
   }, [startCountdown, gameStarted]);
 
+  // ─────────────────────────────────────────────
+  // OWNER: Approve / Reject members
+  // ─────────────────────────────────────────────
   const handleApproveMember = (requestId, memberId, memberUsername) => {
     if (!socket) return;
 
-    socket.emit("approve_member", {
-      requestId,
-      memberId,
-      roomId,
-    });
+    socket.emit("approve_member", { requestId, memberId, roomId });
 
     setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
-    setMembers((prev) => [
-      ...prev,
-      { userId: memberId, username: memberUsername, joinedAt: new Date() },
-    ]);
+    setMembers((prev) => {
+      if (prev.find((m) => m.userId === memberId)) return prev;
+      return [...prev, { userId: memberId, username: memberUsername, joinedAt: new Date() }];
+    });
     toast.success(`${memberUsername} approved!`);
   };
 
   const handleRejectMember = (requestId) => {
     if (!socket) return;
-
-    socket.emit("reject_member", {
-      requestId,
-      roomId,
-    });
-
+    socket.emit("reject_member", { requestId, roomId });
     setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
     toast.info("Member request rejected");
   };
 
+  // ─────────────────────────────────────────────
+  // OWNER: Start game
+  // ─────────────────────────────────────────────
   const handleStartGame = () => {
     if (!socket || !isOwner) return;
-    
-    // Count total players: owner + approved members
-    const totalPlayers = members.length + 1; // +1 for owner
-    
+
+    const totalPlayers = members.length + 1;
     if (totalPlayers < 2) {
       toast.error("Need at least 2 players to start");
       return;
     }
 
-    // Fetch questions through the same method used by 100-days-of-code page
     const allDays = getAllDays();
     const questionPool = allDays.flatMap((day) =>
       (day.questions || []).map((q) => ({
@@ -288,54 +304,41 @@ const DSARoomManager = ({
       return;
     }
 
-    // Emit to entire room (both owner and members)
-    // Server will broadcast "game_starting" or "game_started" to all members including owner
     console.log("[DSA Room] Owner emitting start_game with", dayQuestions.length, "questions");
     socket.emit("start_game", {
       roomId,
       questionMode,
       startTime: Date.now(),
-      questions: dayQuestions, // Include questions
+      questions: dayQuestions,
     });
 
-    // FALLBACK: If server doesn't respond within 7 seconds, start locally
-    // This ensures game works even if server socket broadcast fails or has network delays
     const fallbackTimer = setTimeout(() => {
       console.log("[DSA Room] Server response timeout - starting game locally as fallback");
       toast.warning("Starting game locally (server delayed)");
       setGameStarted(true);
       setStartCountdown(5);
       setQuestions(dayQuestions);
-      
-      // Build leaderboard from members
+
       const localLeaderboard = [
-        {
-          userId: userId,
-          username: username,
-          points: 0,
-          solved: 0,
-          isOwner: true,
-          status: 'idle',
-        },
+        { userId, username, points: 0, solved: 0, isOwner: true, status: "idle" },
         ...members.map((m) => ({
           userId: m.userId,
           username: m.username,
           points: 0,
           solved: 0,
           isOwner: false,
-          status: 'idle',
+          status: "idle",
         })),
       ];
       setLeaderboard(localLeaderboard);
-    }, 7000);  // 7 second timeout for network delays
+    }, 7000);
 
-    // Store timeout ID so we can clear it if server responds
     socket.timeoutId = fallbackTimer;
-
-    // Wait for socket event to broadcast to all players
-    // Both owner and members will receive "game_starting" event
   };
 
+  // ─────────────────────────────────────────────
+  // CODE EDITOR helpers
+  // ─────────────────────────────────────────────
   const activeQuestion = questions[selectedQuestionIdx];
   const activeQuestionId = activeQuestion?.id || `q_${selectedQuestionIdx}`;
 
@@ -348,12 +351,7 @@ const DSARoomManager = ({
   };
 
   const getLanguageId = (lang) => {
-    const langMap = {
-      javascript: "javascript",
-      python: "python3",
-      cpp: "cpp",
-      java: "java",
-    };
+    const langMap = { javascript: "javascript", python: "python3", cpp: "cpp", java: "java" };
     return langMap[lang] || "javascript";
   };
 
@@ -365,13 +363,10 @@ const DSARoomManager = ({
 
       for (let i = 0; i < testCases.length; i++) {
         const testCase = testCases[i];
-        
         try {
           const response = await fetch("https://emkc.org/api/v2/piston/execute", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               language: languageId,
               version: "*",
@@ -386,13 +381,7 @@ const DSARoomManager = ({
           });
 
           if (!response.ok) {
-            results.push({
-              testCase: i + 1,
-              status: "ERROR",
-              error: "Piston API error",
-              expected: testCase.output,
-              actual: "ERROR",
-            });
+            results.push({ testCase: i + 1, status: "ERROR", error: "Piston API error", expected: testCase.output, actual: "ERROR" });
             continue;
           }
 
@@ -400,7 +389,6 @@ const DSARoomManager = ({
           const output = data.run?.output?.trim() || "";
           const expected = testCase.output?.trim() || "";
           const passed = output === expected;
-
           if (passed) passedCount++;
 
           results.push({
@@ -411,37 +399,18 @@ const DSARoomManager = ({
             runtime: data.run?.stdout ? "Executed" : "No output",
           });
         } catch (error) {
-          results.push({
-            testCase: i + 1,
-            status: "ERROR",
-            error: error.message,
-            expected: testCase.output,
-            actual: "ERROR",
-          });
+          results.push({ testCase: i + 1, status: "ERROR", error: error.message, expected: testCase.output, actual: "ERROR" });
         }
       }
 
-      return {
-        passed: passedCount === testCases.length,
-        passedCount,
-        totalCount: testCases.length,
-        testResults: results,
-      };
+      return { passed: passedCount === testCases.length, passedCount, totalCount: testCases.length, testResults: results };
     } catch (error) {
       console.error("[Piston] Execution error:", error);
       return {
         passed: false,
         passedCount: 0,
         totalCount: testCases.length || 1,
-        testResults: [
-          {
-            testCase: 1,
-            status: "ERROR",
-            error: error.message,
-            expected: "N/A",
-            actual: "ERROR",
-          },
-        ],
+        testResults: [{ testCase: 1, status: "ERROR", error: error.message, expected: "N/A", actual: "ERROR" }],
       };
     }
   };
@@ -450,75 +419,47 @@ const DSARoomManager = ({
     if (!activeQuestion) return;
     setCodeByQuestion((prev) => ({
       ...prev,
-      [activeQuestionId]: {
-        ...(prev[activeQuestionId] || {}),
-        [language]: value,
-      },
+      [activeQuestionId]: { ...(prev[activeQuestionId] || {}), [language]: value },
     }));
   };
 
   const handleSubmitCode = async () => {
     if (!socket || !activeQuestion) return;
-
     const sourceCode = getCurrentCode();
-    if (!sourceCode.trim()) {
-      toast.error("Code cannot be empty");
-      return;
-    }
+    if (!sourceCode.trim()) { toast.error("Code cannot be empty"); return; }
 
     setIsSubmittingCode(true);
     setSubmissionResult(null);
 
     try {
-      // Get test cases from the question
       const testCases = activeQuestion.hiddenTestCases || [];
-      
       if (testCases.length === 0) {
         toast.error("No test cases available for this problem");
         setIsSubmittingCode(false);
         return;
       }
 
-      // Execute code on Piston
       console.log("[Piston] Executing code with", testCases.length, "test cases");
       const executionResult = await executePiston(sourceCode, testCases, language);
-
       console.log("[Piston] Execution result:", executionResult);
 
-      // Set submission result immediately
       setSubmissionResult(executionResult);
 
       if (executionResult.passed) {
-        toast.success(`All test cases passed! +100 pts`);
+        toast.success("All test cases passed! +100 pts");
         setQuestions((prev) =>
-          prev.map((q, idx) =>
-            idx === selectedQuestionIdx ? { ...q, solved: true } : q
-          )
+          prev.map((q, idx) => (idx === selectedQuestionIdx ? { ...q, solved: true } : q))
         );
       } else {
-        toast.error(
-          `${executionResult.totalCount - executionResult.passedCount} test case(s) failed`
-        );
+        toast.error(`${executionResult.totalCount - executionResult.passedCount} test case(s) failed`);
       }
 
-      // Emit to socket for leaderboard and multiplayer updates
       socket.emit(
         "code_submit",
-        {
-          roomId,
-          userId,
-          username,
-          questionId: activeQuestion.id || activeQuestionId,
-          sourceCode,
-          language,
-          executionResult, // Include Piston result
-        },
+        { roomId, userId, username, questionId: activeQuestion.id || activeQuestionId, sourceCode, language, executionResult },
         (response) => {
           console.log("[Socket] Code submit response:", response);
-          if (!response?.success) {
-            console.warn("[Socket] Submission failed:", response?.error);
-            // Don't show error twice - Piston result already shown
-          }
+          if (!response?.success) console.warn("[Socket] Submission failed:", response?.error);
         }
       );
     } catch (error) {
@@ -535,14 +476,15 @@ const DSARoomManager = ({
       setShowCopyNotice(true);
       setTimeout(() => setShowCopyNotice(false), 2000);
       toast.success("Room code copied!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to copy code");
     }
   };
 
-  // Game view
+  // ─────────────────────────────────────────────
+  // GAME VIEW
+  // ─────────────────────────────────────────────
   if (gameStarted) {
-    // Show countdown screen
     if (startCountdown !== null && startCountdown > 0) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6 flex items-center justify-center">
@@ -562,7 +504,6 @@ const DSARoomManager = ({
       );
     }
 
-    // Loading screen after countdown
     if (!showLoadingArena) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6 flex items-center justify-center">
@@ -575,10 +516,8 @@ const DSARoomManager = ({
       );
     }
 
-    // Actual game arena view
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6">
-        {/* Header */}
         <div className="max-w-7xl mx-auto mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -588,9 +527,7 @@ const DSARoomManager = ({
               <p className="text-cyan-300/70 text-sm mt-2">Real-time algorithmic combat</p>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-mono font-bold text-emerald-400 font-black">
-                22:55
-              </div>
+              <div className="text-3xl font-mono font-bold text-emerald-400 font-black">22:55</div>
               <div className="text-xs text-emerald-300">TIME REMAINING</div>
             </div>
           </div>
@@ -713,9 +650,7 @@ const DSARoomManager = ({
                       className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white"
                     >
                       {LANGUAGE_OPTIONS.map((lang) => (
-                        <option key={lang} value={lang}>
-                          {lang.toUpperCase()}
-                        </option>
+                        <option key={lang} value={lang}>{lang.toUpperCase()}</option>
                       ))}
                     </select>
                   </div>
@@ -742,8 +677,8 @@ const DSARoomManager = ({
                       : "bg-red-500/10 border-red-500/30 text-red-300"
                   }`}>
                     <div className="font-bold mb-2">
-                      {submissionResult.passed 
-                        ? "✓ All tests passed!" 
+                      {submissionResult.passed
+                        ? "✓ All tests passed!"
                         : `✗ ${submissionResult.totalCount - submissionResult.passedCount}/${submissionResult.totalCount} test(s) failed`}
                     </div>
                     {submissionResult.testResults?.length > 0 && (
@@ -776,7 +711,6 @@ const DSARoomManager = ({
 
           {/* Leaderboard & Activity Panel */}
           <div className="w-96 space-y-6">
-            {/* Leaderboard */}
             <div className="bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-pink-500/30 p-6 backdrop-blur-sm sticky top-6 h-fit shadow-2xl shadow-pink-500/10">
               <div className="flex items-center gap-3 mb-6">
                 <div className="text-3xl animate-bounce">★</div>
@@ -824,36 +758,27 @@ const DSARoomManager = ({
               </div>
             </div>
 
-            {/* Pending Approval Section */}
             {pendingApprovals && pendingApprovals.length > 0 && (
               <div className="mt-6 pt-6 border-t border-slate-700">
                 <div className="text-sm font-bold text-orange-400 mb-3 flex items-center gap-2">
                   <span>⏳</span> Waiting for Approval ({pendingApprovals.length})
                 </div>
                 <div className="space-y-2">
-                  {pendingApprovals.map((user, idx) => (
+                  {pendingApprovals.map((user) => (
                     <div
                       key={user.userId}
                       className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-between hover:border-orange-500 transition"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 rounded-full bg-orange-500/30 flex items-center justify-center text-xs">
-                          U
-                        </div>
+                        <div className="w-6 h-6 rounded-full bg-orange-500/30 flex items-center justify-center text-xs">U</div>
                         <div>
-                          <div className="text-sm font-bold text-slate-100">
-                            {user.username}
-                          </div>
+                          <div className="text-sm font-bold text-slate-100">{user.username}</div>
                           <div className="text-xs text-slate-400">
-                            {user.requestedAt
-                              ? new Date(user.requestedAt).toLocaleTimeString()
-                              : 'Just now'}
+                            {user.requestedAt ? new Date(user.requestedAt).toLocaleTimeString() : "Just now"}
                           </div>
                         </div>
                       </div>
-                      <div className="text-xs text-orange-300 font-semibold">
-                        PENDING
-                      </div>
+                      <div className="text-xs text-orange-300 font-semibold">PENDING</div>
                     </div>
                   ))}
                 </div>
@@ -865,10 +790,13 @@ const DSARoomManager = ({
     );
   }
 
-  // Lobby view
+  // ─────────────────────────────────────────────
+  // LOBBY VIEW
+  // ─────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-slate-100 p-6">
       <div className="max-w-2xl mx-auto">
+
         {/* Room Info */}
         <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
           <div className="flex items-center justify-between mb-6">
@@ -898,7 +826,7 @@ const DSARoomManager = ({
 
           <div className="flex items-center justify-between pt-4 border-t border-cyan-500/20">
             <div className="flex items-center gap-2">
-                <span className="text-lg">U</span>
+              <span className="text-lg">U</span>
               <div>
                 <div className="text-sm font-bold text-cyan-300">{members.length + 1} MEMBERS</div>
                 {isOwner && pendingRequests.length > 0 && (
@@ -937,9 +865,7 @@ const DSARoomManager = ({
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() =>
-                        handleApproveMember(req.id, req.userId, req.username)
-                      }
+                      onClick={() => handleApproveMember(req.id, req.userId, req.username)}
                       className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-medium transition"
                     >
                       Approve
@@ -961,12 +887,9 @@ const DSARoomManager = ({
         <div className="mb-8 bg-slate-900 rounded-2xl border border-slate-800 p-6">
           <h2 className="text-xl font-bold mb-4">Members ({members.length + 1})</h2>
           <div className="space-y-2 mb-4">
-            {/* Room Creator */}
             <div className="p-3 bg-slate-800 rounded-lg border border-emerald-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-sm font-bold">
-                  O
-                </div>
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-sm font-bold">O</div>
                 <div>
                   <div className="font-bold text-slate-100">{username}</div>
                   <div className="text-xs text-slate-400">Room Owner</div>
@@ -975,16 +898,13 @@ const DSARoomManager = ({
               <span className="text-xs text-emerald-300">You</span>
             </div>
 
-            {/* Other Members */}
             {members.map((member) => (
               <div
                 key={member.userId}
                 className="p-3 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold">
-                    ✓
-                  </div>
+                  <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold">✓</div>
                   <div>
                     <div className="font-bold text-slate-100">{member.username}</div>
                     <div className="text-xs text-slate-400">Member</div>
@@ -1007,7 +927,6 @@ const DSARoomManager = ({
               </div>
             </div>
 
-            {/* Question Mode Selection */}
             <div className="mb-6">
               <h3 className="text-xs font-black text-purple-300 mb-3 tracking-wider">QUESTION MODE</h3>
               <div className="grid grid-cols-2 gap-3">
@@ -1036,7 +955,6 @@ const DSARoomManager = ({
               </div>
             </div>
 
-            {/* Start Game Button */}
             <button
               onClick={handleStartGame}
               disabled={members.length + 1 < 2}
@@ -1063,8 +981,8 @@ const DSARoomManager = ({
           </div>
         )}
 
-        {/* Waiting for Approval (Non-Owner, Not in Members List) */}
-        {!isOwner && !members.find((m) => m.userId === userId) && !gameStarted && (
+        {/* ✅ FIX: Waiting for Approval — non-owner, not yet approved */}
+        {!isOwner && !isApproved && !gameStarted && (
           <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-orange-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/10">
             <div className="text-center">
               <div className="text-6xl mb-6 animate-bounce">⏳</div>
@@ -1074,17 +992,17 @@ const DSARoomManager = ({
               </p>
               <div className="flex items-center justify-center gap-2">
                 <div className="flex gap-1">
-                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: '0s' }}></div>
-                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: "0s" }}></div>
+                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                  <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: "0.4s" }}></div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Waiting for Owner to Start Game (After Approval) */}
-        {!isOwner && members.find((m) => m.userId === userId) && !gameStarted && (
+        {/* ✅ FIX: Approved and waiting for game to start */}
+        {!isOwner && isApproved && !gameStarted && (
           <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
             <div className="text-center">
               <div className="text-6xl mb-6 animate-pulse">✓</div>
@@ -1095,22 +1013,7 @@ const DSARoomManager = ({
             </div>
           </div>
         )}
-        
-        {/* FIX: Show approved-but-syncing state - member is approved but members list hasn't updated yet */}
-        {!isOwner && !members.find((m) => m.userId === userId) && !gameStarted && questions.length > 0 && (
-          <div className="mb-8 bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-cyan-500/30 p-6 backdrop-blur-sm shadow-2xl shadow-cyan-500/10">
-            <div className="text-center">
-              <div className="text-6xl mb-6 animate-pulse">✓</div>
-              <h2 className="text-3xl font-black text-cyan-400 mb-3">Approved! Ready for Battle</h2>
-              <p className="text-cyan-300/70 text-sm">
-                You're in the room. Waiting for the owner to start the game...
-              </p>
-              <p className="text-cyan-300/50 text-xs mt-3">
-                (Syncing members list...)
-              </p>
-            </div>
-          </div>
-        )}
+
       </div>
     </div>
   );

@@ -26,6 +26,9 @@ const InterviewBuddy = ({ userId }) => {
   const [dsaRoomActive, setDsaRoomActive] = useState(false);
   const [modalTab, setModalTab] = useState("create"); // "create" or "join"
   const [joinCode, setJoinCode] = useState("");
+  const [showPastReports, setShowPastReports] = useState(false); // ✅ NEW: Past reports view
+  const [selectedSessionForDetail, setSelectedSessionForDetail] = useState(null); // ✅ NEW: Detailed session view
+  const [pastReportsFilter, setPastReportsFilter] = useState("all"); // ✅ NEW: Filter (all, ai, human)
   const [stats, setStats] = useState({
     totalSessions: 0,
     completedSessions: 0,
@@ -460,7 +463,9 @@ const InterviewBuddy = ({ userId }) => {
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
-            <button className="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition hover:shadow-md hover:shadow-slate-700/50">
+            <button 
+              onClick={() => setShowPastReports(true)}
+              className="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition hover:shadow-md hover:shadow-slate-700/50">
               View Past Reports
             </button>
             <button
@@ -785,6 +790,329 @@ const InterviewBuddy = ({ userId }) => {
       </div>
 
       {/* MODAL */}
+      {/* PAST REPORTS MODAL */}
+      {showPastReports && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto">
+          <div className="min-h-screen bg-linear-to-b from-slate-950 to-slate-900">
+            {/* HEADER */}
+            <div className="sticky top-0 bg-slate-950/95 backdrop-blur border-b border-slate-800 z-40">
+              <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black">📊 Interview Performance</h2>
+                  <p className="text-sm text-slate-400 mt-1">Analyze your past interviews and track your growth</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowPastReports(false);
+                    setSelectedSessionForDetail(null);
+                  }}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition text-slate-300"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* CONTENT */}
+            <div className="max-w-6xl mx-auto px-6 py-8">
+              {!selectedSessionForDetail ? (
+                <>
+                  {/* OVERVIEW STATS */}
+                  <div className="grid md:grid-cols-4 gap-4 mb-8">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 transition">
+                      <div className="text-sm text-slate-400 mb-2">Total Interviews</div>
+                      <div className="text-4xl font-black text-blue-400">{stats.totalSessions}</div>
+                      <div className="text-xs text-slate-500 mt-2">All time</div>
+                    </div>
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition">
+                      <div className="text-sm text-slate-400 mb-2">Completed</div>
+                      <div className="text-4xl font-black text-emerald-400">{stats.completedSessions}</div>
+                      <div className="text-xs text-slate-500 mt-2">{stats.totalSessions > 0 ? Math.round((stats.completedSessions / stats.totalSessions) * 100) : 0}% completion rate</div>
+                    </div>
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500/50 transition">
+                      <div className="text-sm text-slate-400 mb-2">Average Score</div>
+                      <div className="text-4xl font-black text-purple-400">{stats.avgScore}%</div>
+                      <div className="text-xs text-slate-500 mt-2">Based on {stats.completedSessions} interviews</div>
+                    </div>
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-yellow-500/50 transition">
+                      <div className="text-sm text-slate-400 mb-2">Practice Time</div>
+                      <div className="text-3xl font-black text-yellow-400">{stats.totalPracticeTime > 60 ? Math.floor(stats.totalPracticeTime / 60) + 'h' : stats.totalPracticeTime + 'm'}</div>
+                      <div className="text-xs text-slate-500 mt-2">Total invested</div>
+                    </div>
+                  </div>
+
+                  {/* CATEGORY BREAKDOWN */}
+                  <div className="grid md:grid-cols-2 gap-6 mb-8">
+                    {/* MODE BREAKDOWN */}
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                      <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <Brain size={20} className="text-blue-400" />
+                        Sessions by Mode
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                            <span className="text-sm text-slate-300">Human Buddy</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-blue-400">{stats.sessionsByMode?.human || 0}</span>
+                            <span className="text-xs text-slate-500">({stats.totalSessions > 0 ? Math.round(((stats.sessionsByMode?.human || 0) / stats.totalSessions) * 100) : 0}%)</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                            <span className="text-sm text-slate-300">AI Buddy</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-purple-400">{stats.sessionsByMode?.ai || 0}</span>
+                            <span className="text-xs text-slate-500">({stats.totalSessions > 0 ? Math.round(((stats.sessionsByMode?.ai || 0) / stats.totalSessions) * 100) : 0}%)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* DIFFICULTY BREAKDOWN */}
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                      <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <Trophy size={20} className="text-yellow-400" />
+                        Sessions by Difficulty
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                            <span className="text-sm text-slate-300">Easy</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-emerald-400">{stats.sessionsByDifficulty?.easy || 0}</span>
+                            <span className="text-xs text-slate-500">({stats.totalSessions > 0 ? Math.round(((stats.sessionsByDifficulty?.easy || 0) / stats.totalSessions) * 100) : 0}%)</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <span className="text-sm text-slate-300">Medium</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-yellow-400">{stats.sessionsByDifficulty?.medium || 0}</span>
+                            <span className="text-xs text-slate-500">({stats.totalSessions > 0 ? Math.round(((stats.sessionsByDifficulty?.medium || 0) / stats.totalSessions) * 100) : 0}%)</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <span className="text-sm text-slate-300">Hard</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-red-400">{stats.sessionsByDifficulty?.hard || 0}</span>
+                            <span className="text-xs text-slate-500">({stats.totalSessions > 0 ? Math.round(((stats.sessionsByDifficulty?.hard || 0) / stats.totalSessions) * 100) : 0}%)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TOPICS COVERED */}
+                  <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 mb-8">
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                      <Code size={20} className="text-cyan-400" />
+                      Topics Covered ({stats.topicsCovered?.length || 0})
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {stats.topicsCovered && stats.topicsCovered.length > 0 ? (
+                        stats.topicsCovered.map((topic, idx) => (
+                          <span
+                            key={idx}
+                            className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300 hover:border-cyan-500/50 transition"
+                          >
+                            {topic}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-sm text-slate-400">No topics covered yet</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* FILTER TABS */}
+                  <div className="flex gap-2 mb-6">
+                    <button
+                      onClick={() => setPastReportsFilter("all")}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
+                        pastReportsFilter === "all"
+                          ? "bg-slate-700 border border-slate-600 text-white"
+                          : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                      }`}
+                    >
+                      All Sessions ({stats.totalSessions})
+                    </button>
+                    <button
+                      onClick={() => setPastReportsFilter("ai")}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
+                        pastReportsFilter === "ai"
+                          ? "bg-purple-500/30 border border-purple-500 text-purple-300"
+                          : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                      }`}
+                    >
+                      AI Sessions ({stats.sessionsByMode?.ai || 0})
+                    </button>
+                    <button
+                      onClick={() => setPastReportsFilter("human")}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
+                        pastReportsFilter === "human"
+                          ? "bg-blue-500/30 border border-blue-500 text-blue-300"
+                          : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                      }`}
+                    >
+                      Human Sessions ({stats.sessionsByMode?.human || 0})
+                    </button>
+                  </div>
+
+                  {/* RECENT SESSIONS LIST */}
+                  <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                      <BarChart3 size={20} className="text-slate-400" />
+                      Session History
+                    </h3>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {stats.recentSessions && stats.recentSessions.length > 0 ? (
+                        stats.recentSessions
+                          .filter((session) => {
+                            if (pastReportsFilter === "all") return true;
+                            return session.mode === pastReportsFilter;
+                          })
+                          .map((session, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => setSelectedSessionForDetail(session)}
+                              className="p-4 bg-slate-800 border border-slate-700 rounded-lg hover:border-slate-600 hover:bg-slate-800/80 cursor-pointer transition"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className={`w-2.5 h-2.5 rounded-full ${
+                                      session.mode === "ai" ? "bg-purple-500" : "bg-blue-500"
+                                    }`}></div>
+                                    <span className="font-bold text-sm">
+                                      {session.mode === "ai" ? "🤖 AI Interview" : "👥 Human Buddy"}
+                                    </span>
+                                    <span className="text-xs text-slate-500">
+                                      • {session.difficulty || "Unknown"}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm text-slate-400 mb-2">
+                                    {session.topic || session.topics || "Mixed Topics"}
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    {session.date || new Date(session.createdAt).toLocaleDateString()} • {session.duration || 'N/A'} min
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div
+                                    className={`text-3xl font-black ${
+                                      (session.score || 0) >= 75
+                                        ? "text-emerald-400"
+                                        : (session.score || 0) >= 50
+                                        ? "text-yellow-400"
+                                        : "text-red-400"
+                                    }`}
+                                  >
+                                    {session.score || 0}%
+                                  </div>
+                                  <div className="text-xs text-slate-500 mt-1">Score</div>
+                                  <button className="mt-3 px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs font-medium transition">
+                                    View Details →
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                      ) : (
+                        <div className="text-center py-12">
+                          <p className="text-slate-400 mb-2">No sessions found</p>
+                          <p className="text-xs text-slate-500">Start an interview to see your performance reports here</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* DETAILED SESSION VIEW */
+                <div>
+                  <button
+                    onClick={() => setSelectedSessionForDetail(null)}
+                    className="mb-6 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition"
+                  >
+                    ← Back to Reports
+                  </button>
+
+                  <div className="grid md:grid-cols-3 gap-6 mb-8">
+                    <div className="md:col-span-2 p-6 rounded-xl bg-slate-900 border border-slate-800">
+                      <h3 className="text-xl font-bold mb-4">Session Details</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Mode</div>
+                          <div className="text-sm font-medium">
+                            {selectedSessionForDetail.mode === "ai" ? "🤖 AI Interview" : "👥 Human Buddy"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Topic</div>
+                          <div className="text-sm font-medium">{selectedSessionForDetail.topic || selectedSessionForDetail.topics || "Mixed Topics"}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Difficulty</div>
+                          <div className="text-sm font-medium capitalize">{selectedSessionForDetail.difficulty || "Unknown"}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Duration</div>
+                          <div className="text-sm font-medium">{selectedSessionForDetail.duration || 'N/A'} minutes</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Date</div>
+                          <div className="text-sm font-medium">{selectedSessionForDetail.date || new Date(selectedSessionForDetail.createdAt).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                      <h3 className="text-xl font-bold mb-4">Performance</h3>
+                      <div className="text-5xl font-black mb-2" style={{
+                        color: (selectedSessionForDetail.score || 0) >= 75 ? '#10b981' : (selectedSessionForDetail.score || 0) >= 50 ? '#f59e0b' : '#ef4444'
+                      }}>
+                        {selectedSessionForDetail.score || 0}%
+                      </div>
+                      <div className="text-sm text-slate-400 mb-6">
+                        {(selectedSessionForDetail.score || 0) >= 75 ? "Excellent Performance" : (selectedSessionForDetail.score || 0) >= 50 ? "Good Performance" : "Needs Improvement"}
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-2 mb-6">
+                        <div
+                          className="bg-linear-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
+                          style={{ width: `${selectedSessionForDetail.score || 0}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-slate-400">Based on technical correctness, communication, problem-solving, and confidence.</p>
+                    </div>
+                  </div>
+
+                  {selectedSessionForDetail.feedback && (
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                      <h3 className="text-lg font-bold mb-4">📋 Feedback Summary</h3>
+                      <div className="bg-slate-800/50 rounded-lg p-4 text-sm text-slate-300 leading-relaxed">
+                        <p>{selectedSessionForDetail.feedback}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MAIN SESSION MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg mx-4 p-8 relative animate-in fade-in zoom-in-95">

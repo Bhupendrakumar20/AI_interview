@@ -128,35 +128,55 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
 
   // ---------- Voice-to-Text ----------
   const startVoiceToText = () => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      console.error("❌ [Speech Recognition] Window not available - SSR environment");
+      return;
+    }
 
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      toast.error("Speech recognition is not supported in this browser.");
+      console.error("❌ [Speech Recognition] Not supported in this browser");
+      toast.error("Speech recognition is not supported in this browser. Try Chrome or Edge.");
       return;
     }
+
+    console.log("🎤 [Speech Recognition] Initializing...");
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
+    recognition.onstart = () => {
+      console.log("✅ [Speech Recognition] Started");
+      toast.success("Listening... Speak clearly into your microphone");
+    };
+
     recognition.onresult = (event) => {
+      console.log(`📝 [Speech Recognition] Got ${event.results.length} results`);
+      
       let finalTranscript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
+        const confidence = event.results[i][0].confidence;
+        
+        console.log(`  Result ${i}: "${transcript}" (confidence: ${(confidence * 100).toFixed(2)}%)`);
+        
         if (event.results[i].isFinal) {
           finalTranscript += transcript + " ";
         }
       }
 
       if (finalTranscript.trim()) {
+        console.log(`✅ Final transcript: "${finalTranscript}"`);
+        
         setAnswers((prev) => {
           const copy = [...prev];
-          copy[currentIndex] =
-            (copy[currentIndex] || "") + " " + finalTranscript;
+          const newAnswer = (copy[currentIndex] || "") + " " + finalTranscript;
+          copy[currentIndex] = newAnswer;
+          console.log(`📌 Answer updated for Q${currentIndex + 1}: "${newAnswer}"`);
           return copy;
         });
 
@@ -168,18 +188,45 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
     };
 
     recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event);
-      toast.error("Speech recognition error.");
+      console.error("❌ [Speech Recognition Error]:", event.error);
+      
+      let errorMsg = "Speech recognition error";
+      switch (event.error) {
+        case "no-speech":
+          errorMsg = "No speech detected. Please check your microphone and try again.";
+          break;
+        case "audio-capture":
+          errorMsg = "No microphone found or permission denied. Check browser settings.";
+          break;
+        case "network":
+          errorMsg = "Network error. Check your internet connection.";
+          break;
+        case "not-allowed":
+          errorMsg = "Microphone permission denied. Allow access in browser settings.";
+          break;
+        default:
+          errorMsg = `Speech error: ${event.error}`;
+      }
+      
+      toast.error(errorMsg);
       setIsRecordingVoice(false);
     };
 
     recognition.onend = () => {
+      console.log("⏹️ [Speech Recognition] Stopped");
       setIsRecordingVoice(false);
     };
 
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsRecordingVoice(true);
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsRecordingVoice(true);
+      console.log("✅ [Speech Recognition] Started successfully");
+    } catch (err) {
+      console.error("❌ [Speech Recognition] Failed to start:", err);
+      toast.error("Failed to start speech recognition");
+      setIsRecordingVoice(false);
+    }
   };
 
   const stopVoiceToText = () => {
@@ -239,6 +286,11 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
       return;
     }
 
+    console.log("🏁 [Interview] Finishing interview...");
+    console.log(`📊 Total questions: ${questions.length}`);
+    console.log(`✅ Answered: ${questions.length - emptyCount}`);
+    console.log(`⏭️ Skipped: ${emptyCount}`);
+
     startTransition(async () => {
       try {
         const transcript = [];
@@ -254,6 +306,12 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
           });
         });
 
+        console.log("📝 [Interview] Calling createFeedback with:");
+        console.log(`  - interviewId: ${interview.id}`);
+        console.log(`  - userId: ${user.id}`);
+        console.log(`  - transcript items: ${transcript.length}`);
+        console.log(`  - feedbackId: ${existingFeedback?.id || "new"}`);
+
         const result = await createFeedback({
           interviewId: interview.id,
           userId: user.id,
@@ -261,15 +319,20 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
           feedbackId: existingFeedback?.id,
         });
 
+        console.log("🎯 [Interview] Feedback result:", result);
+
         if (result?.success && result.feedbackId) {
+          console.log(`✅ [Interview] Feedback saved with ID: ${result.feedbackId}`);
           toast.success("Interview finished! Generating feedback...");
           router.push(`/interview/${interview.id}/feedback`);
         } else {
-          toast.error("Failed to save feedback. Returning to dashboard.");
+          console.error("❌ [Interview] Feedback generation failed:", result);
+          console.error("Error:", result?.error);
+          toast.error(result?.error || "Failed to save feedback. Returning to dashboard.");
           router.push("/");
         }
       } catch (err) {
-        console.error(err);
+        console.error("❌ [Interview] Exception during feedback generation:", err);
         toast.error("Something went wrong while finishing interview.");
       }
     });

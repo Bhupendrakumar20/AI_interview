@@ -36,24 +36,24 @@ const AiBuddyInterviewSession = ({
         // Calculate question count based on duration
         const questionCount = Math.max(3, Math.ceil(duration / 10));
         
-        // Get questions from LeetCode API (NOW ASYNC)
+        // Get questions from LeetCode API or fallback DSA questions
         const newQuestions = await getInterviewQuestions(
           selectedTopics,
           difficulty.toLowerCase(),
           questionCount
         );
 
-        console.log('[Interview Buddy] Loaded LeetCode questions:', newQuestions);
+        console.log('[Interview Buddy] Loaded questions:', newQuestions);
 
         if (newQuestions.length === 0) {
-          toast.error('No LeetCode questions found for selected topics');
+          toast.error('No interview questions available');
           onClose?.();
           return;
         }
 
         setQuestions(newQuestions);
         setSessionStarted(true);
-        toast.success('Interview Started with LeetCode Questions! Click the speaker icon to hear the question.');
+        toast.success(`Interview Started! ${newQuestions.length} questions loaded. Click the speaker icon to hear the first question.`);
         
         // Auto-read first question
         setTimeout(() => {
@@ -63,7 +63,7 @@ const AiBuddyInterviewSession = ({
         }, 500);
       } catch (error) {
         console.error('[Interview Buddy] Init error:', error);
-        toast.error('Failed to initialize interview with LeetCode questions');
+        toast.error('Failed to initialize interview');
         onClose?.();
       } finally {
         setLoading(false);

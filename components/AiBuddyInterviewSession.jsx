@@ -157,19 +157,23 @@ const AiBuddyInterviewSession = ({
       });
 
       if (feedbackResult.success) {
-        console.log('[Interview Buddy] Feedback generated successfully:', feedbackResult);
+        console.log('[Interview Buddy] Feedback generated successfully:', {
+          totalScore: feedbackResult.totalScore,
+          success: feedbackResult.success,
+        });
         
-        // Pass comprehensive results to parent
+        // Pass comprehensive results to parent - use AI feedback score as primary
+        const aiScore = feedbackResult.totalScore || 0;
         const results = {
           totalQuestions,
           answeredQuestions,
-          score: totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0,
+          score: aiScore, // Use AI feedback score, not just answered/total
           feedback: feedbackResult, // Include actual AI-generated feedback
           transcript: transcript,
           timestamp: new Date().toISOString(),
         };
         
-        toast.success('Interview completed! Generating detailed feedback...');
+        toast.success(`Interview completed! Score: ${aiScore}%`);
         onSessionEnd?.(results);
       } else {
         console.error('[Interview Buddy] Feedback generation failed:', feedbackResult.error);
@@ -306,7 +310,7 @@ const AiBuddyInterviewSession = ({
         {/* Progress Bar */}
         <div className="w-full bg-slate-800 rounded-full h-2">
           <div
-            className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+            className="bg-linear-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
             style={{
               width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`,
             }}

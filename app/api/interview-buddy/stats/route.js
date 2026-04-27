@@ -85,19 +85,24 @@ export async function GET(request) {
         return bTime - aTime;
       })
       .slice(0, 3)
-      .map((session) => ({
+      .map((session) => {
+        // Ensure score is always a number (not null)
+        const score = typeof session.score === 'number' ? session.score : 0;
+        
+        return {
         mode: session.mode,
         persona: session.persona,
         topics: session.topics,
         difficulty: session.difficulty,
-        score: session.score,
+        score: score, // Force to number
         status: session.status,
         duration: session.duration || 0,
         // Convert Firestore timestamp to ISO string
         createdAt: session.createdAt 
           ? (session.createdAt.toDate?.() || new Date(session.createdAt)).toISOString()
           : new Date().toISOString(),
-      }));
+      };
+      });
 
     return NextResponse.json(stats);
   } catch (error) {

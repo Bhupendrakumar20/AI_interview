@@ -330,10 +330,17 @@ const InterviewBuddy = ({ userId }) => {
     try {
       // Save session results to Firebase
       if (activeSessionId) {
+        // Priority: AI feedback score > manual score > 0
+        const scoreToSave = results.feedback?.totalScore !== undefined 
+          ? results.feedback.totalScore
+          : (results.score || 0);
+
         console.log('[InterviewBuddy] Saving session results:', {
           sessionId: activeSessionId,
-          score: results.score,
+          score: scoreToSave,
           hasFeedback: !!results.feedback,
+          feedbackTotalScore: results.feedback?.totalScore,
+          resultsScore: results.score,
         });
 
         const response = await fetch(
@@ -343,7 +350,7 @@ const InterviewBuddy = ({ userId }) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               status: "completed",
-              score: results.feedback?.totalScore || results.score || 0,
+              score: scoreToSave,
               feedback: results.feedback || null,
               transcriptUrl: null,
             }),
@@ -354,7 +361,11 @@ const InterviewBuddy = ({ userId }) => {
           console.error("Failed to save session results");
           // Still show results even if save fails
         } else {
-          console.log("✅ Session results saved to Firebase");
+          const savedData = await response.json();
+          console.log("✅ Session results saved to Firebase:", {
+            score: savedData.score,
+            status: savedData.status,
+          });
           // Refresh stats to show updated session
           await fetchStats();
         }

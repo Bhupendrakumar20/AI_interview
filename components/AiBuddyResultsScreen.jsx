@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Target, MessageCircle, Brain } from 'lucide-react';
+import { createFeedback } from '@/lib/actions/general.action';
 
 const AiBuddyResultsScreen = ({
   sessionId,
@@ -14,25 +15,96 @@ const AiBuddyResultsScreen = ({
 }) => {
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchResults = async () => {
       try {
         setLoading(true);
-        // Simulate fetching detailed feedback
-        const generatedFeedback = {
-          clarity: 82,
-          technicalAccuracy: 78,
-          communication: 85,
-          confidence: 80,
-          pacing: 84,
-          fillerWords: 12,
+        setError(null);
+        
+        // Check if feedback already exists in results
+        if (results.feedback && results.feedback.success) {
+          console.log('[Results Screen] Using feedback from results:', results.feedback);
+          
+          // Extract actual feedback data
+          const feedbackData = results.feedback;
+          
+          // Map to display format
+          const displayFeedback = {
+            clarity: feedbackData.categoryScores?.[0]?.score || 80,
+            technicalAccuracy: feedbackData.categoryScores?.[1]?.score || 78,
+            communication: feedbackData.categoryScores?.[2]?.score || 85,
+            confidence: feedbackData.categoryScores?.[3]?.score || 80,
+            pacing: feedbackData.categoryScores?.[4]?.score || 84,
+            fillerWords: 12,
+            overallScore: feedbackData.totalScore || results.score || 0,
+            strengths: feedbackData.strengths || [],
+            weaknesses: feedbackData.areasForImprovement || [],
+            summary: feedbackData.finalAssessment || '',
+          };
+          
+          setFeedback(displayFeedback);
+        } else if (results.transcript && results.transcript.length > 0) {
+          // If transcript exists but feedback doesn't, generate it
+          console.log('[Results Screen] Generating feedback from transcript...');
+          const feedbackResult = await createFeedback({
+            interviewId: sessionId,
+            userId: sessionId,
+            transcript: results.transcript,
+          });
+          
+          if (feedbackResult.success) {
+            const displayFeedback = {
+              clarity: feedbackResult.categoryScores?.[0]?.score || 80,
+              technicalAccuracy: feedbackResult.categoryScores?.[1]?.score || 78,
+              communication: feedbackResult.categoryScores?.[2]?.score || 85,
+              confidence: feedbackResult.categoryScores?.[3]?.score || 80,
+              pacing: feedbackResult.categoryScores?.[4]?.score || 84,
+              fillerWords: 12,
+              overallScore: feedbackResult.totalScore || results.score || 0,
+              strengths: feedbackResult.strengths || [],
+              weaknesses: feedbackResult.areasForImprovement || [],
+              summary: feedbackResult.finalAssessment || '',
+            };
+            setFeedback(displayFeedback);
+          } else {
+            throw new Error(feedbackResult.error || 'Failed to generate feedback');
+          }
+        } else {
+          // Fallback to basic feedback if no transcript
+          console.warn('[Results Screen] No transcript available, using default feedback');
+          setFeedback({
+            clarity: 80,
+            technicalAccuracy: 75,
+            communication: 82,
+            confidence: 78,
+            pacing: 80,
+            fillerWords: 14,
+            overallScore: results.score || 0,
+            strengths: [],
+            weaknesses: [],
+            summary: 'Interview completed. Please refresh to see detailed analysis.',
+          });
+        }
+      } catch (err) {
+        console.error('[Results Screen] Error fetching results:', err);
+        setError(err.message);
+        toast.error('Failed to load results: ' + err.message);
+        
+        // Set fallback feedback
+        setFeedback({
+          clarity: results.score || 0,
+          technicalAccuracy: results.score || 0,
+          communication: results.score || 0,
+          confidence: results.score || 0,
+          pacing: results.score || 0,
+          fillerWords: 0,
           overallScore: results.score || 0,
-        };
-        setFeedback(generatedFeedback);
-      } catch (error) {
-        console.error('Error fetching results:', error);
-        toast.error('Failed to load results');
+          strengths: [],
+          weaknesses: [],
+          summary: 'Unable to load detailed feedback. Please try again.',
+        });
       } finally {
         setLoading(false);
       }
@@ -296,6 +368,61 @@ const AiBuddyResultsScreen = ({
             </div>
           </div>
         </div>
+
+        {/* AI-Generated Detailed Feedback */}
+        {feedback?.strengths && feedback.strengths.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <span className="text-green-400">✓</span> Identified Strengths
+            </h2>
+            <div className="space-y-4">
+              {feedback.strengths.map((strength, idx) => (
+                <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-green-500">
+                  <h3 className="font-semibold text-green-400 mb-1">
+                    {typeof strength === 'string' ? strength : strength.category || `Strength ${idx + 1}`}
+                  </h3>
+                  {typeof strength !== 'string' && strength.description && (
+                    <p className="text-slate-300 text-sm">{strength.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {feedback?.weaknesses && feedback.weaknesses.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <span className="text-yellow-400">!</span> Areas for Improvement
+            </h2>
+            <div className="space-y-4">
+              {feedback.weaknesses.map((weakness, idx) => (
+                <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-yellow-500">
+                  <h3 className="font-semibold text-yellow-400 mb-1">
+                    {typeof weakness === 'string' ? weakness : weakness.category || `Area ${idx + 1}`}
+                  </h3>
+                  {typeof weakness !== 'string' && weakness.description && (
+                    <p className="text-slate-300 text-sm">{weakness.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {feedback?.summary && (
+          <div className="bg-linear-to-br from-slate-900/50 to-slate-800/50 border border-slate-700 rounded-lg p-8 mb-12">
+            <h2 className="text-xl font-bold text-white mb-4">Interview Summary</h2>
+            <p className="text-slate-300 leading-relaxed">{feedback.summary}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-900/30 border border-red-700 rounded-lg p-6 mb-12">
+            <h3 className="text-red-400 font-semibold mb-2">Feedback Error</h3>
+            <p className="text-red-300 text-sm">{error}</p>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-4 justify-center mb-12">

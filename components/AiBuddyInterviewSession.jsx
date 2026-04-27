@@ -8,6 +8,7 @@ import {
   speakQuestion,
   stopSpeech,
 } from '@/lib/utils/ai-buddy-questions';
+import { createFeedback } from '@/lib/actions/general.action';
 
 const AiBuddyInterviewSession = ({
   sessionId,
@@ -130,36 +131,63 @@ const AiBuddyInterviewSession = ({
     const answeredQuestions = Object.keys(userAnswers).length;
     
     try {
-      // Save session results to backend
-      const response = await fetch(`/api/interview-buddy/sessions/${sessionId}/update`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'completed',
-          score: totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0,
-          feedback: {
-            clarity: 85,
-            technicalAccuracy: 80,
-            communication: 88,
-            confidence: 82,
-            pacing: 84,
-            fillerWords: 10,
-            overallScore: 84,
-          },
-        }),
+      // Create transcript for feedback generation
+      const transcript = questions.map((q, idx) => ({
+        role: 'system',
+        content: `Question ${idx + 1}: ${q.title}. ${q.description}`,
+        question: q.title,
+        answer: userAnswers[idx] || '',
+      }));
+
+      // Generate real feedback using AI
+      console.log('[Interview Buddy] Generating feedback for interview...');
+      const feedbackResult = await createFeedback({
+        interviewId: sessionId,
+        userId: sessionId, // Use sessionId as userId for buddy interviews
+        transcript: transcript,
       });
 
-      if (response.ok) {
-        toast.success('Interview completed! Results saved.');
-        onSessionEnd?.({
+      if (feedbackResult.success) {
+        console.log('[Interview Buddy] Feedback generated successfully:', feedbackResult);
+        
+        // Pass comprehensive results to parent
+        const results = {
           totalQuestions,
           answeredQuestions,
           score: totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0,
-        });
+          feedback: feedbackResult, // Include actual AI-generated feedback
+          transcript: transcript,
+          timestamp: new Date().toISOString(),
+        };
+        
+        toast.success('Interview completed! Generating detailed feedback...');
+        onSessionEnd?.(results);
+      } else {
+        console.error('[Interview Buddy] Feedback generation failed:', feedbackResult.error);
+        // Still end the session with basic results even if feedback failed
+        toast.warning('Interview completed but feedback generation failed. Please try again.');
+        const basicResults = {
+          totalQuestions,
+          answeredQuestions,
+          score: totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0,
+          feedback: null,
+          error: feedbackResult.error,
+        };
+        onSessionEnd?.(basicResults);
       }
     } catch (error) {
-      console.error('Error saving results:', error);
-      toast.error('Failed to save interview results');
+      console.error('[Interview Buddy] Error in handleSessionEnd:', error);
+      toast.error('Failed to complete interview: ' + error.message);
+      
+      // Still call onSessionEnd with basic results
+      const basicResults = {
+        totalQuestions,
+        answeredQuestions,
+        score: totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0,
+        feedback: null,
+        error: error.message,
+      };
+      onSessionEnd?.(basicResults);
     }
   };
 

@@ -203,14 +203,32 @@ const InterviewBuddy = ({ userId }) => {
   ];
 
   // Format recent sessions for display
-  const recentSessions = (stats.recentSessions || []).map(session => ({
-    type: session.mode,
-    title: `${session.mode === 'ai' ? 'AI Buddy' : 'Human Buddy'} · ${session.topics?.[0] || 'Interview'} Round`,
-    meta: `${session.persona || session.mode} · ${session.difficulty} · ${session.duration} min · ${new Date(session.createdAt).toLocaleDateString()}`,
-    score: `${session.score || 0}%`,
-    scoreType: session.score >= 80 ? "good" : "mid",
-    label: "Overall Score",
-  }));
+  const recentSessions = (stats.recentSessions || []).map(session => {
+    let dateStr = "Date unknown";
+    try {
+      const date = new Date(session.createdAt);
+      if (!isNaN(date.getTime())) {
+        dateStr = date.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+        });
+      }
+    } catch (e) {
+      console.error("Error parsing date:", session.createdAt, e);
+    }
+
+    const score = session.score !== null && session.score !== undefined ? Math.round(session.score) : 0;
+    
+    return {
+      type: session.mode,
+      title: `${session.mode === 'ai' ? 'AI Buddy' : 'Human Buddy'} · ${session.topics?.[0] || 'Interview'} Round`,
+      meta: `${session.persona || session.mode} · ${session.difficulty} · ${session.duration || 0} min · ${dateStr}`,
+      score: `${score}%`,
+      scoreType: score >= 80 ? "good" : "mid",
+      label: "Overall Score",
+    };
+  });
 
   const features = [
     {
@@ -305,10 +323,50 @@ const InterviewBuddy = ({ userId }) => {
     }
   };
 
-  const handleSessionEnd = (results) => {
-    setSessionResults(results);
-    setShowResults(true);
-    setIsInterviewActive(false);
+  const handleSessionEnd = async (results) => {
+    try {
+      // Save session results to Firebase
+      if (activeSessionId) {
+        console.log('[InterviewBuddy] Saving session results:', {
+          sessionId: activeSessionId,
+          score: results.score,
+          hasFeedback: !!results.feedback,
+        });
+
+        const response = await fetch(
+          `/api/interview-buddy/sessions/${activeSessionId}/update`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "completed",
+              score: results.feedback?.totalScore || results.score || 0,
+              feedback: results.feedback || null,
+              transcriptUrl: null,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error("Failed to save session results");
+          // Still show results even if save fails
+        } else {
+          console.log("✅ Session results saved to Firebase");
+          // Refresh stats to show updated session
+          await fetchStats();
+        }
+      }
+
+      setSessionResults(results);
+      setShowResults(true);
+      setIsInterviewActive(false);
+    } catch (error) {
+      console.error("Error in handleSessionEnd:", error);
+      // Still show results even if save fails
+      setSessionResults(results);
+      setShowResults(true);
+      setIsInterviewActive(false);
+    }
   };
 
   const handleCloseResults = () => {

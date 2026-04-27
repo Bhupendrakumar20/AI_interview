@@ -38,6 +38,15 @@ export async function PUT(request, { params }) {
         updateData.startTime = !doc.data().startTime ? new Date() : doc.data().startTime;
       } else if (status === "completed") {
         updateData.endTime = new Date();
+        
+        // Calculate actual duration in minutes
+        const startTime = doc.data().startTime || doc.data().createdAt;
+        if (startTime) {
+          const start = startTime.toDate?.() || new Date(startTime);
+          const end = new Date();
+          const durationMinutes = Math.round((end - start) / 60000); // Convert ms to minutes
+          updateData.duration = Math.max(1, durationMinutes); // At least 1 minute
+        }
       }
     }
 

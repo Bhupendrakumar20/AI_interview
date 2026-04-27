@@ -21,6 +21,7 @@ const AiBuddyInterviewSession = ({
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState({});
+  const [currentAnswerText, setCurrentAnswerText] = useState(''); // Track answer text without saving
   const [loading, setLoading] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -89,6 +90,14 @@ const AiBuddyInterviewSession = ({
 
     return () => clearInterval(interval);
   }, [sessionStarted, timeRemaining]);
+
+  // Update current answer text when question changes
+  useEffect(() => {
+    const currentQuestion = questions[currentQuestionIndex];
+    if (currentQuestion) {
+      setCurrentAnswerText(userAnswers[currentQuestion.id] || '');
+    }
+  }, [currentQuestionIndex, questions, userAnswers]);
 
   const readCurrentQuestion = () => {
     if (questions.length > 0 && currentQuestionIndex < questions.length) {
@@ -192,11 +201,39 @@ const AiBuddyInterviewSession = ({
   };
 
   const handleRecordAnswer = (questionId, answer) => {
+    // 🔥 ONLY called from handleSaveAnswer button click, NEVER from typing
+    if (!questionId || !answer.trim()) return;
+    
     setUserAnswers(prev => ({
       ...prev,
       [questionId]: answer,
     }));
-    toast.success('Answer recorded');
+    // Toast ONLY shows on explicit Save button click
+    toast.success('✓ Answer saved', { duration: 2000 });
+    console.log('[AiBuddy] Answer saved for question:', questionId);
+  };
+  
+  const handleAnswerChange = (text) => {
+    // 🔥 PURE TYPING - No state updates, no toasts, no side effects
+    // This is called on EVERY keystroke but does NOT save anything
+    setCurrentAnswerText(text);
+    // Intentionally NOT calling toast.success() or any other notifications
+  };
+  
+  const handleSaveAnswer = () => {
+    // 🔥 ONLY this function saves answers when user clicks the green Save button
+    if (!currentQuestion) {
+      toast.error('No question available');
+      return;
+    }
+    
+    if (!currentAnswerText.trim()) {
+      toast.warning('Please type an answer before saving');
+      return;
+    }
+    
+    // Save the answer ONLY when clicking the Save button
+    handleRecordAnswer(currentQuestion.id, currentAnswerText);
   };
 
   const handleNextQuestion = () => {
@@ -370,14 +407,14 @@ const AiBuddyInterviewSession = ({
             <textarea
               placeholder="Your answer will appear here if you enable microphone, or you can type your answer..."
               className="w-full h-32 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
-              defaultValue={userAnswers[currentQuestion.id] || ''}
-              onChange={(e) => handleRecordAnswer(currentQuestion.id, e.target.value)}
+              value={currentAnswerText}
+              onChange={(e) => handleAnswerChange(e.target.value)}
             ></textarea>
           </div>
 
           {/* Save Answer Button */}
           <button
-            onClick={() => handleRecordAnswer(currentQuestion.id, 'answered')}
+            onClick={handleSaveAnswer}
             className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all"
           >
             ✓ Save Answer

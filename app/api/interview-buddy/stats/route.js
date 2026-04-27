@@ -79,7 +79,11 @@ export async function GET(request) {
 
     // Get recent sessions (last 3)
     stats.recentSessions = sessions
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || new Date(a.createdAt).getTime() || 0;
+        const bTime = b.createdAt?.toMillis?.() || new Date(b.createdAt).getTime() || 0;
+        return bTime - aTime;
+      })
       .slice(0, 3)
       .map((session) => ({
         mode: session.mode,
@@ -88,7 +92,11 @@ export async function GET(request) {
         difficulty: session.difficulty,
         score: session.score,
         status: session.status,
-        createdAt: session.createdAt,
+        duration: session.duration || 0,
+        // Convert Firestore timestamp to ISO string
+        createdAt: session.createdAt 
+          ? (session.createdAt.toDate?.() || new Date(session.createdAt)).toISOString()
+          : new Date().toISOString(),
       }));
 
     return NextResponse.json(stats);

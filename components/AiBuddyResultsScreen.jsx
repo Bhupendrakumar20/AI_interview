@@ -132,6 +132,7 @@ const AiBuddyResultsScreen = ({
           <div>
             <h1 className="text-3xl font-black text-white">Interview Complete</h1>
             <p className="text-slate-400 text-sm mt-2">Here's your detailed performance report</p>
+            <p className="text-yellow-400 text-xs mt-2">⭐ <span className="font-semibold">Note:</span> Feedback evaluates answer CORRECTNESS, not just communication quality. Wrong answers with good explanations will score low on Technical Correctness.</p>
           </div>
           <button
             onClick={onClose}
@@ -189,6 +190,21 @@ const AiBuddyResultsScreen = ({
 
             {/* Detailed Metrics */}
             <div className="space-y-4">
+              {/* Technical Correctness - MOST IMPORTANT */}
+              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-300 font-semibold text-sm">Technical Correctness ⭐</span>
+                  <span className="text-red-400 font-bold">{feedback?.technicalAccuracy}%</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-2">
+                  <div
+                    className="bg-linear-to-r from-red-500 to-red-400 h-2 rounded-full"
+                    style={{ width: `${feedback?.technicalAccuracy}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">Accuracy of technical answers (most important)</p>
+              </div>
+
               {/* Clarity */}
               <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -197,22 +213,8 @@ const AiBuddyResultsScreen = ({
                 </div>
                 <div className="w-full bg-slate-800 rounded-full h-2">
                   <div
-                      className="bg-linear-to-r from-blue-500 to-blue-400 h-2 rounded-full"
+                    className="bg-linear-to-r from-blue-500 to-blue-400 h-2 rounded-full"
                     style={{ width: `${feedback?.clarity}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Technical Accuracy */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-300 font-semibold text-sm">Technical Accuracy</span>
-                  <span className="text-purple-400 font-bold">{feedback?.technicalAccuracy}%</span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-2">
-                  <div
-                      className="bg-linear-to-r from-purple-500 to-purple-400 h-2 rounded-full"
-                    style={{ width: `${feedback?.technicalAccuracy}%` }}
                   ></div>
                 </div>
               </div>
@@ -225,7 +227,7 @@ const AiBuddyResultsScreen = ({
                 </div>
                 <div className="w-full bg-slate-800 rounded-full h-2">
                   <div
-                      className="bg-linear-to-r from-emerald-500 to-emerald-400 h-2 rounded-full"
+                    className="bg-linear-to-r from-emerald-500 to-emerald-400 h-2 rounded-full"
                     style={{ width: `${feedback?.communication}%` }}
                   ></div>
                 </div>
@@ -239,10 +241,11 @@ const AiBuddyResultsScreen = ({
                 </div>
                 <div className="w-full bg-slate-800 rounded-full h-2">
                   <div
-                      className="bg-linear-to-r from-yellow-500 to-yellow-400 h-2 rounded-full"
+                    className="bg-linear-to-r from-yellow-500 to-yellow-400 h-2 rounded-full"
                     style={{ width: `${feedback?.confidence}%` }}
                   ></div>
                 </div>
+                <p className="text-xs text-slate-400 mt-2">Note: High confidence in wrong answers = lower score</p>
               </div>
             </div>
           </div>
@@ -404,6 +407,30 @@ const AiBuddyResultsScreen = ({
                   {typeof weakness !== 'string' && weakness.description && (
                     <p className="text-slate-300 text-sm">{weakness.description}</p>
                   )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Answer Accuracy Breakdown */}
+        {results.transcript && results.transcript.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <span className="text-blue-400">✓</span> Answer Evaluation
+            </h2>
+            <div className="space-y-4">
+              {results.transcript.map((item, idx) => (
+                <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-blue-500">
+                  <div className="mb-3">
+                    <h3 className="font-semibold text-blue-300 mb-1">Question {idx + 1}: {item.question}</h3>
+                    <p className="text-slate-400 text-sm italic mb-3">"{item.answer || '(No answer provided)'}"</p>
+                  </div>
+                  <div className="bg-slate-900/50 rounded p-2">
+                    <p className="text-xs text-slate-300">
+                      ⚠️ <span className="font-semibold">Note:</span> Review the feedback above for technical correctness evaluation. Some answers may have been partially correct or showed good approach with incorrect implementation.
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>

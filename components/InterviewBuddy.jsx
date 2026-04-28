@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Brain, Radio, BarChart3, Code, Video, FileJson, Film, Trophy, Cpu } from "lucide-react";
+import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Brain, Radio, BarChart3, Code, Video, FileJson, Film, Trophy, Cpu, Eye } from "lucide-react";
 import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
 import HumanBuddySession from "./HumanBuddySession";
@@ -755,7 +755,11 @@ const InterviewBuddy = ({ userId }) => {
       <div className="px-10 pb-12">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold flex items-center gap-2">Recent Sessions</h2>
-          <button className="px-4 py-2 text-sm font-medium hover:text-blue-400 transition">
+          <button 
+            onClick={() => setShowPastReports(true)}
+            className="px-4 py-2 text-sm font-medium hover:text-blue-400 transition flex items-center gap-1"
+          >
+            <Eye size={16} />
             View All →
           </button>
         </div>
@@ -764,16 +768,24 @@ const InterviewBuddy = ({ userId }) => {
           {recentSessions.map((session, idx) => (
             <div
               key={idx}
-              className="p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition"
+              onClick={() => setSelectedSessionForDetail(stats.recentSessions[idx])}
+              className="p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 cursor-pointer transition-all hover:bg-slate-900/80 hover:shadow-lg hover:shadow-blue-500/20"
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-2 h-2 rounded-full ${
+                  className={`w-3 h-3 rounded-full ${
                     session.type === "human" ? "bg-blue-500" : "bg-purple-500"
                   }`}
                 ></div>
                 <div className="flex-1">
-                  <div className="font-medium text-sm">{session.title}</div>
+                  <div className="font-medium text-sm flex items-center gap-2">
+                    {session.type === "human" ? (
+                      <Users size={16} className="text-blue-400" />
+                    ) : (
+                      <Brain size={16} className="text-purple-400" />
+                    )}
+                    {session.title}
+                  </div>
                   <div className="text-xs text-slate-400 mt-0.5">{session.meta}</div>
                 </div>
                 <div className="text-right shrink-0">
@@ -787,16 +799,32 @@ const InterviewBuddy = ({ userId }) => {
                   <div className="text-xs text-slate-400 mt-0.5">{session.label}</div>
                 </div>
                 <div className="flex gap-2">
-                  <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
-                    Stats
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSessionForDetail(stats.recentSessions[idx]);
+                      setShowPastReports(true);
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 transition border border-blue-500/30"
+                    title="View Stats"
+                  >
+                    <BarChart3 size={16} />
                   </button>
-                  <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
-                    ▶️
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSessionForDetail(stats.recentSessions[idx]);
+                      setShowPastReports(true);
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 transition border border-emerald-500/30"
+                    title="View Details"
+                  >
+                    <Eye size={16} />
                   </button>
                 </div>
               </div>
             </div>
-          ))}
+          ))}  
         </div>
       </div>
 

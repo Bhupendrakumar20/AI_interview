@@ -343,23 +343,47 @@ const InterviewBuddy = ({ userId }) => {
           resultsScore: results.score,
         });
 
+        // Clean the feedback object before sending (only keep serializable fields)
+        const cleanedFeedback = results.feedback ? {
+          totalScore: results.feedback.totalScore,
+          categoryScores: results.feedback.categoryScores,
+          strengths: results.feedback.strengths,
+          areasForImprovement: results.feedback.areasForImprovement,
+          finalAssessment: results.feedback.finalAssessment,
+        } : null;
+
+        const requestBody = {
+          status: "completed",
+          score: scoreToSave,
+          feedback: cleanedFeedback,
+          transcriptUrl: null,
+        };
+
+        console.log('[InterviewBuddy] Request payload ready:', {
+          status: requestBody.status,
+          score: requestBody.score,
+          feedbackKeys: cleanedFeedback ? Object.keys(cleanedFeedback) : null,
+        });
+
         const response = await fetch(
           `/api/interview-buddy/sessions/${activeSessionId}/update`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              status: "completed",
-              score: scoreToSave,
-              feedback: results.feedback || null,
-              transcriptUrl: null,
-            }),
+            body: JSON.stringify(requestBody),
           }
         );
 
+        console.log(`[InterviewBuddy] Response status: ${response.status}`);
+
         if (!response.ok) {
-          console.error("Failed to save session results");
-          // Still show results even if save fails
+          const errorData = await response.text();
+          console.error("❌ Failed to save session results");
+          console.error("   Status:", response.status);
+          console.error("   Response:", errorData);
+          
+          // Still show results even if save fails, but warn user
+          toast.warning("Session completed but results may not be saved. Try refreshing.");
         } else {
           const savedData = await response.json();
           console.log("✅ Session results saved to Firebase:", {
@@ -375,11 +399,14 @@ const InterviewBuddy = ({ userId }) => {
       setShowResults(true);
       setIsInterviewActive(false);
     } catch (error) {
-      console.error("Error in handleSessionEnd:", error);
+      console.error("❌ Error in handleSessionEnd:", error);
+      console.error("   Message:", error.message);
+      console.error("   Stack:", error.stack);
       // Still show results even if save fails
       setSessionResults(results);
       setShowResults(true);
       setIsInterviewActive(false);
+      toast.error("Error saving session: " + error.message);
     }
   };
 

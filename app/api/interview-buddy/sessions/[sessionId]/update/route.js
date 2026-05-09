@@ -12,6 +12,7 @@ import * as admin from "firebase-admin";
 import { db } from "@/firebase/admin";
 import { serializeFirebaseData } from "@/lib/firebase-helpers";
 import { getCurrentUser } from "@/lib/actions/auth.action";
+import { updateSessionWithTransaction } from "@/lib/security/transaction-manager";
 
 export async function PUT(request, { params }) {
   try {
@@ -49,54 +50,27 @@ export async function PUT(request, { params }) {
 
     const { status, score, feedback, recordingUrl, transcriptUrl } = body;
 
-    const doc = await db.collection("interview_buddy_sessions").doc(sessionId).get();
-
-    if (!doc.exists) {
-      console.error("❌ Session not found:", sessionId);
-      return NextResponse.json(
-        { error: "Session not found" },
-        { status: 404 }
-      );
-    }
-
-    const sessionData = doc.data();
-
-    // ✅ FIX #3: CRITICAL - Verify ownership before allowing updates
-    if (sessionData.createdBy !== currentUser.uid) {
-      console.error(
-        `❌ UNAUTHORIZED: User ${currentUser.uid} attempted to update session created by ${sessionData.createdBy}`
-      );
-      return NextResponse.json(
-        { error: "You do not have permission to update this session" },
-        { status: 403 }
-      );
-    }
+    // Build update object
+    const updateData = {};
 
     // ✅ Validate status transitions
-    const validStatuses = ["created", "in-progress", "completed", "paused"];
-    const currentStatus = sessionData.status;
-    const validTransitions = {
-      created: ["in-progress", "paused"],
-      "in-progress": ["completed", "paused"],
-      paused: ["in-progress", "completed"],
-      completed: [], // Terminal state
-    };
+    if (status) {
+      const validStatuses = ["created", "in-progress", "completed", "paused"];
+      const validTransitions = {
+        created: ["in-progress", "paused"],
+        "in-progress": ["completed", "paused"],
+        paused: ["in-progress", "completed"],
+        completed: [], // Terminal state
+      };
 
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: `Invalid status: ${status}` },
-        { status: 400 }
-      );
-    }
+      if (!validStatuses.includes(status)) {
+        return NextResponse.json(
+          { error: `Invalid status: ${status}` },
+          { status: 400 }
+        );
+      }
 
-    if (status && !validTransitions[currentStatus]?.includes(status)) {
-      return NextResponse.json(
-        {
-          error: `Cannot transition from ${currentStatus} to ${status}`,
-          validTransitions: validTransitions[currentStatus],
-        },
-        { status: 400 }
-      );
+      updateData.status = status;
     }
 
     // ✅ Validate score
@@ -107,52 +81,50 @@ export async function PUT(request, { params }) {
           { status: 400 }
         );
       }
+      updateData.score = score;
     }
 
     // ✅ Validate feedback structure
-    if (feedback !== undefined && typeof feedback !== "object") {
-      return NextResponse.json(
-        { error: "Feedback must be an object" },
-        { status: 400 }
-      );
+    if (feedback !== undefined) {
+      if (typeof feedback !== "object") {
+        return NextResponse.json(
+          { error: "Feedback must be an object" },
+          { status: 400 }
+        );
+      }
+      updateData.feedback = feedback;
     }
 
     // ✅ Validate URLs
-    if (recordingUrl && typeof recordingUrl !== "string") {
-      return NextResponse.json(
-        { error: "Recording URL must be a string" },
-        { status: 400 }
-      );
+    if (recordingUrl) {
+      if (typeof recordingUrl !== "string") {
+        return NextResponse.json(
+          { error: "Recording URL must be a string" },
+          { status: 400 }
+        );
+      }
+      updateData.recordingUrl = recordingUrl;
     }
 
-    if (transcriptUrl && typeof transcriptUrl !== "string") {
-      return NextResponse.json(
-        { error: "Transcript URL must be a string" },
-        { status: 400 }
-      );
+    if (transcriptUrl) {
+      if (typeof transcriptUrl !== "string") {
+        return NextResponse.json(
+          { error: "Transcript URL must be a string" },
+          { status: 400 }
+        );
+      }
+      updateData.transcriptUrl = transcriptUrl;
     }
 
-    // Build update object
-    const updateData = {
-      updatedAt: new Date(),
-    };
-
-    if (status) updateData.status = status;
-    if (score !== undefined) updateData.score = score;
-    if (feedback) updateData.feedback = feedback;
-    if (recordingUrl) updateData.recordingUrl = recordingUrl;
-    if (transcriptUrl) updateData.transcriptUrl = transcriptUrl;
-
-    // ✅ Update session
-    await doc.ref.update(updateData);
-
-    const updatedSession = await doc.ref.get();
+    // ✅ FIX #8: Use transaction to prevent race conditions
+    // This ensures atomicity: either all updates succeed or none
+    const updatedSession = await updateSessionWithTransaction(sessionId, updateData, currentUser);
 
     return NextResponse.json(
       {
         success: true,
         sessionId,
-        session: serializeFirebaseData(updatedSession.data()),
+        session: serializeFirebaseData(updatedSession),
       },
       { status: 200 }
     );

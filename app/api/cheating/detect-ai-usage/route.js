@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { withRateLimit } from "@/lib/rate-limiter";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 
@@ -45,7 +46,9 @@ Consider:
 Respond with just a number (0-100).`;
 
         try {
-          const result = await model.generateContent(analyzePrompt);
+          const result = await withRateLimit(async () => {
+            return await model.generateContent(analyzePrompt);
+          }, "aiGenerationDetection", candidateId || sessionId || "anonymous");
           const scoreText = await result.response.text();
           const score = parseInt(scoreText.match(/\d+/)?.[0] || "0");
           aiDetectionScore = Math.min(100, Math.max(0, score));

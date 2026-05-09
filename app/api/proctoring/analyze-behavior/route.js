@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { withRateLimit } from "@/lib/rate-limiter";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 
@@ -106,7 +107,9 @@ export async function POST(request) {
         
         Format as JSON`;
 
-        const result = await model.generateContent(prompt);
+        const result = await withRateLimit(async () => {
+          return await model.generateContent(prompt);
+        }, "proctorBehaviorAnalysis", candidateId || sessionId || "anonymous");
         const responseText = await result.response.text();
 
         // Try to parse JSON response

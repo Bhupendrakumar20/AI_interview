@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { withRateLimit } from "@/lib/rate-limiter";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 
@@ -54,7 +55,9 @@ Generate ONLY ONE question. Format response as JSON with:
 }`;
 
     try {
-      const result = await model.generateContent(interviewContext);
+      const result = await withRateLimit(async () => {
+        return await model.generateContent(interviewContext);
+      }, "generateInterviewQuestion", candidateId || sessionId || "anonymous");
       const responseText = await result.response.text();
 
       // Parse JSON response
@@ -85,7 +88,9 @@ Response format:
 
       let followUpQuestions = [];
       try {
-        const followUpResult = await model.generateContent(followUpPrompt);
+        const followUpResult = await withRateLimit(async () => {
+          return await model.generateContent(followUpPrompt);
+        }, "generateFollowUpQuestions", candidateId || sessionId || "anonymous");
         const followUpText = await followUpResult.response.text();
         const jsonMatch = followUpText.match(/\[[\s\S]*\]/);
         followUpQuestions = JSON.parse(jsonMatch ? jsonMatch[0] : "[]");

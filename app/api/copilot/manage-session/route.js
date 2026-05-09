@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { withRateLimit } from "@/lib/rate-limiter";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 
@@ -98,7 +99,9 @@ async function setupCopilotMode(sessionId, candidateId) {
 
 Format as JSON array of tips.`;
 
-    const tipsResult = await model.generateContent(tipsPrompt);
+    const tipsResult = await withRateLimit(async () => {
+      return await model.generateContent(tipsPrompt);
+    }, "copilotModeTips", candidateId || sessionId || "anonymous");
     const tipsText = await tipsResult.response.text();
 
     let tips = [];
@@ -157,7 +160,9 @@ Format as JSON with:
   "followUpValidation": "how to verify AI suggestions"
 }`;
 
-    const result = await model.generateContent(assistPrompt);
+    const result = await withRateLimit(async () => {
+      return await model.generateContent(assistPrompt);
+    }, "copilotModeAssist", candidateId || sessionId || "anonymous");
     const responseText = await result.response.text();
 
     let assistance;
@@ -243,7 +248,9 @@ Return JSON:
   "recommendation": "assessment of their AI usage effectiveness"
 }`;
 
-    const result = await model.generateContent(evaluationPrompt);
+    const result = await withRateLimit(async () => {
+      return await model.generateContent(evaluationPrompt);
+    }, "copilotModeEvaluation", candidateId || sessionId || "anonymous");
     const responseText = await result.response.text();
 
     let evaluation;

@@ -5,49 +5,27 @@
 import { NextResponse } from "next/server";
 import * as admin from "firebase-admin";
 import { db } from "@/firebase/admin";
-
-function generateSessionCode() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let code = "IB-";
-  for (let i = 0; i < 5; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
+import { generateSecureSessionCode } from "@/lib/security/token-generator";
+import { getCurrentUser } from "@/lib/actions/auth.action";
 
 /**
- * Ensures session code is unique in database
- * Generates new codes until finding one that doesn't exist
+ * Note: UUID v4 tokens are cryptographically unique with negligible collision probability.
+ * No database uniqueness check needed.
+ * Entropy: 128 bits (2^128 possibilities)
  */
-async function generateUniqueSessionCode() {
-  let code;
-  let isUnique = false;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (!isUnique && attempts < maxAttempts) {
-    code = generateSessionCode();
-    
-    // Check if code already exists
-    const existingSession = await db
-      .collection("interview_buddy_sessions")
-      .where("sessionCode", "==", code)
-      .limit(1)
-      .get();
-    
-    isUnique = existingSession.empty;
-    attempts++;
-  }
-
-  if (!isUnique) {
-    throw new Error("Failed to generate unique session code after multiple attempts");
-  }
-
-  return code;
-}
 
 export async function POST(request) {
   try {
+    // ✅ FIX #1.4: Verify user authentication before processing
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: "User not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
     const {
       userId,
       mode = "ai",
@@ -56,22 +34,48 @@ export async function POST(request) {
       difficulty = "medium",
       duration = 30,
       jobDescription = null,
-    } = await request.json();
+    } = body;
 
-    if (!userId) {
-      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    // ✅ FIX #1.1: Verify userId matches authenticated user
+    if (!userId || userId !== currentUser.uid) {
+      return NextResponse.json(
+        { error: "User ID mismatch with authenticated user" },
+        { status: 403 }
+      );
     }
 
-    // 🔥 Generate UNIQUE session code - ensures no two sessions have same code
-    const sessionCode = mode === "human" ? await generateUniqueSessionCode() : null;
+    // ✅ Validate session parameters
+    if (!["ai", "human"].includes(mode)) {
+      return NextResponse.json(
+        { error: "Invalid session mode" },
+        { status: 400 }
+      );
+    }
 
-    console.log(`[create-session] Generated unique session code: ${sessionCode} for user ${userId}`);
+    if (!["easy", "medium", "hard"].includes(difficulty)) {
+      return NextResponse.json(
+        { error: "Invalid difficulty level" },
+        { status: 400 }
+      );
+    }
+
+    if (duration < 5 || duration > 120) {
+      return NextResponse.json(
+        { error: "Duration must be between 5 and 120 minutes" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ FIX #1: Generate cryptographically secure session code (128-bit entropy)
+    const sessionCode = mode === "human" ? generateSecureSessionCode() : null;
+
+    console.log(`[create-session] Generated secure session code for user ${userId}`);
 
     const sessionRef = await db.collection("interview_buddy_sessions").add({
       createdBy: userId,
       mode,
       persona,
-      topics,
+      topics: Array.isArray(topics) ? topics : [],
       difficulty,
       duration,
       jobDescription,
@@ -91,20 +95,19 @@ export async function POST(request) {
     // 🔗 Generate invite link for sharing
     const origin = request.headers.get("origin") || process.env.VERCEL_URL 
       ? `https://${process.env.VERCEL_URL}` 
-      : "https://ai-interview-git-pr-d49414-errorbhupendra481-gmailcoms-projects.vercel.app";
+      : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:4001";
     
     const inviteLink = `${origin}/interview/buddy/${sessionCode}`;
 
-    console.log(`\n[create-session] ✅ SUCCESS`);
+    console.log(`[create-session] ✅ Session created`);
     console.log(`  SessionId: ${sessionRef.id}`);
-    console.log(`  SessionCode: ${sessionCode}`);
-    console.log(`  InviteLink: ${inviteLink}`);
+    console.log(`  CreatedBy: ${userId}`);
 
     return NextResponse.json(
       {
         sessionId: sessionRef.id,
         sessionCode,
-        inviteLink, // 🔗 NEW: Direct invite link for sharing
+        inviteLink,
         success: true,
       },
       { status: 201 }

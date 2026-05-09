@@ -1,13 +1,43 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { withRateLimit } from "@/lib/rate-limiter";
+import { getCurrentUser } from "@/lib/actions/auth.action";
+import { checkGeminiRateLimit } from "@/lib/security/rate-limiters";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 
 export async function POST(request) {
   try {
+    // ✅ FIX #4: Verify authentication
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return Response.json(
+        { error: "User not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // ✅ FIX #7: Check rate limit (500 per hour per user)
+    if (!checkGeminiRateLimit(currentUser.uid)) {
+      return Response.json(
+        { 
+          error: "Gemini API rate limit exceeded. Please try again later.",
+          retryAfter: 3600,
+        },
+        { status: 429 }
+      );
+    }
+
     const { resume, sessionId, candidateId } = await request.json();
 
-    if (!resume) {
-      return Response.json({ error: "Resume not provided" }, { status: 400 });
+    if (!resume || typeof resume !== 'string') {
+      return Response.json({ error: "Valid resume text is required" }, { status: 400 });
+    }
+
+    if (resume.length > 50000) {
+      return Response.json(
+        { error: "Resume is too long (max 50KB)" },
+        { status: 400 }
+      );
     }
 
     let extractedClaims = [];
@@ -34,7 +64,9 @@ Return as JSON array with format:
   ...
 ]`;
 
-        const extractionResult = await model.generateContent(extractionPrompt);
+        const extractionResult = await withRateLimit(async () => {
+          return await model.generateContent(extractionPrompt);
+        }, "resumeClaimExtraction", candidateId || sessionId || "anonymous");
         const extractionText = await extractionResult.response.text();
 
         try {
@@ -64,7 +96,9 @@ Return as JSON array with format:
   ...
 ]`;
 
-        const questionsResult = await model.generateContent(questionsPrompt);
+        const questionsResult = await withRateLimit(async () => {
+          return await model.generateContent(questionsPrompt);
+        }, "resumeVerificationQuestions", candidateId || sessionId || "anonymous");
         const questionsText = await questionsResult.response.text();
 
         try {

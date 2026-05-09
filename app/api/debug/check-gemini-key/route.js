@@ -1,20 +1,33 @@
 /**
  * GET /api/debug/check-gemini-key
  * 
+ * ⚠️ DISABLED IN PRODUCTION
+ * 
  * Diagnostic endpoint to verify:
  * 1. Gemini API key is configured
  * 2. API key is valid and can connect to Google AI
  * 3. Model availability
  * 4. API quota status
  * 
- * ONLY for debugging - remove before production
+ * This endpoint exposes sensitive environment information
+ * and should only be accessible in development
  */
 
 import { NextResponse } from "next/server";
 import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
+import { createDebugResponse } from "@/lib/security/debug-protection";
 
 export async function GET(request) {
+  // ✅ Check if debug endpoints are allowed
+  const debugResponse = createDebugResponse(request);
+  if (debugResponse) {
+    return NextResponse.json(
+      debugResponse.json,
+      { status: debugResponse.status }
+    );
+  }
+
   try {
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY;
 
@@ -26,8 +39,11 @@ export async function GET(request) {
           checks: {
             apiKeyExists: false,
             apiKeyConfigured: false,
-            message: "❌ GOOGLE_GENERATIVE_AI_API_KEY is not configured in environment variables",
-            solution: "Add GOOGLE_GENERATIVE_AI_API_KEY to .env.local or deployment environment",
+            message: "GOOGLE_GENERATIVE_AI_API_KEY is not configured",
+          },
+        },
+        { status: 500 }
+      );
           },
         },
         { status: 400 }

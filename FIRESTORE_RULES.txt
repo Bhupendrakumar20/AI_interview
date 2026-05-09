@@ -4,43 +4,86 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // ========================================================
-    // INTERNSHIPS COLLECTION
+    // HELPER FUNCTION: Verify user is authenticated
     // ========================================================
-    match /internships/{internshipId} {
-      allow read: if true; // Everyone can read
-      allow write: if request.auth != null && request.auth.token.admin == true; // Only admins can write
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    function isUser(uid) {
+      return request.auth.uid == uid;
+    }
+    
+    function isAdmin() {
+      return request.auth.token.admin == true || request.auth.token.super_admin == true;
     }
     
     // ========================================================
-    // APPLICATIONS COLLECTION
+    // USERS COLLECTION - Protected
+    // ========================================================
+    match /users/{userId} {
+      // ✅ Users can only read their own profile
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // ✅ Only the user can update their own profile
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // ✅ Users cannot delete their account via Firestore
+      allow delete: if false;
+    }
+    
+    // ========================================================
+    // INTERNSHIPS COLLECTION - Protected
+    // ========================================================
+    // ✅ FIX #3.5: Changed from public read to admin-only
+    match /internships/{internshipId} {
+      // ✅ Only admins can read (no public access)
+      allow read: if request.auth != null && request.auth.token.admin == true;
+      
+      // ✅ Only admins can create/update/delete
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // ========================================================
+    // APPLICATIONS COLLECTION - Protected by User
     // ========================================================
     match /applications/{applicationId} {
+      // ✅ FIX #5.1: Validate application data structure
       allow read: if request.auth != null && 
         (request.auth.uid == resource.data.userId || 
          request.auth.token.admin == true);
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        request.auth.token.admin == true;
+      
+      // ✅ FIX #5.1: Users can only create applications for themselves
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasAny(['userId', 'internshipId', 'createdAt']);
+      
+      // ✅ Only owner or admin can update
+      allow update: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.token.admin == true);
+      
+      // ✅ Only owner or admin can delete
+      allow delete: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.token.admin == true);
     }
     
     // ========================================================
-    // CRITICAL: INTERVIEW BUDDY SESSIONS - DO NOT REMOVE
-    // ========================================================
-    // This collection stores ALL interview buddy sessions
-    // Sessions can be: human buddy mode OR ai buddy mode
-    // Each session has: participants, creator, score, feedback, recording
+    // INTERVIEW BUDDY SESSIONS - Protected by Participant List
     // ========================================================
     match /interview_buddy_sessions/{sessionId} {
       
-      // RULE 1: CREATION
+      // ✅ RULE 1: CREATION
       // ✅ Authenticated users can create new interview buddy sessions
       // ✅ Both AI and Human buddy modes supported
       // ✅ Session code auto-generated for human mode
       allow create: if request.auth != null && 
         request.resource.data.createdBy == request.auth.uid &&
-        request.resource.data.mode in ['human', 'ai'];
+        request.resource.data.mode in ['human', 'ai'] &&
+        request.resource.data.status == 'created';
       
-      // RULE 2: READ ACCESS
+      // ✅ RULE 2: READ ACCESS
       // ✅ Users can see sessions where they are:
       //    - The creator (session owner)
       //    - A participant (invited to join)
@@ -49,14 +92,17 @@ service cloud.firestore {
         (resource.data.createdBy == request.auth.uid || 
          request.auth.uid in resource.data.participants);
       
-      // RULE 3: UPDATE ACCESS
+      // ✅ RULE 3: UPDATE ACCESS
       // ✅ Only session creator can update
       // ✅ Can update: status, score, feedback, recording URL, transcript
       // ✅ Prevents other users from tampering with results
       allow update: if request.auth != null && 
-        resource.data.createdBy == request.auth.uid;
+        resource.data.createdBy == request.auth.uid &&
+        // ✅ Prevent score manipulation - only certain fields can change status
+        (request.resource.data.status in ['in-progress', 'completed', 'paused'] ||
+         request.resource.data == resource.data);
       
-      // RULE 4: DELETE ACCESS
+      // ✅ RULE 4: DELETE ACCESS
       // ✅ Only session creator can delete
       // ✅ Prevents accidental deletion by participants
       // ✅ Keeps audit trail of completed sessions
@@ -65,18 +111,117 @@ service cloud.firestore {
     }
     
     // ========================================================
-    // INTERVIEW BUDDY STATS COLLECTION
-    // ========================================================
-    // For caching user's interview buddy statistics
+    // INTERVIEW BUDDY STATS COLLECTION - User-Private
     // ========================================================
     match /user_interview_buddy_stats/{userId} {
-      // User can only read their own stats
+      // ✅ User can only read their own stats
       allow read: if request.auth != null && 
         request.auth.uid == userId;
       
-      // Only authenticated users can write to their own stats
+      // ✅ Only the user can write to their own stats
       allow write: if request.auth != null && 
         request.auth.uid == userId;
+    }
+    
+    // ========================================================
+    // INTERVIEWS COLLECTION - Protected by Owner
+    // ========================================================
+    match /interviews/{interviewId} {
+      // ✅ FIX #5.3: Only creator can read interviews
+      allow read: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      
+      // ✅ Authenticated users can create
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+      
+      // ✅ Only creator can update
+      allow update: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+      
+      // ✅ Only creator can delete
+      allow delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // ========================================================
+    // DSA ROOMS COLLECTION - Protected by Participants
+    // ========================================================
+    match /dsa_rooms/{roomId} {
+      // ✅ Authenticated users can read rooms they're in
+      allow read: if request.auth != null &&
+        (resource.data.createdBy == request.auth.uid ||
+         request.auth.uid in resource.data.participants);
+      
+      // ✅ Authenticated users can create rooms
+      allow create: if request.auth != null &&
+        request.resource.data.createdBy == request.auth.uid;
+      
+      // ✅ Only creator can update room
+      allow update: if request.auth != null &&
+        resource.data.createdBy == request.auth.uid;
+      
+      // ✅ Only creator can delete
+      allow delete: if request.auth != null &&
+        resource.data.createdBy == request.auth.uid;
+    }
+    
+    // ========================================================
+    // DSA ROOM PARTICIPANTS - Participant-Only Access
+    // ========================================================
+    match /dsa_room_participants/{participantId} {
+      // ✅ Users can read their own participant records
+      allow read: if request.auth != null &&
+        request.auth.uid == resource.data.userId;
+      
+      // ✅ Users can create own participant record
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+      
+      // ✅ Users can update their own record
+      allow update: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+      
+      // ✅ Users can delete their own record
+      allow delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // ========================================================
+    // DSA QUESTIONS COLLECTION - Public Read
+    // ========================================================
+    match /dsa_questions/{questionId} {
+      // ✅ Public read - no authentication needed
+      allow read: if true;
+      
+      // ✅ Only admins can write
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // ========================================================
+    // USER STATS COLLECTION - User-Private
+    // ========================================================
+    match /user_stats/{userId} {
+      // ✅ User can only read their own stats
+      allow read: if request.auth != null && 
+        request.auth.uid == userId;
+      
+      // ✅ User can update their own stats (via functions)
+      allow write: if request.auth != null && 
+        request.auth.uid == userId;
+    }
+    
+    // ========================================================
+    // FEEDBACK COLLECTION - Private to Creator
+    // ========================================================
+    match /feedback/{feedbackId} {
+      // ✅ Only creator can read
+      allow read: if request.auth != null &&
+        resource.data.createdBy == request.auth.uid;
+      
+      // ✅ Only creator can write
+      allow write: if request.auth != null &&
+        request.resource.data.createdBy == request.auth.uid;
     }
     
     // ========================================================

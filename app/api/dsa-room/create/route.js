@@ -3,36 +3,58 @@
 
 import { NextResponse } from 'next/server';
 import { db } from '@/firebase/admin';
-import { generateRoomCode } from '@/lib/utils/dsa-room-utils';
+import { generateSecureRoomCode } from '@/lib/security/token-generator';
+import { getCurrentUser } from '@/lib/actions/auth.action';
+import { checkRoomCreationRateLimit } from '@/lib/security/rate-limiters';
 
 export async function POST(request) {
   try {
+    // ✅ FIX #1.4: Verify authentication
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: "User not authenticated" },
+        { status: 401 }
+      );
+    }
+
     const { userId, username, questionSetId, maxParticipants = 10 } = await request.json();
 
-    if (!userId || !username) {
+    // ✅ FIX #1.1: Verify userId matches authenticated user
+    if (!userId || userId !== currentUser.uid) {
       return NextResponse.json(
-        { error: 'userId and username are required' },
+        { error: "User ID mismatch with authenticated user" },
+        { status: 403 }
+      );
+    }
+
+    // ✅ FIX #7: Check room creation rate limit (10 rooms per hour per user)
+    if (!checkRoomCreationRateLimit(userId)) {
+      return NextResponse.json(
+        { 
+          error: "Too many rooms created. Maximum 10 rooms per hour.",
+          remaining: 0,
+        },
+        { status: 429 }
+      );
+    }
+
+    if (!username || typeof username !== 'string' || username.length > 100) {
+      return NextResponse.json(
+        { error: 'Valid username is required' },
         { status: 400 }
       );
     }
 
-    // Generate unique room code
-    let roomCode = generateRoomCode();
-    let isUniqueCode = false;
-
-    while (!isUniqueCode) {
-      const existing = await db
-        .collection('dsa_rooms')
-        .where('roomCode', '==', roomCode)
-        .limit(1)
-        .get();
-
-      if (existing.empty) {
-        isUniqueCode = true;
-      } else {
-        roomCode = generateRoomCode();
-      }
+    if (maxParticipants < 1 || maxParticipants > 100) {
+      return NextResponse.json(
+        { error: 'Invalid max participants' },
+        { status: 400 }
+      );
     }
+
+    // ✅ FIX #1: Generate cryptographically secure room code (no DB lookup needed)
+    const roomCode = generateSecureRoomCode();
 
     // Get questions for room
     const questionsSnapshot = await db

@@ -164,32 +164,6 @@ export async function PUT(request, { params }) {
     );
   }
 }
-    
-    if (recordingUrl) updateData.recordingUrl = recordingUrl;
-    if (transcriptUrl) updateData.transcriptUrl = transcriptUrl;
-
-    // Update session
-    await doc.ref.update(updateData);
-
-    const updatedSession = await doc.ref.get();
-
-    return NextResponse.json(
-      {
-        success: true,
-        sessionId,
-        session: serializeFirebaseData(updatedSession.data()),
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("❌ [PUT /update] Error updating session:", error);
-    console.error("    Stack:", error.stack);
-    return NextResponse.json(
-      { error: error.message || "Failed to update session" },
-      { status: 500 }
-    );
-  }
-}
 
 /**
  * DELETE /api/interview-buddy/sessions/[sessionId]

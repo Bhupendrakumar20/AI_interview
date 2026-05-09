@@ -14,6 +14,7 @@ dotenv.config({ path: '.env.local' });
 import { initializeDSARoomHandlers } from '../lib/socket-handlers/dsa-room-handlers.js';
 import { initializeHumanBuddyHandlers } from '../lib/socket-handlers/human-buddy-handlers.js';
 import { hasUserVoted, recordVote, clearRoomVotes, clearUserVotes } from '../lib/security/voting-protection.js';
+import { calculateDSAScore, recordDSASubmission, finalizeDSASession } from '../lib/security/dsa-score-validation.js';
 
 // Lazy-load Firebase only when needed
 let db;
@@ -1060,18 +1061,16 @@ dsaRoomNamespace.on('connection', (socket) => {
 
       console.log(`[code_submit] ${socket.data.username} submitting for ${questionId}`);
 
-      // Create submission record
-      const submissionRef = await db.collection('dsa_room_submissions').add({
+      // ✅ FIX #10: Use server-validated submission recording
+      const submission = await recordDSASubmission(
         roomId,
         userId,
         questionId,
         code,
         language,
-        status: 'pending',
-        submittedAt: new Date(submittedAt),
         timeFromStart,
-        createdAt: new Date(),
-      });
+        'pending'
+      );
 
       // In production: Send to Judge0 or background queue
       // For now, emit a mock result after delay
@@ -1079,22 +1078,26 @@ dsaRoomNamespace.on('connection', (socket) => {
         const passed = Math.random() > 0.3; // 70% pass rate for demo
 
         socket.emit('submission_result', {
-          submissionId: submissionRef.id,
+          submissionId: submission.submissionId,
           questionId,
           passed,
-          points: passed ? 150 : 0,
+          // ✅ IMPORTANT: Client should NOT calculate points
+          // Points are calculated server-side during finalizeDSASession
+          message: passed ? 'Submission accepted' : 'Submission failed',
         });
 
         if (passed) {
-          // Update leaderboard
-          dsaRoomNamespace.to(`room_${roomId}`).emit('leaderboard_update', [
-            { rank: 1, userId, username: socket.data.username, points: 150 },
-          ]);
+          // Broadcast leaderboard update based on latest server-calculated scores
+          // (These are temporary and will be recalculated during room finalization)
+          dsaRoomNamespace.to(`room_${roomId}`).emit('leaderboard_update', {
+            phase: 'interim',
+            message: 'Leaderboard will be finalized when room ends',
+          });
         }
       }, 1500);
     } catch (error) {
       console.error('[code_submit] Error:', error);
-      socket.emit('error', { message: 'Failed to submit code' });
+      socket.emit('error', { message: 'Failed to submit code: ' + error.message });
     }
   });
 
@@ -1291,36 +1294,33 @@ dsaRoomNamespace.on('connection', (socket) => {
         return;
       }
 
-      // Get final leaderboard
+      // Get participants
       const participants = await fetchParticipants(roomId);
-      const finalLeaderboard = participants
-        .sort((a, b) => b.points - a.points)
-        .map((p, idx) => ({ ...p, rank: idx + 1 }));
 
-      // Update room status
-      await roomRef.update({
-        status: 'completed',
-        endedAt: new Date(),
-        finalLeaderboard,
-      });
+      // ✅ FIX #10: Use server-validated score calculation instead of client-side points
+      // This prevents score manipulation and ensures fairness
+      const result = await finalizeDSASession(roomId, participants);
 
-      // Broadcast room ended to all participants
+      // Broadcast room ended to all participants with validated scores
       dsaRoomNamespace.to(`room_${roomId}`).emit('room_ended', {
         roomId,
         reason: 'owner_ended',
-        leaderboard: finalLeaderboard,
+        leaderboard: result.leaderboard,
+        scoringMethod: result.scoringMethod,
         summary: {
           totalQuestions: roomData.questions?.length || 0,
           totalParticipants: participants.length,
           timeSpent: Date.now() - (roomData.serverStartTime?.getTime?.() || Date.now()),
+          maxScore: result.leaderboard[0]?.score || 0,
         },
       });
 
       console.log(`✓ Room ${roomId} ended with ${participants.length} participants`);
+      console.log(`✓ Final scores calculated server-side (secure)`);
       console.log(`✓ [end_room] Complete\n`);
     } catch (error) {
       console.error('[end_room] Error:', error);
-      socket.emit('error_response', { message: 'Failed to end room' });
+      socket.emit('error_response', { message: 'Failed to end room: ' + error.message });
     }
   });
 

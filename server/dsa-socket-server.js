@@ -13,6 +13,7 @@ dotenv.config({ path: '.env.local' });
 // Import handlers (Firebase will be initialized when handlers are called)
 import { initializeDSARoomHandlers } from '../lib/socket-handlers/dsa-room-handlers.js';
 import { initializeHumanBuddyHandlers } from '../lib/socket-handlers/human-buddy-handlers.js';
+import { hasUserVoted, recordVote, clearRoomVotes, clearUserVotes } from '../lib/security/voting-protection.js';
 
 // Lazy-load Firebase only when needed
 let db;
@@ -575,7 +576,21 @@ dsaRoomNamespace.on('connection', (socket) => {
   socket.on('vote_time_limit', async (data) => {
     try {
       const { vote } = data;
+      const userId = socket.data.userId;
       const roomId = socket.data.roomId;
+
+      // ✅ FIX #9: Prevent duplicate votes
+      if (hasUserVoted(roomId, userId, 'time_limit')) {
+        socket.emit('error', { message: 'You have already voted for time limit' });
+        return;
+      }
+
+      // ✅ Validate vote value
+      const validTimeVotes = ['5', '10', '15', '20', '30', '45', '60'];
+      if (!validTimeVotes.includes(String(vote))) {
+        socket.emit('error', { message: 'Invalid time vote' });
+        return;
+      }
 
       const roomRef = db.collection('dsa_rooms').doc(roomId);
       const roomData = (await roomRef.get()).data();
@@ -589,6 +604,9 @@ dsaRoomNamespace.on('connection', (socket) => {
         updatedAt: new Date(),
       });
 
+      // Record the vote in memory to prevent duplicates
+      recordVote(roomId, userId, 'time_limit');
+
       // Broadcast updated votes
       dsaRoomNamespace.to(`room_${roomId}`).emit('voting_update', {
         phase: 'time_limit',
@@ -599,13 +617,28 @@ dsaRoomNamespace.on('connection', (socket) => {
       console.log(`[vote_time_limit] ${vote}min: ${newVotes[vote]}/${roomData.participants.length}`);
     } catch (error) {
       console.error('[vote_time_limit] Error:', error);
+      socket.emit('error', { message: 'Voting failed: ' + error.message });
     }
   });
 
   socket.on('vote_question_mode', async (data) => {
     try {
       const { vote } = data; // 'same' or 'different'
+      const userId = socket.data.userId;
       const roomId = socket.data.roomId;
+
+      // ✅ FIX #9: Prevent duplicate votes
+      if (hasUserVoted(roomId, userId, 'question_mode')) {
+        socket.emit('error', { message: 'You have already voted for question mode' });
+        return;
+      }
+
+      // ✅ Validate vote value
+      const validModeVotes = ['same', 'different'];
+      if (!validModeVotes.includes(String(vote).toLowerCase())) {
+        socket.emit('error', { message: 'Invalid question mode vote' });
+        return;
+      }
 
       const roomRef = db.collection('dsa_rooms').doc(roomId);
       const roomData = (await roomRef.get()).data();
@@ -619,6 +652,9 @@ dsaRoomNamespace.on('connection', (socket) => {
         updatedAt: new Date(),
       });
 
+      // Record the vote in memory to prevent duplicates
+      recordVote(roomId, userId, 'question_mode');
+
       // Broadcast
       dsaRoomNamespace.to(`room_${roomId}`).emit('voting_update', {
         phase: 'question_mode',
@@ -627,6 +663,7 @@ dsaRoomNamespace.on('connection', (socket) => {
       });
     } catch (error) {
       console.error('[vote_question_mode] Error:', error);
+      socket.emit('error', { message: 'Voting failed: ' + error.message });
     }
   });
 

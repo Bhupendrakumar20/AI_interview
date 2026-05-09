@@ -44,10 +44,6 @@ export async function GET(request) {
         },
         { status: 500 }
       );
-          },
-        },
-        { status: 400 }
-      );
     }
 
     console.log("✅ API Key found in environment");

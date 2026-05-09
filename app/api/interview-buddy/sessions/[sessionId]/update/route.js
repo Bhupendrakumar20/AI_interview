@@ -168,19 +168,19 @@ export async function PUT(request, { params }) {
     if (recordingUrl) updateData.recordingUrl = recordingUrl;
     if (transcriptUrl) updateData.transcriptUrl = transcriptUrl;
 
-    console.log("📋 [PUT /update] Updating Firebase with:", Object.keys(updateData));
+    // Update session
     await doc.ref.update(updateData);
-    console.log("✅ [PUT /update] Firebase update successful");
 
-    const updatedDoc = await doc.ref.get();
-    const serialized = serializeFirebaseData(updatedDoc.data());
+    const updatedSession = await doc.ref.get();
 
-    console.log("✅ [PUT /update] Session updated successfully:", sessionId);
-    return NextResponse.json({
-      id: sessionId,
-      ...serialized,
-      success: true,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        sessionId,
+        session: serializeFirebaseData(updatedSession.data()),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("❌ [PUT /update] Error updating session:", error);
     console.error("    Stack:", error.stack);

@@ -6,6 +6,7 @@
  * - Verifies user owns the session before allowing updates
  * - Validates all input parameters
  * - Prevents score manipulation
+ * - Encrypts sensitive data (recordings, transcripts)
  */
 import { NextResponse } from "next/server";
 import * as admin from "firebase-admin";
@@ -13,6 +14,16 @@ import { db } from "@/firebase/admin";
 import { serializeFirebaseData } from "@/lib/firebase-helpers";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { updateSessionWithTransaction } from "@/lib/security/transaction-manager";
+import { encryptField } from "@/lib/security/encryption";
+
+// Get master encryption key if available
+function getMasterKeyIfAvailable() {
+  try {
+    return process.env.DATA_ENCRYPTION_KEY;
+  } catch {
+    return null;
+  }
+}
 
 export async function PUT(request, { params }) {
   try {
@@ -103,7 +114,20 @@ export async function PUT(request, { params }) {
           { status: 400 }
         );
       }
-      updateData.recordingUrl = recordingUrl;
+      
+      // ✅ FIX #12: Encrypt sensitive URLs if encryption key available
+      const encryptionKey = getMasterKeyIfAvailable();
+      if (encryptionKey) {
+        try {
+          updateData.recordingUrl = encryptField(recordingUrl, encryptionKey);
+          updateData.recordingUrl_encrypted = true;
+        } catch {
+          console.warn("Recording URL encryption failed, storing plaintext");
+          updateData.recordingUrl = recordingUrl;
+        }
+      } else {
+        updateData.recordingUrl = recordingUrl;
+      }
     }
 
     if (transcriptUrl) {
@@ -113,7 +137,20 @@ export async function PUT(request, { params }) {
           { status: 400 }
         );
       }
-      updateData.transcriptUrl = transcriptUrl;
+      
+      // ✅ FIX #12: Encrypt sensitive URLs if encryption key available
+      const encryptionKey = getMasterKeyIfAvailable();
+      if (encryptionKey) {
+        try {
+          updateData.transcriptUrl = encryptField(transcriptUrl, encryptionKey);
+          updateData.transcriptUrl_encrypted = true;
+        } catch {
+          console.warn("Transcript URL encryption failed, storing plaintext");
+          updateData.transcriptUrl = transcriptUrl;
+        }
+      } else {
+        updateData.transcriptUrl = transcriptUrl;
+      }
     }
 
     // ✅ FIX #8: Use transaction to prevent race conditions

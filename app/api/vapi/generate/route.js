@@ -29,12 +29,14 @@ export async function POST(request) {
     }
 
     // ✅ FIX #7: Check rate limit (500 per hour per user)
-    if (!checkGeminiRateLimit(userid)) {
+    const rateLimitCheck = await checkGeminiRateLimit(userid);
+    if (!rateLimitCheck.allowed) {
       return Response.json(
         { 
           success: false, 
           error: "Gemini API rate limit exceeded. Please try again later.",
-          retryAfter: 3600,
+          retryAfter: rateLimitCheck.resetIn,
+          remaining: rateLimitCheck.remaining,
         },
         { status: 429 }
       );

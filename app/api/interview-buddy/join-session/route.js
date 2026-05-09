@@ -34,11 +34,13 @@ export async function POST(request) {
       );
     }
 
-    if (!checkSessionJoinRateLimit(ip, sessionCode)) {
+    const rateLimitCheck = await checkSessionJoinRateLimit(ip, sessionCode);
+    if (!rateLimitCheck.allowed) {
       return NextResponse.json(
         { 
           error: "Too many join attempts. Please try again later.",
-          remaining: getRemainingRequests(`session-join:${ip}:${sessionCode}`, 20),
+          remaining: rateLimitCheck.remaining,
+          resetIn: rateLimitCheck.resetIn,
         },
         { status: 429 }
       );

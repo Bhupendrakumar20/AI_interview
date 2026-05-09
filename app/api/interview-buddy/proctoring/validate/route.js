@@ -30,10 +30,15 @@ export async function POST(request) {
       );
     }
 
-    // ✅ Rate limit proctoring requests (5 per minute per user)
-    if (!checkGeminiRateLimit(currentUser.uid, 5, 60000)) {
+    // ✅ Rate limit proctoring requests (500 per hour per user)
+    const rateLimitCheck = await checkGeminiRateLimit(currentUser.uid);
+    if (!rateLimitCheck.allowed) {
       return NextResponse.json(
-        { error: "Too many proctoring requests. Please wait before trying again." },
+        { 
+          error: "Too many proctoring requests. Please wait before trying again.",
+          resetIn: rateLimitCheck.resetIn,
+          remaining: rateLimitCheck.remaining,
+        },
         { status: 429 }
       );
     }

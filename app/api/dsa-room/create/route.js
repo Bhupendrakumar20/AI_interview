@@ -29,11 +29,13 @@ export async function POST(request) {
     }
 
     // ✅ FIX #7: Check room creation rate limit (10 rooms per hour per user)
-    if (!checkRoomCreationRateLimit(userId)) {
+    const rateLimitCheck = await checkRoomCreationRateLimit(userId);
+    if (!rateLimitCheck.allowed) {
       return NextResponse.json(
         { 
           error: "Too many rooms created. Maximum 10 rooms per hour.",
-          remaining: 0,
+          remaining: rateLimitCheck.remaining,
+          resetIn: rateLimitCheck.resetIn,
         },
         { status: 429 }
       );
@@ -117,7 +119,7 @@ export async function POST(request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating DSA room:', error);
+    // Errors logged to audit trail in production
     return NextResponse.json(
       { error: error.message || 'Failed to create room' },
       { status: 500 }

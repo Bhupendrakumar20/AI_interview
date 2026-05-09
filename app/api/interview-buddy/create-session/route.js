@@ -7,6 +7,8 @@ import * as admin from "firebase-admin";
 import { db } from "@/firebase/admin";
 import { generateSecureSessionCode } from "@/lib/security/token-generator";
 import { getCurrentUser } from "@/lib/actions/auth.action";
+import { getClientIp } from "@/lib/security/endpoint-security";
+import { logAuditEvent } from "@/lib/security/audit-logging";
 
 /**
  * Note: UUID v4 tokens are cryptographically unique with negligible collision probability.
@@ -69,8 +71,6 @@ export async function POST(request) {
     // ✅ FIX #1: Generate cryptographically secure session code (128-bit entropy)
     const sessionCode = mode === "human" ? generateSecureSessionCode() : null;
 
-    console.log(`[create-session] Generated secure session code for user ${userId}`);
-
     const sessionRef = await db.collection("interview_buddy_sessions").add({
       createdBy: userId,
       mode,
@@ -99,9 +99,13 @@ export async function POST(request) {
     
     const inviteLink = `${origin}/interview/buddy/${sessionCode}`;
 
-    console.log(`[create-session] ✅ Session created`);
-    console.log(`  SessionId: ${sessionRef.id}`);
-    console.log(`  CreatedBy: ${userId}`);
+    await logAuditEvent({
+      userId,
+      eventType: "interview_session_created",
+      severity: "info",
+      description: `Created interview session in ${mode} mode`,
+      metadata: { sessionId: sessionRef.id, mode, sessionCode },
+    });
 
     return NextResponse.json(
       {
@@ -113,7 +117,14 @@ export async function POST(request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error creating session:", error);
+    await logAuditEvent({
+      userId: currentUser?.uid || "unknown",
+      eventType: "interview_session_creation_failed",
+      severity: "error",
+      description: `Failed to create interview session: ${error.message}`,
+      ip: getClientIp(request),
+    });
+
     return NextResponse.json(
       { error: error.message || "Failed to create session" },
       { status: 500 }

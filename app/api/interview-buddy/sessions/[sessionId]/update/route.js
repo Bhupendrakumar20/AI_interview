@@ -15,6 +15,8 @@ import { serializeFirebaseData } from "@/lib/firebase-helpers";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { updateSessionWithTransaction } from "@/lib/security/transaction-manager";
 import { encryptField } from "@/lib/security/encryption";
+import { getClientIp } from "@/lib/security/endpoint-security";
+import { logAuditEvent } from "@/lib/security/audit-logging";
 
 // Get master encryption key if available
 function getMasterKeyIfAvailable() {
@@ -40,7 +42,6 @@ export async function PUT(request, { params }) {
     const sessionId = params?.sessionId || (await params)?.sessionId;
 
     if (!sessionId) {
-      console.error("❌ Session ID is required but missing");
       return NextResponse.json(
         { error: "Session ID is required" },
         { status: 400 }
@@ -52,7 +53,6 @@ export async function PUT(request, { params }) {
     try {
       body = await request.json();
     } catch (parseError) {
-      console.error("❌ Failed to parse request body:", parseError.message);
       return NextResponse.json(
         { error: "Invalid JSON in request body", details: parseError.message },
         { status: 400 }
@@ -122,7 +122,7 @@ export async function PUT(request, { params }) {
           updateData.recordingUrl = encryptField(recordingUrl, encryptionKey);
           updateData.recordingUrl_encrypted = true;
         } catch {
-          console.warn("Recording URL encryption failed, storing plaintext");
+          // Encryption failed, storing plaintext
           updateData.recordingUrl = recordingUrl;
         }
       } else {
@@ -145,7 +145,7 @@ export async function PUT(request, { params }) {
           updateData.transcriptUrl = encryptField(transcriptUrl, encryptionKey);
           updateData.transcriptUrl_encrypted = true;
         } catch {
-          console.warn("Transcript URL encryption failed, storing plaintext");
+          // Encryption failed, storing plaintext
           updateData.transcriptUrl = transcriptUrl;
         }
       } else {
@@ -166,7 +166,15 @@ export async function PUT(request, { params }) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Error updating session:", error);
+    await logAuditEvent({
+      userId: currentUser?.uid || "unknown",
+      eventType: "interview_session_update_failed",
+      severity: "error",
+      description: `Failed to update session: ${error.message}`,
+      resource: `sessions/${sessionId}`,
+      ip: getClientIp(request),
+    });
+
     return NextResponse.json(
       { error: error.message || "Failed to update session" },
       { status: 500 }
@@ -216,7 +224,15 @@ export async function DELETE(request, { params }) {
       message: "Session deleted",
     });
   } catch (error) {
-    console.error("Error deleting session:", error);
+    await logAuditEvent({
+      userId: currentUser?.uid || "unknown",
+      eventType: "interview_session_deletion_failed",
+      severity: "error",
+      description: `Failed to delete session: ${error.message}`,
+      resource: `sessions/${sessionId}`,
+      ip: getClientIp(request),
+    });
+
     return NextResponse.json(
       { error: error.message || "Failed to delete session" },
       { status: 500 }

@@ -8,6 +8,7 @@ import { Bell, User, LogOut, Settings } from "lucide-react";
 import { logout } from "@/lib/actions/auth.action";
 import { db } from "@/firebase/client";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function TopBar({ user }) {
   const router = useRouter();
@@ -132,6 +133,9 @@ export default function TopBar({ user }) {
 
         {/* Right Section - Actions */}
         <div className="flex items-center gap-4">
+          {/* Theme Toggle */}
+          <ThemeToggle />
+          
           {/* DSA Room Notifications Badge */}
           {pendingApprovalsCount > 0 && (
             <Link

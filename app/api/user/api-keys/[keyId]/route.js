@@ -4,11 +4,10 @@ import { getClientIp } from "@/lib/security/endpoint-security";
 import {
   revokeApiKey,
   rotateApiKey,
-  hashApiKey,
 } from "@/lib/security/api-key-management";
 import { logAuditEvent } from "@/lib/security/audit-logging";
-import { db } from "@/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/firebase/admin";
+import { doc, getDoc } from "firebase-admin/firestore";
 
 /**
  * DELETE /api/user/api-keys/[keyId]
@@ -77,8 +76,12 @@ export async function POST(request, { params }) {
     }
 
     // Get the old key to retrieve service name
-    const keyDocRef = doc(db, "users", user.uid, "api_keys", keyId);
-    const keyDocSnap = await getDoc(keyDocRef);
+    const keyDocSnap = await db
+      .collection("users")
+      .doc(user.uid)
+      .collection("api_keys")
+      .doc(keyId)
+      .get();
 
     if (!keyDocSnap.exists()) {
       return NextResponse.json({ error: "API key not found" }, { status: 404 });

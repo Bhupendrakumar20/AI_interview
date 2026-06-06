@@ -2,6 +2,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
+import { ThemeProvider } from "@/lib/theme-context";
 import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -18,8 +19,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} bg-background text-foreground dark`}>
-        {children}
-        <ToastProvider />
+        <ThemeProvider>
+          {children}
+          <ToastProvider />
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

@@ -2,7 +2,7 @@
  * DSA Room — Live Coding Component
  * ─────────────────────────────────
  * Real-time multiplayer DSA competitive coding with:
- *  • Monaco Editor + language switching
+ *  • CodeEditorPanel (enhanced code editor)
  *  • Server-synced timer
  *  • Real-time leaderboard
  *  • First blood celebrations
@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { io } from "socket.io-client";
+import CodeEditorPanel from "@/components/CodeEditorPanel";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SOCKET SINGLETON
@@ -493,6 +494,13 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
     socket.emit("set_language", { language: lang });
   };
 
+  // ── Handle code editor execution ────────────────────────────────────────────
+  const handleCodeExecute = useCallback((result) => {
+    // Update code from editor
+    setCode(result.code);
+    // You can add logging or emit to server if needed
+  }, []);
+
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(() => {
     if (isSubmitting || roomStatus !== "active") return;
@@ -570,16 +578,17 @@ export default function DSALiveRoom({ roomCode, username, userId }) {
           <QuestionPanel question={question} />
         </div>
 
-        {/* Center - Editor */}
+        {/* Center - Enhanced Code Editor */}
         <div className="flex-1 relative flex flex-col overflow-hidden bg-slate-950">
-          <SubmitResult result={submitResult} onDismiss={() => setSubmitResult(null)} />
-          <textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="flex-1 p-4 bg-slate-900 text-slate-100 font-mono text-sm border-0 outline-none resize-none"
-            spellCheck="false"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          <CodeEditorPanel
+            language={language}
+            onLanguageChange={handleLanguageChange}
+            initialCode={code}
+            testCases={question?.testCases || []}
+            onExecute={handleCodeExecute}
+            disabled={isSubmitting}
           />
+          <SubmitResult result={submitResult} onDismiss={() => setSubmitResult(null)} />
         </div>
 
         {/* Right Panel - Leaderboard */}

@@ -8,6 +8,7 @@ import {
   Monitor, X, Send, Clock
 } from 'lucide-react';
 import { io } from 'socket.io-client';
+import CodeEditorPanel from '@/components/CodeEditorPanel';
 
 const HumanBuddySession = ({
   sessionId,
@@ -38,6 +39,8 @@ const HumanBuddySession = ({
   const [notesInput, setNotesInput] = useState('');
   const [sessionTime, setSessionTime] = useState(0);
   const [showCopied, setShowCopied] = useState(false);
+  const [collaborativeMode, setCollaborativeMode] = useState('notes'); // 'notes' or 'code'
+  const [codeLanguage, setCodeLanguage] = useState('javascript');
   
   // WebRTC state
   const localVideoRef = useRef(null);
@@ -1039,38 +1042,100 @@ const HumanBuddySession = ({
           </div>
         </div>
 
-        {/* Notes Section */}
+        {/* Notes/Code Section */}
         <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col">
           <div className="border-b border-slate-800 p-4">
-            <h2 className="font-bold text-lg">Shared Notes</h2>
-            <p className="text-xs text-slate-400">Collaborative notes during session</p>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-bold text-lg">Collaboration</h2>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setCollaborativeMode('notes')}
+                  className={`px-2 py-1 text-xs font-medium rounded transition ${
+                    collaborativeMode === 'notes'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  📝 Notes
+                </button>
+                <button
+                  onClick={() => setCollaborativeMode('code')}
+                  className={`px-2 py-1 text-xs font-medium rounded transition ${
+                    collaborativeMode === 'code'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  💻 Code
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400">
+              {collaborativeMode === 'notes' ? 'Collaborative notes' : 'Pair programming code editor'}
+            </p>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="bg-slate-800 rounded-lg p-3 mb-4 min-h-32 max-h-48">
-              <p className="text-sm text-slate-300 whitespace-pre-wrap">{sharedNotes || 'No notes yet...'}</p>
-            </div>
-          </div>
+          {/* NOTES MODE */}
+          {collaborativeMode === 'notes' && (
+            <>
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="bg-slate-800 rounded-lg p-3 mb-4 min-h-32 max-h-48">
+                  <p className="text-sm text-slate-300 whitespace-pre-wrap">{sharedNotes || 'No notes yet...'}</p>
+                </div>
+              </div>
 
-          <div className="border-t border-slate-800 p-4">
-            <div className="flex gap-2">
-              <textarea
-                value={notesInput}
-                onChange={(e) => setNotesInput(e.target.value)}
-                placeholder="Add notes..."
-                rows={3}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
-              />
+              <div className="border-t border-slate-800 p-4">
+                <div className="flex gap-2">
+                  <textarea
+                    value={notesInput}
+                    onChange={(e) => setNotesInput(e.target.value)}
+                    placeholder="Add notes..."
+                    rows={3}
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                </div>
+                <button
+                  onClick={updateNotes}
+                  disabled={!notesInput.trim()}
+                  className="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg py-2 font-medium transition-all flex items-center justify-center gap-2 text-white"
+                >
+                  <Send className="w-4 h-4" />
+                  Add Note
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* CODE MODE */}
+          {collaborativeMode === 'code' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto" style={{ minHeight: '300px' }}>
+                <CodeEditorPanel
+                  language={codeLanguage}
+                  onLanguageChange={setCodeLanguage}
+                  initialCode={sharedNotes}
+                  testCases={[]}
+                  onExecute={(result) => {
+                    setSharedNotes(result.code);
+                  }}
+                />
+              </div>
+              <div className="border-t border-slate-800 p-3">
+                <button
+                  onClick={() => {
+                    socket?.emit('update_notes', {
+                      sessionId,
+                      content: sharedNotes,
+                    });
+                    toast.success('Code shared!');
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 rounded-lg py-2 font-medium text-white text-sm transition-all"
+                >
+                  ✓ Share Code
+                </button>
+              </div>
             </div>
-            <button
-              onClick={updateNotes}
-              disabled={!notesInput.trim()}
-              className="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg py-2 font-medium transition-all flex items-center justify-center gap-2 text-white"
-            >
-              <Send className="w-4 h-4" />
-              Add Note
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

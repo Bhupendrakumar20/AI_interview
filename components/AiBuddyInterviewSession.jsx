@@ -9,6 +9,7 @@ import {
   stopSpeech,
 } from '@/lib/utils/ai-buddy-questions';
 import { createFeedback } from '@/lib/actions/general.action';
+import CodeEditorPanel from '@/components/CodeEditorPanel';
 
 const AiBuddyInterviewSession = ({
   sessionId,
@@ -27,6 +28,8 @@ const AiBuddyInterviewSession = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(duration * 60); // Convert to seconds
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [answerMode, setAnswerMode] = useState('text'); // 'text' or 'code'
+  const [codeLanguage, setCodeLanguage] = useState('javascript');
 
   // Initialize Interview
   useEffect(() => {
@@ -384,45 +387,102 @@ const AiBuddyInterviewSession = ({
 
         {/* Answer Recording Section */}
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-8">
-          <h3 className="text-xl font-bold text-white mb-6">Your Answer</h3>
-
-          <div className="space-y-4">
-            {/* Recording Indicator */}
-            <div className="flex items-center justify-between p-4 bg-slate-800 rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-slate-600'}`}></div>
-                <span className="text-slate-300">
-                  {isRecording ? 'Recording your answer...' : 'Click below to record your answer'}
-                </span>
-              </div>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-white">Your Answer</h3>
+            
+            {/* Toggle between Text and Code Input */}
+            <div className="flex gap-2">
               <button
-                onClick={() => setIsRecording(!isRecording)}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  isRecording
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                onClick={() => setAnswerMode('text')}
+                className={`px-3 py-1 text-sm font-medium rounded-lg transition ${
+                  answerMode === 'text'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                 }`}
               >
-                {isRecording ? 'Stop Recording' : 'Start Recording'}
+                📝 Text Answer
+              </button>
+              <button
+                onClick={() => setAnswerMode('code')}
+                className={`px-3 py-1 text-sm font-medium rounded-lg transition ${
+                  answerMode === 'code'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                💻 Code Solution
               </button>
             </div>
-
-            {/* Transcript Area */}
-            <textarea
-              placeholder="Your answer will appear here if you enable microphone, or you can type your answer..."
-              className="w-full h-32 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
-              value={currentAnswerText}
-              onChange={(e) => handleAnswerChange(e.target.value)}
-            ></textarea>
           </div>
 
-          {/* Save Answer Button */}
-          <button
-            onClick={handleSaveAnswer}
-            className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all"
-          >
-            ✓ Save Answer
-          </button>
+          {/* TEXT MODE */}
+          {answerMode === 'text' && (
+            <div className="space-y-4">
+              {/* Recording Indicator */}
+              <div className="flex items-center justify-between p-4 bg-slate-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-slate-600'}`}></div>
+                  <span className="text-slate-300">
+                    {isRecording ? 'Recording your answer...' : 'Click below to record your answer'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setIsRecording(!isRecording)}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                    isRecording
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  {isRecording ? 'Stop Recording' : 'Start Recording'}
+                </button>
+              </div>
+
+              {/* Transcript Area */}
+              <textarea
+                placeholder="Your answer will appear here if you enable microphone, or you can type your answer..."
+                className="w-full h-32 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
+                value={currentAnswerText}
+                onChange={(e) => handleAnswerChange(e.target.value)}
+              ></textarea>
+
+              {/* Save Answer Button */}
+              <button
+                onClick={handleSaveAnswer}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all"
+              >
+                ✓ Save Answer
+              </button>
+            </div>
+          )}
+
+          {/* CODE MODE */}
+          {answerMode === 'code' && (
+            <div className="space-y-4">
+              <div style={{ height: '400px' }}>
+                <CodeEditorPanel
+                  language={codeLanguage}
+                  onLanguageChange={setCodeLanguage}
+                  initialCode={currentAnswerText}
+                  testCases={currentQuestion?.testCases || []}
+                  onExecute={(result) => {
+                    setCurrentAnswerText(result.code);
+                  }}
+                />
+              </div>
+
+              {/* Save Code Answer Button */}
+              <button
+                onClick={() => {
+                  handleAnswerChange(currentAnswerText);
+                  handleSaveAnswer();
+                }}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all"
+              >
+                ✓ Save Code Solution
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Navigation Buttons */}

@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@/lib/ai-provider";
 import { withRateLimit } from "@/lib/rate-limiter";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
 
 export async function POST(request) {
   try {
@@ -25,9 +25,9 @@ export async function POST(request) {
       aiTextProbability: 0,
     };
 
-    // Use Gemini to detect AI-generated content
+    // Use Gemini or Groq to detect AI-generated content
     let aiDetectionScore = 0;
-    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GROQ_API_KEY) {
       try {
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
@@ -48,7 +48,7 @@ Respond with just a number (0-100).`;
         try {
           const result = await withRateLimit(async () => {
             return await model.generateContent(analyzePrompt);
-          }, "aiGenerationDetection", candidateId || sessionId || "anonymous");
+          }, "aiGenerationDetection", candidateId || sessionId || "anonymous", { prompt: analyzePrompt });
           const scoreText = await result.response.text();
           const score = parseInt(scoreText.match(/\d+/)?.[0] || "0");
           aiDetectionScore = Math.min(100, Math.max(0, score));

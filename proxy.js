@@ -1,8 +1,9 @@
-// middleware.js
+// proxy.js — Next.js Route Proxy
+// Protects /admin routes with authentication
 import { NextResponse } from 'next/server';
 import { adminMiddleware } from './middleware/admin';
 
-export async function middleware(request) {
+export async function proxy(request) {
   const path = request.nextUrl.pathname;
   
   // Protect admin routes

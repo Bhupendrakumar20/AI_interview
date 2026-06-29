@@ -1,154 +1,76 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import HumanBuddySession from '@/components/HumanBuddySession';
-import { Loader2 } from 'lucide-react';
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Users, Video, MessageSquare } from 'lucide-react';
 
-/**
- * Direct Invite Link Page for Human Buddy Mode
- * Users access via: /interview/buddy/[inviteCode]
- * Automatically joins session without needing to enter code
- */
 export default function BuddyInvitePage() {
-  const params = useParams();
   const router = useRouter();
-  
-  const inviteCode = params.inviteCode;
-  
-  const [isLoading, setIsLoading] = useState(true);
-  const [sessionData, setSessionData] = useState(null);
-  const [isOwner, setIsOwner] = useState(false);
-  const [error, setError] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [username, setUsername] = useState(null);
 
-  useEffect(() => {
-    const joinSessionViaInvite = async () => {
-      try {
-        // First check if user is authenticated
-        const userResponse = await fetch('/api/auth/current-user');
-        
-        if (!userResponse.ok) {
-          // User not logged in, redirect to login
-          toast.error('Please log in first');
-          router.push('/auth/login');
-          return;
-        }
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between py-12 px-6 relative overflow-hidden">
+      {/* Background Glows */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-linear-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -z-10"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-linear-to-br from-purple-500/10 to-transparent rounded-full blur-3xl -z-10"></div>
 
-        const userData = await userResponse.json();
-        
-        if (!userData?.id) {
-          toast.error('Authentication failed');
-          router.push('/auth/login');
-          return;
-        }
-
-        setUserId(userData.id);
-        setUsername(userData.displayName || `User_${userData.id?.slice(0, 8)}`);
-
-        if (!inviteCode) {
-          setError('Invalid invite code');
-          setIsLoading(false);
-          return;
-        }
-
-        console.log(`\n${'═'.repeat(60)}`);
-        console.log(`🔗 [BuddyInvite] Joining via invite link`);
-        console.log(`${'═'.repeat(60)}`);
-        console.log(`📍 UserId: ${userData.id}`);
-        console.log(`🔑 InviteCode: ${inviteCode}`);
-        
-        // Call API to join session via invite code
-        const response = await fetch('/api/interview-buddy/join-by-invite', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: userData.id,
-            inviteCode: inviteCode,
-          }),
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          console.error(`❌ Join failed:`, error);
-          throw new Error(error.error || 'Failed to join session');
-        }
-
-        const data = await response.json();
-        console.log(`✅ Successfully joined session:`, {
-          sessionId: data.sessionId,
-          sessionCode: data.sessionCode,
-          isCreator: data.isCreator,
-        });
-        
-        setSessionData({
-          sessionId: data.sessionId,
-          sessionCode: data.sessionCode,
-          isCreator: data.isCreator,
-        });
-        
-        setIsOwner(data.isCreator);
-        setIsLoading(false);
-      } catch (err) {
-        console.error('❌ Error joining session:', err);
-        setError(err.message || 'Failed to join session');
-        toast.error(err.message || 'Failed to join session');
-        setIsLoading(false);
-      }
-    };
-
-    joinSessionViaInvite();
-  }, [inviteCode, router]);
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-white text-lg">Joining buddy session...</p>
-        </div>
+      {/* Header */}
+      <div className="max-w-7xl mx-auto w-full">
+        <button
+          onClick={() => router.push('/interview/buddy')}
+          className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition text-sm cursor-pointer"
+        >
+          <ArrowLeft size={16} /> Back to Interview Buddy
+        </button>
       </div>
-    );
-  }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900">
-        <div className="text-center max-w-md">
-          <p className="text-red-400 text-lg mb-4">{error}</p>
-          <button
-            onClick={() => router.push('/')}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Go Home
-          </button>
+      {/* Main Content */}
+      <div className="max-w-2xl mx-auto text-center my-auto flex flex-col items-center">
+        <div className="w-20 h-20 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-8 shadow-lg shadow-blue-500/10 animate-pulse">
+          <Users size={40} className="text-blue-400" />
         </div>
+
+        <span className="text-xs font-bold tracking-widest text-blue-400 uppercase bg-blue-500/10 border border-blue-500/20 px-3.5 py-1.5 rounded-full mb-4">
+          Development in Progress
+        </span>
+
+        <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight bg-linear-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+          Human Buddy Mode
+        </h1>
+
+        <p className="text-slate-300 text-lg mb-8 max-w-md">
+          We are upgrading our peer-to-peer connection systems. This feature is currently offline while we integrate a new video and chat solution.
+        </p>
+
+        {/* Feature Preview Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full text-left mb-8">
+          <div className="p-5 rounded-xl bg-slate-900/50 border border-slate-800">
+            <div className="text-blue-400 mb-2">
+              <Video size={20} />
+            </div>
+            <h3 className="font-bold text-white mb-1">Peer Video Mock Sessions</h3>
+            <p className="text-xs text-slate-400">Collaborate with peers in mock interviews with split screen layouts and role assignments.</p>
+          </div>
+          <div className="p-5 rounded-xl bg-slate-900/50 border border-slate-800">
+            <div className="text-blue-400 mb-2">
+              <MessageSquare size={20} />
+            </div>
+            <h3 className="font-bold text-white mb-1">Real-time Signals & Docs</h3>
+            <p className="text-xs text-slate-400">Share signal cards and live feedback templates during peer mock interviews.</p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => router.push('/interview/buddy')}
+          className="px-6 py-3 rounded-lg bg-linear-to-r from-blue-500 to-indigo-600 text-white font-medium hover:shadow-lg hover:shadow-blue-500/30 transition hover:scale-105 cursor-pointer"
+        >
+          Go to AI Buddy Mode
+        </button>
       </div>
-    );
-  }
 
-  // Session component
-  if (sessionData && userId && username) {
-    return (
-      <HumanBuddySession
-        sessionId={sessionData.sessionId}
-        sessionCode={sessionData.sessionCode}
-        userId={userId}
-        username={username}
-        isOwner={isOwner}
-        onSessionEnd={() => {
-          router.push('/');
-        }}
-        onClose={() => {
-          router.push('/');
-        }}
-      />
-    );
-  }
-
-  return null;
+      {/* Footer */}
+      <div className="max-w-7xl mx-auto w-full text-center text-xs text-slate-500">
+        PrepWise · Shaping the future of technical interview prep
+      </div>
+    </div>
+  );
 }

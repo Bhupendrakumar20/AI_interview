@@ -66,35 +66,35 @@ const Sidebar = ({ user }) => {
 
   return (
     <aside className={cn(
-      "sticky top-0 h-screen border-r border-dark-300 bg-linear-to-b from-dark-100 to-dark-200 transition-all duration-300 z-40 shadow-lg",
+      "sticky top-0 h-screen border-r border-border bg-card transition-all duration-300 z-40 shadow-md",
       collapsed ? "w-20" : "w-64"
     )}>
       <div className="flex flex-col h-full">
         {/* Logo */}
-        <div className="p-4 border-b border-dark-300 bg-dark-150">
+        <div className="p-4 border-b border-border bg-background/50">
           <Link href="/" className="flex items-center gap-3">
             <Image src="/prepwise_logo.png" alt="logo" width={32} height={32} className="rounded-md" />
             {!collapsed && (
               <div>
-                <h2 className="text-primary-100 font-bold text-lg">PrepWise</h2>
-                <p className="text-xs text-light-300">Career Platform</p>
+                <h2 className="text-foreground font-bold text-lg leading-tight tracking-tight">PrepWise</h2>
+                <p className="text-xs text-muted-foreground">Career Platform</p>
               </div>
             )}
           </Link>
         </div>
 
         {/* User Profile */}
-        <div className="p-4 border-b border-dark-300">
+        <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="bg-linear-to-br from-primary-200 to-primary-300 rounded-full size-10 flex items-center justify-center shadow-md">
-              <span className="text-dark-100 font-bold text-sm">
+            <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-full size-10 flex items-center justify-center shadow-md">
+              <span className="font-bold text-sm">
                 {user?.name?.charAt(0) || "U"}
               </span>
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-light-50 truncate text-sm">{user?.name || "User"}</p>
-                <p className="text-xs text-light-300">Student</p>
+                <p className="font-semibold text-foreground truncate text-sm">{user?.name || "User"}</p>
+                <p className="text-xs text-muted-foreground">Student</p>
               </div>
             )}
           </div>
@@ -110,15 +110,24 @@ const Sidebar = ({ user }) => {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 group hover:scale-[1.02]",
+                    "flex items-center gap-3 px-4 py-3 rounded-lg relative transition-all group overflow-hidden",
+                    "transition-[transform,background-color] duration-200 ease-out",
                     isActive
-                      ? "bg-primary-200 text-dark-100 font-semibold shadow-md hover:shadow-lg"
-                      : "hover:bg-dark-200 text-light-200 hover:text-light-50 hover:shadow-md hover:shadow-primary-200/10"
+                      ? "bg-primary/8 text-primary font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-primary/4 hover:translate-x-0.5"
                   )}
+                  style={{
+                    transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease"
+                  }}
                 >
+                  {/* Left Pill Indicator */}
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full" />
+                  )}
+
                   <div className={cn(
-                    "shrink-0 transition-transform duration-200",
-                    !isActive && "group-hover:scale-110"
+                    "shrink-0 transition-transform duration-200 ease-out",
+                    isActive ? "text-primary" : "text-muted-foreground group-hover:translate-x-[2px] group-hover:text-foreground"
                   )}>
                     <Icon name={item.icon} className="w-5 h-5" />
                   </div>
@@ -132,7 +141,7 @@ const Sidebar = ({ user }) => {
           {!collapsed && (
             <>
               <div className="mt-6 mb-3 px-4">
-                <h3 className="text-xs font-bold text-light-400 uppercase tracking-wider">Your Dashboards</h3>
+                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Your Dashboards</h3>
               </div>
               <div className="space-y-1 px-2">
                 {dashboardItems.map((item) => {
@@ -142,13 +151,17 @@ const Sidebar = ({ user }) => {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all duration-300 group hover:scale-[1.02]",
+                        "flex items-center gap-2 px-4 py-2 text-sm rounded-lg relative transition-all duration-200 group",
                         isActive
-                          ? "bg-primary-200/20 text-primary-100 font-semibold hover:bg-primary-200/30"
-                          : "hover:bg-dark-200 text-light-300 hover:text-light-100 hover:shadow-md hover:shadow-primary-200/5"
+                          ? "bg-primary/8 text-primary font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-primary/4 hover:translate-x-0.5"
                       )}
                     >
-                      <span className="text-xs opacity-60">›</span>
+                      {/* Left Pill Indicator */}
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-primary rounded-r-full" />
+                      )}
+                      <span className="text-xs opacity-60 group-hover:translate-x-[2px] transition-transform">›</span>
                       <span className="truncate">{item.label}</span>
                     </Link>
                   );
@@ -159,10 +172,10 @@ const Sidebar = ({ user }) => {
         </div>
 
         {/* Collapse Button */}
-        <div className="p-3 border-t border-dark-300 bg-dark-150">
+        <div className="p-3 border-t border-border bg-background/50">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="w-full p-2 rounded-lg bg-dark-200 hover:bg-dark-300 text-light-200 hover:text-primary-100 transition-all duration-200 flex items-center justify-center font-semibold text-sm"
+            className="w-full p-2 rounded-lg bg-secondary hover:bg-primary/8 text-muted-foreground hover:text-primary transition-all duration-200 flex items-center justify-center font-semibold text-sm cursor-pointer"
           >
             {collapsed ? "»" : "«"}
             {!collapsed && <span className="ml-2 text-xs">Collapse</span>}

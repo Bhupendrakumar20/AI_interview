@@ -105,12 +105,12 @@ export default function TopBar({ user }) {
     try {
       setLoggingOut(true);
       await logout();
-      toast.success("✅ Logged out successfully!");
+      toast.success("Logged out successfully");
       setTimeout(() => {
         router.push("/sign-in");
       }, 500);
     } catch (error) {
-      toast.error("❌ Failed to logout!");
+      toast.error("Failed to logout");
     } finally {
       setLoggingOut(false);
       setShowDropdown(false);
@@ -120,15 +120,15 @@ export default function TopBar({ user }) {
   const isSettingsPage = pathname === "/settings" || pathname.startsWith("/settings/");
 
   return (
-    <nav className="sticky top-0 z-50 bg-dark-200 border-b border-dark-300 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 bg-card border-b border-border backdrop-blur-md">
       <div className="flex items-center justify-between px-6 py-3 h-16">
         {/* Left Section */}
         <div className="flex items-center gap-2 flex-1">
-          <span className="text-lg font-semibold text-primary-200">
+          <span className="text-lg font-semibold text-foreground">
             {user?.name || "User"}
           </span>
-          <span className="text-light-400 text-sm">•</span>
-          <span className="text-light-400 text-sm">{user?.email || "student"}</span>
+          <span className="text-muted-foreground text-sm">•</span>
+          <span className="text-muted-foreground text-sm">{user?.email || "student"}</span>
         </div>
 
         {/* Right Section - Actions */}
@@ -140,7 +140,7 @@ export default function TopBar({ user }) {
           {pendingApprovalsCount > 0 && (
             <Link
               href="/interview/buddy"
-              className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all hover:shadow-lg hover:shadow-orange-500/20"
+              className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all hover:shadow-lg hover:shadow-orange-500/20 cursor-pointer"
               title="Pending Interview Buddy DSA approvals"
             >
               <Bell size={20} className="text-orange-400" />
@@ -153,10 +153,10 @@ export default function TopBar({ user }) {
           {/* Settings Button */}
           <Link
             href="/settings"
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
               isSettingsPage
-                ? "bg-primary-200 text-dark-100 font-semibold shadow-lg"
-                : "bg-dark-300 text-light-100 hover:bg-dark-300/80 hover:text-primary-200"
+                ? "bg-primary text-primary-foreground font-semibold shadow-lg"
+                : "bg-secondary text-foreground hover:bg-secondary/80 hover:text-primary"
             }`}
           >
             <Settings size={18} />
@@ -167,27 +167,27 @@ export default function TopBar({ user }) {
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="w-10 h-10 rounded-full bg-primary-200 text-dark-100 font-bold flex items-center justify-center hover:shadow-lg transition-shadow text-lg"
+              className="w-10 h-10 rounded-full bg-primary text-primary-foreground font-bold flex items-center justify-center hover:shadow-lg transition-shadow text-lg cursor-pointer"
             >
               {user?.name?.charAt(0) || "U"}
             </button>
 
             {/* Dropdown Menu */}
             {showDropdown && (
-              <div className="absolute right-0 mt-2 w-48 rounded-lg bg-dark-300 border border-dark-200 shadow-xl overflow-hidden">
+              <div className="absolute right-0 mt-2 w-48 rounded-lg bg-card border border-border shadow-xl overflow-hidden z-50">
                 {/* Profile Info */}
-                <div className="px-4 py-3 border-b border-dark-200 bg-dark-200/50">
-                  <p className="text-sm font-semibold text-light-100 truncate">
+                <div className="px-4 py-3 border-b border-border bg-secondary/50">
+                  <p className="text-sm font-semibold text-foreground truncate">
                     {user?.name || "User"}
                   </p>
-                  <p className="text-xs text-light-400 truncate">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
 
                 {/* Menu Items */}
                 <Link
                   href="/profile"
                   onClick={() => setShowDropdown(false)}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-light-100 hover:bg-dark-200 transition"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary transition cursor-pointer"
                 >
                   <User size={18} />
                   <span>View Profile</span>
@@ -196,7 +196,7 @@ export default function TopBar({ user }) {
                 <Link
                   href="/settings"
                   onClick={() => setShowDropdown(false)}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-light-100 hover:bg-dark-200 transition"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary transition cursor-pointer"
                 >
                   <Settings size={18} />
                   <span>Settings</span>
@@ -206,7 +206,7 @@ export default function TopBar({ user }) {
                 <button
                   onClick={handleLogout}
                   disabled={loggingOut}
-                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition border-t border-dark-200 disabled:opacity-50"
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition border-t border-border disabled:opacity-50 cursor-pointer"
                 >
                   <LogOut size={18} />
                   <span>{loggingOut ? "Logging out..." : "Logout"}</span>

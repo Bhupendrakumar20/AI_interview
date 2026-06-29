@@ -468,6 +468,7 @@ const AiBuddyInterviewSession = ({
                   onExecute={(result) => {
                     setCurrentAnswerText(result.code);
                   }}
+                  onChange={handleAnswerChange}
                 />
               </div>
 

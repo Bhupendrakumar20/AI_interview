@@ -4,11 +4,41 @@ import { toast } from "sonner";
 import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Brain, Radio, BarChart3, Code, Video, FileJson, Film, Trophy, Cpu, Eye } from "lucide-react";
 import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
-import HumanBuddySession from "./HumanBuddySession";
-import DSARoomLobby from "./DSARoomLobby";
+
+const ComingSoonScreen = ({ title, icon: Icon, desc, onClose }) => (
+  <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between py-12 px-6 relative overflow-hidden">
+    <div className="absolute top-0 right-0 w-96 h-96 bg-linear-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -z-10"></div>
+    <div className="absolute bottom-0 left-0 w-96 h-96 bg-linear-to-br from-purple-500/10 to-transparent rounded-full blur-3xl -z-10"></div>
+    <div className="max-w-7xl mx-auto w-full">
+      <button onClick={onClose} className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition text-sm cursor-pointer bg-transparent border-0">
+        <span className="text-lg">←</span> Back to Mode Selection
+      </button>
+    </div>
+    <div className="max-w-2xl mx-auto text-center my-auto flex flex-col items-center">
+      <div className="w-20 h-20 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-8 shadow-lg shadow-blue-500/10 animate-pulse">
+        <Icon size={40} className="text-blue-400" />
+      </div>
+      <span className="text-xs font-bold tracking-widest text-blue-400 uppercase bg-blue-500/10 border border-blue-500/20 px-3.5 py-1.5 rounded-full mb-4">
+        Coming Soon
+      </span>
+      <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight bg-linear-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+        {title}
+      </h1>
+      <p className="text-slate-300 text-lg mb-8 max-w-md">
+        {desc}
+      </p>
+      <button onClick={onClose} className="px-6 py-3 rounded-lg bg-linear-to-r from-blue-500 to-indigo-600 text-white font-medium hover:shadow-lg hover:shadow-blue-500/30 transition hover:scale-105 cursor-pointer border-0">
+        Try AI Buddy Mode instead
+      </button>
+    </div>
+    <div className="max-w-7xl mx-auto w-full text-center text-xs text-slate-500">
+      PrepWise · Shaping the future of technical interview prep
+    </div>
+  </div>
+);
 
 const InterviewBuddy = ({ userId }) => {
-  const [currentMode, setCurrentMode] = useState("human");
+  const [currentMode, setCurrentMode] = useState("ai");
   const [selectedPersona, setSelectedPersona] = useState("hiring-manager");
   const [selectedDifficulty, setSelectedDifficulty] = useState("medium");
   const [sessionDuration, setSessionDuration] = useState(30);
@@ -428,35 +458,18 @@ const InterviewBuddy = ({ userId }) => {
   return (
     <>
       {dsaRoomActive ? (
-        <DSARoomLobby
-          userId={userId}
-          username={`User_${userId?.slice(0, 8) || 'Guest'}`}
-          onRoomJoined={(roomData) => {
-            toast.success("Room joined! Starting DSA competition...");
-            // Room data contains socket connection for further use
-          }}
+        <ComingSoonScreen
+          title="DSA Room Mode"
+          icon={Trophy}
+          desc="We are rebuilding the LeetCode-style competitive multiplayer rooms. This feature is currently offline while we deploy a highly optimized execution engine."
           onClose={() => setDsaRoomActive(false)}
         />
-      ) : isHumanBuddyActive && sessionCode && activeSessionId ? (
-        <HumanBuddySession
-          sessionId={activeSessionId}
-          sessionCode={sessionCode}
-          userId={userId}
-          username={`User_${userId?.slice(0, 8) || 'Guest'}`}
-          isOwner={isSessionOwner} // 🔥 Fixed: Use actual owner flag, not hardcoded true
-          onSessionEnd={() => {
-            setIsHumanBuddyActive(false);
-            setSessionCode(null);
-            setActiveSessionId(null);
-            setIsSessionOwner(false);
-            fetchStats();
-          }}
-          onClose={() => {
-            setIsHumanBuddyActive(false);
-            setSessionCode(null);
-            setActiveSessionId(null);
-            setIsSessionOwner(false);
-          }}
+      ) : isHumanBuddyActive ? (
+        <ComingSoonScreen
+          title="Human Buddy Mode"
+          icon={Users}
+          desc="We are currently upgrading peer-to-peer audio/video connection systems. This feature is offline while we integrate our new robust WebRTC signaling servers."
+          onClose={() => setIsHumanBuddyActive(false)}
         />
       ) : showResults && sessionResults ? (
         <AiBuddyResultsScreen
@@ -535,16 +548,12 @@ const InterviewBuddy = ({ userId }) => {
         <div className="grid md:grid-cols-3 gap-4">
           {/* Human Mode Card */}
           <div
-            onClick={() => setCurrentMode("human")}
-            className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all ${
-              currentMode === "human"
-                ? "border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20"
-                : "border-slate-700 bg-slate-900/50 hover:border-slate-600"
-            }`}
+            onClick={() => setIsHumanBuddyActive(true)}
+            className="relative p-6 rounded-2xl border border-slate-800 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/50 cursor-pointer transition-all opacity-85 hover:opacity-100"
           >
-            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
-              {currentMode === "human" ? "✓" : ""}
-            </div>
+            <span className="absolute top-4 right-4 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
+              Coming Soon
+            </span>
             <div className="mb-3 text-blue-400">
               <Users size={32} />
             </div>
@@ -592,15 +601,11 @@ const InterviewBuddy = ({ userId }) => {
           {/* DSA Room Mode Card */}
           <div
             onClick={() => setDsaRoomActive(true)}
-            className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all ${
-              dsaRoomActive
-                ? "border-emerald-500 bg-emerald-500/5 shadow-lg shadow-emerald-500/20"
-                : "border-slate-700 bg-slate-900/50 hover:border-slate-600"
-            }`}
+            className="relative p-6 rounded-2xl border border-slate-800 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/50 cursor-pointer transition-all opacity-85 hover:opacity-100"
           >
-            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
-              {dsaRoomActive ? "✓" : ""}
-            </div>
+            <span className="absolute top-4 right-4 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              Coming Soon
+            </span>
             <div className="mb-3 text-emerald-400">
               <Trophy size={32} />
             </div>
@@ -616,6 +621,7 @@ const InterviewBuddy = ({ userId }) => {
               ))}
             </div>
           </div>
+
         </div>
       </div>
 
@@ -646,33 +652,6 @@ const InterviewBuddy = ({ userId }) => {
             </div>
           )}
 
-          {/* Human Invite */}
-          {currentMode === "human" && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Invite a Buddy</h3>
-              <p className="text-sm text-slate-400 mb-4">
-                Generate a unique session code and share it with your interview partner. Once they join, roles are assigned in the lobby.
-              </p>
-              <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                Session code auto-expires in 24h
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 font-bold text-blue-400 text-center text-lg tracking-widest">
-                  {sessionCode}
-                </div>
-                <button
-                  onClick={copyCode}
-                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition"
-                >
-                  Copy
-                </button>
-              </div>
-              <button className="w-full mt-3 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700 transition">
-                Share Link Instead
-              </button>
-            </div>
-          )}
 
           {/* Topics */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">

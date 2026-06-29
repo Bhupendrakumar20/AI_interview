@@ -347,11 +347,11 @@ export default function CoursesPage() {
                   </div>
                   <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                     <div className={cn(
-                      'text-xs font-bold px-2 sm:px-3 py-1 rounded-full text-white whitespace-nowrap',
-                      course.colorClass === 'from-cyan-500 to-cyan-600' && 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-200',
-                      course.colorClass === 'from-violet-500 to-violet-600' && 'bg-violet-500/20 border border-violet-500/40 text-violet-200',
-                      course.colorClass === 'from-orange-500 to-orange-600' && 'bg-orange-500/20 border border-orange-500/40 text-orange-200',
-                      course.colorClass === 'from-emerald-500 to-emerald-600' && 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-200',
+                      'text-xs font-bold px-2 sm:px-3 py-1 rounded-full whitespace-nowrap',
+                      course.colorClass === 'from-cyan-500 to-cyan-600' && 'bg-cyan-500/10 border border-cyan-500/20 dark:bg-cyan-500/20 dark:border-cyan-500/40 text-cyan-700 dark:text-cyan-200',
+                      course.colorClass === 'from-violet-500 to-violet-600' && 'bg-violet-500/10 border border-violet-500/20 dark:bg-violet-500/20 dark:border-violet-500/40 text-violet-700 dark:text-violet-200',
+                      course.colorClass === 'from-orange-500 to-orange-600' && 'bg-orange-500/10 border border-orange-500/20 dark:bg-orange-500/20 dark:border-orange-500/40 text-orange-700 dark:text-orange-200',
+                      course.colorClass === 'from-emerald-500 to-emerald-600' && 'bg-emerald-500/10 border border-emerald-500/20 dark:bg-emerald-500/20 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-200',
                     )}>
                       {course.resources.length} Resources
                     </div>

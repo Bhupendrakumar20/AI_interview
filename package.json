@@ -3,16 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack -p 4001",
-    "dev:socket": "node server/dsa-socket-server-prod.js",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev:socket\"",
+    "dev": "next dev --webpack -p 4001",
+    "dev:all": "concurrently \"npm run dev\" \"npm run piston:start\"",
     "seed-db": "node scripts/seedDatabase.js",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "piston:start": "node server/piston-local-server.js",
+    "piston:status": "node -e \"fetch('http://localhost:2000/api/v2/piston/runtimes').then(r=>r.json()).then(d=>console.log('Runtimes:',d.map(r=>r.language+' '+r.version).join(', '))).catch(e=>console.log('Piston offline:',e.message))\""
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.43",
+    "@ai-sdk/groq": "^3.0.39",
+    "@ai-sdk/openai": "^3.0.68",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^4.1.3",
     "@radix-ui/react-label": "^2.1.2",

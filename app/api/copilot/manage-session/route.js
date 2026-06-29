@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@/lib/ai-provider";
 import { withRateLimit } from "@/lib/rate-limiter";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
 
 export async function POST(request) {
   try {
@@ -73,7 +73,7 @@ async function setupCopilotMode(sessionId, candidateId) {
       ],
     };
 
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && !process.env.GOOGLE_API_KEY && !process.env.GROQ_API_KEY) {
       return Response.json(
         {
           mode: "copilot",
@@ -101,7 +101,7 @@ Format as JSON array of tips.`;
 
     const tipsResult = await withRateLimit(async () => {
       return await model.generateContent(tipsPrompt);
-    }, "copilotModeTips", candidateId || sessionId || "anonymous");
+    }, "copilotModeTips", candidateId || sessionId || "anonymous", { prompt: tipsPrompt });
     const tipsText = await tipsResult.response.text();
 
     let tips = [];
@@ -134,7 +134,7 @@ Format as JSON array of tips.`;
 
 async function assistWithAI(question, aiToolsUsed = [], sessionId, candidateId) {
   try {
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && !process.env.GOOGLE_API_KEY && !process.env.GROQ_API_KEY) {
       return generateFallbackAssistance(question);
     }
 
@@ -162,7 +162,7 @@ Format as JSON with:
 
     const result = await withRateLimit(async () => {
       return await model.generateContent(assistPrompt);
-    }, "copilotModeAssist", candidateId || sessionId || "anonymous");
+    }, "copilotModeAssist", candidateId || sessionId || "anonymous", { prompt: assistPrompt });
     const responseText = await result.response.text();
 
     let assistance;
@@ -211,7 +211,7 @@ async function evaluateCopilotUsage(
   candidateId
 ) {
   try {
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && !process.env.GOOGLE_API_KEY && !process.env.GROQ_API_KEY) {
       return generateFallbackEvaluation(
         candidateResponse,
         aiToolsUsed,
@@ -250,7 +250,7 @@ Return JSON:
 
     const result = await withRateLimit(async () => {
       return await model.generateContent(evaluationPrompt);
-    }, "copilotModeEvaluation", candidateId || sessionId || "anonymous");
+    }, "copilotModeEvaluation", candidateId || sessionId || "anonymous", { prompt: evaluationPrompt });
     const responseText = await result.response.text();
 
     let evaluation;

@@ -55,10 +55,10 @@ export default async function HomePage() {
     <div className="space-y-8">
       {/* Hero Section */}
       <section className="text-center py-8">
-        <h1 className="text-5xl font-bold mb-4 bg-linear-to-r from-primary-100 to-primary-200 bg-clip-text text-transparent">
+        <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 bg-clip-text text-transparent dark:bg-linear-to-r dark:from-primary-100 dark:to-primary-200">
           Unlock Your Career!
         </h1>
-        <p className="text-light-100 text-lg max-w-2xl mx-auto">
+        <p className="text-slate-600 dark:text-light-100 text-lg max-w-2xl mx-auto">
           Practice interviews, find opportunities, and accelerate your career growth
         </p>
       </section>

@@ -1,9 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@/lib/ai-provider";
 import { withRateLimit } from "@/lib/rate-limiter";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { checkGeminiRateLimit } from "@/lib/security/rate-limiters";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
 
 export async function POST(request) {
   try {
@@ -45,8 +45,8 @@ export async function POST(request) {
     let extractedClaims = [];
     let verificationQuestions = [];
 
-    // Use Gemini to extract and analyze resume claims
-    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    // Use Gemini or Groq to extract and analyze resume claims
+    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GROQ_API_KEY) {
       try {
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
@@ -68,7 +68,7 @@ Return as JSON array with format:
 
         const extractionResult = await withRateLimit(async () => {
           return await model.generateContent(extractionPrompt);
-        }, "resumeClaimExtraction", candidateId || sessionId || "anonymous");
+        }, "resumeClaimExtraction", candidateId || sessionId || "anonymous", { prompt: extractionPrompt });
         const extractionText = await extractionResult.response.text();
 
         try {
@@ -100,7 +100,7 @@ Return as JSON array with format:
 
         const questionsResult = await withRateLimit(async () => {
           return await model.generateContent(questionsPrompt);
-        }, "resumeVerificationQuestions", candidateId || sessionId || "anonymous");
+        }, "resumeVerificationQuestions", candidateId || sessionId || "anonymous", { prompt: questionsPrompt });
         const questionsText = await questionsResult.response.text();
 
         try {

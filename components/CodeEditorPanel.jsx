@@ -33,6 +33,7 @@ export default function CodeEditorPanel({
   language = 'javascript', 
   onLanguageChange, 
   onExecute,
+  onChange,
   initialCode = '',
   testCases = [],
   disabled = false 
@@ -54,23 +55,76 @@ export default function CodeEditorPanel({
   
   const codeInputRef = useRef(null);
 
+  // Sync state if initialCode prop changes
+  useEffect(() => {
+    setCode(initialCode);
+  }, [initialCode]);
+
   // ─────────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ─────────────────────────────────────────────────────────────────────────────
 
   const handleCodeChange = (e) => {
-    setCode(e.target.value);
+    const newCode = e.target.value;
+    setCode(newCode);
+    if (onChange) onChange(newCode);
+  };
+
+  const handleKeyDown = (e) => {
+    const textarea = e.target;
+    const { selectionStart, selectionEnd, value } = textarea;
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const tabSpaces = '  '; // 2 spaces
+      const newValue = value.substring(0, selectionStart) + tabSpaces + value.substring(selectionEnd);
+      
+      setCode(newValue);
+      if (onChange) onChange(newValue);
+      
+      // Update cursor position in next tick
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = selectionStart + tabSpaces.length;
+      }, 0);
+    } else if (e.key === 'Enter') {
+      // Find current line to detect indentation
+      const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
+      const currentLine = value.substring(lineStart, selectionStart);
+      
+      // Match leading whitespace of the current line
+      const match = currentLine.match(/^(\s*)/);
+      let indent = match ? match[1] : '';
+      
+      // If the line ends with an opening brace/bracket/paren, auto-indent further
+      const trimmedLine = currentLine.trim();
+      const opensBlock = /[{[(]$/;
+      if (opensBlock.test(trimmedLine)) {
+        indent += '  '; // Add 2 spaces of indentation
+      }
+      
+      e.preventDefault();
+      const insertText = '\n' + indent;
+      const newValue = value.substring(0, selectionStart) + insertText + value.substring(selectionEnd);
+      
+      setCode(newValue);
+      if (onChange) onChange(newValue);
+      
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = selectionStart + insertText.length;
+      }, 0);
+    }
   };
 
   const handleFormat = useCallback(() => {
     try {
       const formatted = formatCode(code, language);
       setCode(formatted);
+      if (onChange) onChange(formatted);
       setError('');
     } catch (err) {
       setError(`Formatting failed: ${err.message}`);
     }
-  }, [code, language]);
+  }, [code, language, onChange]);
 
   const handleCheckSyntax = useCallback(() => {
     const errors = detectSyntaxErrors(code, language);
@@ -98,6 +152,7 @@ export default function CodeEditorPanel({
   const handleClearCode = () => {
     if (confirm('Clear all code?')) {
       setCode('');
+      if (onChange) onChange('');
       setOutput('');
       setError('');
       setTestResults(null);
@@ -318,6 +373,7 @@ export default function CodeEditorPanel({
                 ref={codeInputRef}
                 value={code}
                 onChange={handleCodeChange}
+                onKeyDown={handleKeyDown}
                 placeholder="Write your code here..."
                 className={`w-full h-full p-4 ${editorBg} ${editorText} font-mono text-sm resize-none focus:outline-none border-none`}
                 style={{

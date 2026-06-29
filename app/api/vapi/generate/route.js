@@ -6,6 +6,7 @@ import { getRandomInterviewCover } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { checkGeminiRateLimit } from "@/lib/security/rate-limiters";
 import { sanitizeString } from "@/lib/security/endpoint-security";
+import { withRateLimit } from "@/lib/rate-limiter";
 
 export async function POST(request) {
   try {
@@ -104,13 +105,15 @@ Requirements:
 
 Generate the questions now:`;
 
-    const { text: questions } = await generateText({
-      model: google("gemini-2.0-flash-001"),
-      system: systemPrompt,
-      prompt: userPrompt,
-      temperature: 0.7,
-      maxTokens: 1000,
-    });
+    const { text: questions } = await withRateLimit(async () => {
+      return await generateText({
+        model: google("gemini-2.0-flash-001"),
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: 0.7,
+        maxTokens: 1000,
+      });
+    }, "vapiGenerateQuestions", userid);
 
     // ✅ Validate Gemini response is valid JSON
     let parsedQuestions;

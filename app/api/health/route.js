@@ -35,15 +35,25 @@ export async function GET(request) {
       checks.status = "DEGRADED";
     }
 
-    // Check 2: Gemini API Key
+    // Check 2: API Keys (Gemini / Groq)
+    const geminiConfigured = !!process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const groqConfigured = !!process.env.GROQ_API_KEY;
+
     checks.services.geminiApiKey = {
-      status: process.env.GOOGLE_GENERATIVE_AI_API_KEY ? "CONFIGURED" : "MISSING",
-      preview: process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      status: geminiConfigured ? "CONFIGURED" : "MISSING",
+      preview: geminiConfigured
         ? process.env.GOOGLE_GENERATIVE_AI_API_KEY.substring(0, 10) + "..."
         : "NOT SET",
     };
 
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    checks.services.groqApiKey = {
+      status: groqConfigured ? "CONFIGURED" : "MISSING",
+      preview: groqConfigured
+        ? process.env.GROQ_API_KEY.substring(0, 10) + "..."
+        : "NOT SET",
+    };
+
+    if (!geminiConfigured && !groqConfigured) {
       checks.status = "UNHEALTHY";
     }
 
@@ -103,6 +113,44 @@ export async function GET(request) {
       note: "Firebase admin configured",
     };
 
+    // Check 5: Piston Code Execution Service
+    const pistonUrl = process.env.PISTON_API_URL || "http://localhost:2000/api/v2/piston";
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 3000);
+      let pistonOk = false;
+      let pistonDetail = "";
+      try {
+        const pistonRes = await fetch(`${pistonUrl}/runtimes`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+        });
+        pistonOk = pistonRes.ok;
+        if (!pistonOk) {
+          const body = await pistonRes.text();
+          pistonDetail = body.substring(0, 200);
+        }
+      } finally {
+        clearTimeout(tid);
+      }
+      checks.services.piston = {
+        status: pistonOk ? "OPERATIONAL" : "FAILED",
+        url: pistonUrl,
+        note: pistonOk
+          ? "Piston code execution is running"
+          : `Cannot reach Piston API. ${pistonDetail || "Is Docker running? See docker-compose.yml"}`,
+      };
+      if (!pistonOk) checks.status = "DEGRADED";
+    } catch (err) {
+      checks.services.piston = {
+        status: "OFFLINE",
+        url: pistonUrl,
+        note: `Connection failed: ${err.message}. Run: docker compose up -d`,
+      };
+      checks.status = "DEGRADED";
+    }
+
     // Check 5: Rate Limited APIs Status
     const rateLimitedApis = [
       "/api/interview/generate-question",
@@ -146,8 +194,8 @@ function getRecommendation(checks) {
   if (checks.status === "HEALTHY") {
     return "✅ All systems operational. Rate limiter is active and protecting APIs.";
   } else if (checks.status === "DEGRADED") {
-    if (!checks.services.geminiApiKey?.status.includes("CONFIGURED")) {
-      return "⚠️ Gemini API key missing. Set GOOGLE_GENERATIVE_AI_API_KEY in .env.local";
+    if (!checks.services.geminiApiKey?.status.includes("CONFIGURED") && !checks.services.groqApiKey?.status.includes("CONFIGURED")) {
+      return "⚠️ AI API key missing. Set GOOGLE_GENERATIVE_AI_API_KEY or GROQ_API_KEY in .env.local";
     }
     return "⚠️ Some services degraded. Check service statuses above.";
   } else {
@@ -158,8 +206,8 @@ function getRecommendation(checks) {
 function getNextSteps(checks) {
   const steps = [];
 
-  if (!checks.services.geminiApiKey?.status.includes("CONFIGURED")) {
-    steps.push("1. Set GOOGLE_GENERATIVE_AI_API_KEY in environment variables");
+  if (!checks.services.geminiApiKey?.status.includes("CONFIGURED") && !checks.services.groqApiKey?.status.includes("CONFIGURED")) {
+    steps.push("1. Set GOOGLE_GENERATIVE_AI_API_KEY or GROQ_API_KEY in environment variables");
     steps.push("2. Restart development server");
   }
 

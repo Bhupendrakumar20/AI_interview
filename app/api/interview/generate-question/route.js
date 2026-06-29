@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@/lib/ai-provider";
 import { withRateLimit } from "@/lib/rate-limiter";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
 
 export async function POST(request) {
   try {
@@ -16,9 +16,9 @@ export async function POST(request) {
       candidateId,
     } = await request.json();
 
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && !process.env.GOOGLE_API_KEY && !process.env.GROQ_API_KEY) {
       return Response.json(
-        { error: "Gemini API key not configured" },
+        { error: "API key not configured" },
         { status: 500 }
       );
     }
@@ -57,7 +57,7 @@ Generate ONLY ONE question. Format response as JSON with:
     try {
       const result = await withRateLimit(async () => {
         return await model.generateContent(interviewContext);
-      }, "generateInterviewQuestion", candidateId || sessionId || "anonymous");
+      }, "generateInterviewQuestion", candidateId || sessionId || "anonymous", { prompt: interviewContext });
       const responseText = await result.response.text();
 
       // Parse JSON response
@@ -90,7 +90,7 @@ Response format:
       try {
         const followUpResult = await withRateLimit(async () => {
           return await model.generateContent(followUpPrompt);
-        }, "generateFollowUpQuestions", candidateId || sessionId || "anonymous");
+        }, "generateFollowUpQuestions", candidateId || sessionId || "anonymous", { prompt: followUpPrompt });
         const followUpText = await followUpResult.response.text();
         const jsonMatch = followUpText.match(/\[[\s\S]*\]/);
         followUpQuestions = JSON.parse(jsonMatch ? jsonMatch[0] : "[]");

@@ -25,20 +25,27 @@ const QuickAccess = () => {
   ];
 
   return (
-    <section>
-      <h2 className="text-3xl font-bold mb-6 animate-fadeIn">Quick Access</h2>
+    <section className="py-6">
+      <h2 className="text-xl font-bold tracking-tight text-foreground mb-6" style={{ letterSpacing: "-0.02em" }}>Quick Access</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {quickLinks.map((item, idx) => (
           <button
             key={item.label}
             onClick={() => router.push(item.href)}
-            className="dark-gradient rounded-xl p-4 flex flex-col items-center justify-center transition-all duration-300 hover:scale-105 hover:border hover:border-primary-200/50 hover:shadow-lg hover:shadow-primary-200/20 active:scale-95 group"
-            style={{animation: `slideInUp 0.5s ease-out ${idx * 0.05}s both`}}
+            className="group flex flex-col justify-between items-start h-32 p-4 bg-card/60 border border-border/80 rounded-[16px] backdrop-blur-xs transition-all duration-300 hover:border-primary/40 hover:bg-card hover:shadow-lg hover:shadow-primary/5 active:scale-95 cursor-pointer text-left w-full relative overflow-hidden"
+            style={{
+              animation: `slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 0.04}s both`
+            }}
           >
-            <div className="text-2xl mb-2 transition-all duration-300 group-hover:scale-110 group-hover:text-primary-200">
-              <item.icon size={28} className="text-slate-400 group-hover:text-primary-100" />
+            {/* Top-Left Squircle Icon Container - Catchy Accent */}
+            <div className="w-10 h-10 flex items-center justify-center rounded-[12px] bg-primary/10 text-primary transition-all duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
+              <item.icon size={24} className="transition-transform duration-300 group-hover:scale-110" />
             </div>
-            <span className="text-sm text-center text-slate-300 group-hover:text-slate-100 transition-colors">{item.label}</span>
+
+            {/* Bottom-Left Label */}
+            <span className="text-sm font-semibold text-foreground tracking-tight group-hover:text-primary transition-colors mt-auto">
+              {item.label}
+            </span>
           </button>
         ))}
       </div>

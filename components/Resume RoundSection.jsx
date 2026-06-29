@@ -65,8 +65,8 @@ export default function ResumeRoundSection() {
         <div className="section-title-block flex items-center gap-3">
           <FileText className="w-6 h-6 text-cyan-400" />
           <div>
-            <h3 className="text-2xl font-bold text-white">Resume Round</h3>
-            <p className="text-sm text-slate-400 mt-1">
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Resume Round</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Upload your resume & get grilled on every claim
             </p>
           </div>
@@ -77,22 +77,22 @@ export default function ResumeRoundSection() {
       </div>
 
       {/* Resume Card */}
-      <div className="bg-linear-to-br from-slate-900/80 to-slate-900/40 border border-cyan-500/30 rounded-2xl p-8 mb-8 animate-slideUp">
+      <div className="bg-white border border-slate-200 shadow-sm dark:bg-linear-to-br dark:from-slate-900/80 dark:to-slate-900/40 dark:border-cyan-500/30 dark:shadow-none rounded-2xl p-8 mb-8 animate-slideUp">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Upload Zone */}
           <div className="flex flex-col justify-center">
             <div className="upload-zone border-2 border-dashed border-cyan-500/40 rounded-xl p-8 text-center hover:border-cyan-500/60 transition-all duration-300 bg-cyan-500/5 hover:bg-cyan-500/10">
               <div className="flex flex-col items-center">
-                <FileText className="w-12 h-12 text-cyan-400 mb-4" />
-                <p className="text-white font-bold mb-2">Drop your resume here</p>
-                <p className="text-slate-400 text-sm mb-4">
+                <FileText className="w-12 h-12 text-cyan-500 dark:text-cyan-400 mb-4" />
+                <p className="text-slate-900 dark:text-white font-bold mb-2">Drop your resume here</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
                   or click to browse from your device
                 </p>
                 <div className="flex gap-2 justify-center flex-wrap">
                   {["PDF", "DOCX", "DOC", "TXT"].map((type) => (
                     <span
                       key={type}
-                      className="px-3 py-1 bg-slate-800/60 border border-slate-700 rounded text-xs text-slate-300 hover:border-cyan-500 transition-colors cursor-pointer"
+                      className="px-3 py-1 bg-slate-50 border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700 rounded text-xs text-slate-600 dark:text-slate-300 hover:border-cyan-500 transition-colors cursor-pointer"
                     >
                       {type}
                     </span>
@@ -102,28 +102,28 @@ export default function ResumeRoundSection() {
             </div>
 
             {/* Extract Details */}
-            <div className="mt-6 p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
-              <p className="text-cyan-400 font-bold text-sm mb-3">
+            <div className="mt-6 p-4 bg-cyan-500/5 border border-cyan-500/20 dark:bg-cyan-500/10 dark:border-cyan-500/30 rounded-lg">
+              <p className="text-cyan-600 dark:text-cyan-400 font-bold text-sm mb-3">
                 ✓ What the AI extracts from your resume:
               </p>
-              <ul className="text-sm text-slate-300 space-y-2">
+              <ul className="text-sm text-slate-600 dark:text-slate-300 space-y-2">
                 <li className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> Work experience & roles
+                  <span className="text-cyan-600 dark:text-cyan-400 font-semibold">✓</span> Work experience & roles
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> Skills & certifications
+                  <span className="text-cyan-600 dark:text-cyan-400 font-semibold">✓</span> Skills & certifications
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> Education & internships
+                  <span className="text-cyan-600 dark:text-cyan-400 font-semibold">✓</span> Education & internships
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> Projects & tech stack
+                  <span className="text-cyan-600 dark:text-cyan-400 font-semibold">✓</span> Projects & tech stack
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> Achievements & metrics
+                  <span className="text-cyan-600 dark:text-cyan-400 font-semibold">✓</span> Achievements & metrics
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> Gap analysis points
+                  <span className="text-cyan-600 dark:text-cyan-400 font-semibold">✓</span> Gap analysis points
                 </li>
               </ul>
             </div>
@@ -144,7 +144,7 @@ export default function ResumeRoundSection() {
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                       selectedFocus === focus
                         ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/40"
-                        : "bg-slate-800/60 text-slate-300 border border-slate-700 hover:border-slate-600"
+                        : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700 dark:hover:border-slate-600"
                     }`}
                   >
                     {focus}
@@ -165,17 +165,17 @@ export default function ResumeRoundSection() {
                     onClick={() => setSelectedPersona(persona.id)}
                     className={`w-full p-3 rounded-lg transition-all duration-200 text-left ${
                       selectedPersona === persona.id
-                        ? "bg-cyan-500/20 border-2 border-cyan-500 "
-                        : "bg-slate-800/40 border border-slate-700 hover:border-slate-600"
+                        ? "bg-cyan-500/10 border-2 border-cyan-500"
+                        : "bg-slate-50 border border-slate-200 hover:bg-slate-100 dark:bg-slate-800/40 dark:border-slate-700 dark:hover:border-slate-600"
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-lg">{persona.icon}</span>
                       <div>
-                        <p className="text-sm font-bold text-white">
+                        <p className="text-sm font-bold text-slate-900 dark:text-white">
                           {persona.name}
                         </p>
-                        <p className="text-xs text-slate-400">{persona.desc}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{persona.desc}</p>
                       </div>
                     </div>
                   </button>
@@ -191,7 +191,7 @@ export default function ResumeRoundSection() {
               <select
                 value={selectedDuration}
                 onChange={(e) => setSelectedDuration(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:border-cyan-500 focus:outline-none transition-colors"
               >
                 {durationOptions.map((duration) => (
                   <option key={duration} value={duration}>
@@ -221,14 +221,14 @@ export default function ResumeRoundSection() {
         {features.map((feature, idx) => (
           <div
             key={idx}
-            className="p-4 bg-slate-900/60 border border-slate-800 rounded-lg hover:border-cyan-500/30 transition-all duration-300 animate-fadeIn"
+            className="p-4 bg-white border border-slate-200 hover:border-cyan-500/30 dark:bg-slate-900/60 dark:border-slate-800 rounded-lg transition-all duration-300 animate-fadeIn"
             style={{ animationDelay: `${idx * 0.1}s` }}
           >
             <div className="flex items-start gap-3">
-              <span className="text-lg text-cyan-400 shrink-0">{feature.icon}</span>
+              <span className="text-lg text-cyan-500 dark:text-cyan-400 shrink-0">{feature.icon}</span>
               <div>
-                <p className="text-sm font-bold text-white">{feature.title}</p>
-                <p className="text-xs text-slate-400 mt-1">{feature.desc}</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{feature.title}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{feature.desc}</p>
               </div>
             </div>
           </div>

@@ -1,0 +1,40 @@
+# Self-Hosted Piston Code Execution Engine
+# ─────────────────────────────────────────
+# SETUP (one time):
+#   docker compose up -d
+#   node scripts/piston-setup.js          ← installs all language runtimes
+#
+# DAILY:
+#   docker compose up -d                  ← start
+#   docker compose down                   ← stop
+#
+# After starting, Piston is available at:
+#   http://localhost:2000/api/v2/piston/runtimes
+#
+# Update .env.local:
+#   PISTON_API_URL="http://localhost:2000/api/v2/piston"
+
+services:
+  piston:
+    image: ghcr.io/engineer-man/piston:latest
+    container_name: piston-executor
+    privileged: true
+    ports:
+      - "2000:2000"
+    restart: unless-stopped
+    environment:
+      - PISTON_RUNNER_MAX_CONCURRENT_JOBS=64
+      - PISTON_RUNNER_MAX_JOB_TIME=10
+      - PISTON_RUNNER_MEMORY_LIMIT=256
+    volumes:
+      - piston_packages:/piston/packages
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2000/api/v2/piston/runtimes"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  piston_packages:
+    driver: local

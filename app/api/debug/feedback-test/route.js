@@ -64,10 +64,10 @@ export async function GET(request) {
         categoryScoreStructure: result.categoryScores
           ? `Array of ${result.categoryScores.length} items`
           : "Not an array",
-        apiKeyConfigured: process.env.GOOGLE_GENERATIVE_AI_API_KEY ? "✅ Yes" : "❌ No",
+        apiKeyConfigured: (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY) ? "✅ Yes" : "❌ No",
         recommendation: isFallback
-          ? "⚠️  Using FALLBACK data. Check API key and Gemini quotas"
-          : "✅ Gemini API is working correctly",
+          ? "⚠️  Using FALLBACK data. Check API key and quotas"
+          : "✅ AI API (Gemini/Groq) is working correctly",
       },
     });
   } catch (error) {
@@ -77,11 +77,11 @@ export async function GET(request) {
         success: false,
         error: error.message,
         diagnostics: {
-          apiKeyConfigured: process.env.GOOGLE_GENERATIVE_AI_API_KEY ? "✅ Yes" : "❌ No",
+          apiKeyConfigured: (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY) ? "✅ Yes" : "❌ No",
           errorType: error.constructor.name,
           errorMessage: error.message,
           recommendation:
-            "Check console logs and verify GOOGLE_GENERATIVE_AI_API_KEY is set correctly",
+            "Check console logs and verify GOOGLE_GENERATIVE_AI_API_KEY or GROQ_API_KEY is set correctly",
         },
       },
       { status: 500 }

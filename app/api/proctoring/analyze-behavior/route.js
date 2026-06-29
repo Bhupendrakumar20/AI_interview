@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@/lib/ai-provider";
 import { withRateLimit } from "@/lib/rate-limiter";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
 
 export async function POST(request) {
   try {
@@ -83,9 +83,9 @@ export async function POST(request) {
       100 - flagsTriggered * 15 // Each flag reduces score by 15%
     );
 
-    // Use Gemini to generate detailed analysis if API key exists
+    // Use Gemini or Groq to generate detailed analysis if API key exists
     let aiAnalysis = {};
-    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GROQ_API_KEY) {
       try {
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
@@ -109,7 +109,7 @@ export async function POST(request) {
 
         const result = await withRateLimit(async () => {
           return await model.generateContent(prompt);
-        }, "proctorBehaviorAnalysis", candidateId || sessionId || "anonymous");
+        }, "proctorBehaviorAnalysis", candidateId || sessionId || "anonymous", { prompt });
         const responseText = await result.response.text();
 
         // Try to parse JSON response

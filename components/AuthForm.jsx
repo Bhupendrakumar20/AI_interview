@@ -103,12 +103,12 @@ const AuthForm = ({ type }) => {
         <div className="flex flex-col gap-3 justify-center items-center">
           <Image src="/prepwise_logo.png" alt="logo" height={40} width={40} className="rounded-md" />
           <div className="text-center">
-            <h2 className="text-primary-100 font-bold text-xl">PrepWise</h2>
-            <p className="text-xs text-light-300">Career Platform</p>
+            <h2 className="text-foreground font-bold text-xl">PrepWise</h2>
+            <p className="text-xs text-muted-foreground">Career Platform</p>
           </div>
         </div>
 
-        <h3>Practice job interviews with AI</h3>
+        <h3 className="text-foreground">Practice job interviews with AI</h3>
 
         <Form {...form}>
           <form
@@ -145,24 +145,24 @@ const AuthForm = ({ type }) => {
               <div className="text-right">
                 <Link
                   href="/forgot-password"
-                  className="text-xs text-primary-200 hover:text-primary-100 font-semibold transition-colors"
+                  className="text-xs text-primary hover:text-primary/80 font-semibold transition-colors"
                 >
                   Forgot password?
                 </Link>
               </div>
             )}
 
-            <Button className="btn" type="submit">
+            <Button className="btn cursor-pointer" type="submit">
               {isSignIn ? "Sign In" : "Create an Account"}
             </Button>
           </form>
         </Form>
 
-        <p className="text-center">
+        <p className="text-center text-muted-foreground text-sm">
           {isSignIn ? "No account yet?" : "Have an account already?"}
           <Link
             href={!isSignIn ? "/sign-in" : "/sign-up"}
-            className="font-bold text-user-primary ml-1"
+            className="font-bold text-primary ml-1"
           >
             {!isSignIn ? "Sign In" : "Sign Up"}
           </Link>

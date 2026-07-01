@@ -15,6 +15,7 @@ import {
   QUESTION_TYPES,
 } from "@/lib/mock-test-constants";
 import QuestionCard from "@/components/QuestionCard";
+import MockTestWorkspace from "@/components/MockTestWorkspace";
 import { toast } from "sonner";
 import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Lightbulb, Star } from "lucide-react";
 
@@ -52,7 +53,7 @@ export default function MockTestPage() {
   const [searchRole, setSearchRole] = useState(filters.role);
   const [selectedTestType, setSelectedTestType] = useState(TEST_TYPES[0]);
   const [testHistory, setTestHistory] = useState([]);
-  const [showModal, setShowModal] = useState(false);
+  const [isTestActive, setIsTestActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
 
   // Load questions on filter change
@@ -116,20 +117,27 @@ export default function MockTestPage() {
       toast.error("No questions loaded");
       return;
     }
-    setShowModal(true);
-    setCurrentQuestion(0);
+    setIsTestActive(true);
   };
 
   const getDifficultyBadge = (diff) => {
     const badges = {
-      "Easy": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-      "Medium": "bg-amber-500/20 text-amber-300 border-amber-500/30",
       "Easy": "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
       "Medium": "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30",
       "Hard": "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30",
     };
     return badges[diff] || badges["Medium"];
   };
+
+  if (isTestActive) {
+    return (
+      <MockTestWorkspace
+        filters={{ ...filters, type: selectedTestType.name }}
+        questions={questions}
+        onClose={() => setIsTestActive(false)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">

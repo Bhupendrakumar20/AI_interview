@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack -p 4001",
-    "dev:all": "concurrently \"npm run dev\" \"npm run piston:start\"",
+    "dev:all": "concurrently \"npm run dev\" \"npm run piston:start\" \"npm run socket:start\"",
+    "socket:start": "node server/buddy-socket-server.js",
     "seed-db": "node scripts/seedDatabase.js",
+
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -18,6 +20,7 @@
     "@ai-sdk/openai": "^3.0.68",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^4.1.3",
+    "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-label": "^2.1.2",
     "@radix-ui/react-slot": "^1.1.2",
     "@uploadthing/react": "^7.3.3",

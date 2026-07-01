@@ -110,8 +110,12 @@ const InterviewBuddy = ({ userId }) => {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to create session");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to create session");
+      }
       const data = await response.json();
+
 
       setActiveSessionId(data.sessionId);
       setSessionCode(data.sessionCode);
@@ -123,11 +127,10 @@ const InterviewBuddy = ({ userId }) => {
         setIsModalOpen(false);
         toast.success("AI Interview started! Questions are loading...");
       } else if (currentMode === "human") {
-        // If human mode, start human buddy session
-        setIsSessionOwner(true); // 🔥 User created the session, they are the owner
-        setIsHumanBuddyActive(true);
+        setIsSessionOwner(true);
         setIsModalOpen(false);
-        toast.success("Session created! Share the invite link with your buddy.");
+        toast.success("Session created! Redirecting to call room...");
+        window.location.href = `/interview/buddy/${data.sessionCode}`;
       }
     } catch (error) {
       console.error("Error creating session:", error);
@@ -183,12 +186,8 @@ const InterviewBuddy = ({ userId }) => {
       }
 
       const data = await response.json();
-      setSessionCode(data.sessionCode);
-      setActiveSessionId(data.sessionId);
-      setIsSessionOwner(false); // 🔥 User joined an existing session, they are NOT the owner
-      setIsHumanBuddyActive(true);
-      setIsModalOpen(false);
-      toast.success("Joined session! Starting buddy call...");
+      toast.success("Joined session! Redirecting to call room...");
+      window.location.href = `/interview/buddy/${data.sessionCode}`;
     } catch (error) {
       console.error("Error joining session:", error);
       toast.error(error.message || "Failed to join session");
@@ -548,12 +547,16 @@ const InterviewBuddy = ({ userId }) => {
         <div className="grid md:grid-cols-3 gap-4">
           {/* Human Mode Card */}
           <div
-            onClick={() => setIsHumanBuddyActive(true)}
-            className="relative p-6 rounded-2xl border border-slate-800 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/50 cursor-pointer transition-all opacity-85 hover:opacity-100"
+            onClick={() => setCurrentMode("human")}
+            className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all ${
+              currentMode === "human"
+                ? "border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20"
+                : "border-slate-700 bg-slate-900/50 hover:border-slate-600"
+            }`}
           >
-            <span className="absolute top-4 right-4 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
-              Coming Soon
-            </span>
+            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
+              {currentMode === "human" ? "✓" : ""}
+            </div>
             <div className="mb-3 text-blue-400">
               <Users size={32} />
             </div>
@@ -569,6 +572,7 @@ const InterviewBuddy = ({ userId }) => {
               ))}
             </div>
           </div>
+
 
           {/* AI Mode Card */}
           <div

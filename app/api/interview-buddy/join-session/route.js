@@ -114,13 +114,14 @@ export async function POST(request) {
       );
     }
 
-    // ✅ Check if session is full
-    if (sessionData.participants?.length >= 2) {
+    // ✅ Check if session is full (Dynamic 3-Person Mesh)
+    if (sessionData.participants?.length >= 3) {
       return NextResponse.json(
         { error: "Session is full" },
         { status: 400 }
       );
     }
+
 
     // ✅ Check if user already in session
     if (sessionData.participants?.includes(userId)) {

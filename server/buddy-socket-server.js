@@ -74,6 +74,27 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Relay chat/session notes to other peers in the room
+  socket.on("note-sync", ({ text, sender }) => {
+    if (currentRoom) {
+      socket.to(currentRoom).emit("note-sync", { text, sender });
+    }
+  });
+
+  // Relay code changes to other peers in the room
+  socket.on("code-sync", ({ code, language }) => {
+    if (currentRoom) {
+      socket.to(currentRoom).emit("code-sync", { code, language });
+    }
+  });
+
+  // Relay whiteboard shapes to other peers in the room
+  socket.on("whiteboard-sync", ({ shapes }) => {
+    if (currentRoom) {
+      socket.to(currentRoom).emit("whiteboard-sync", { shapes });
+    }
+  });
+
   // Handle manual disconnect or connection loss
   socket.on("disconnect", () => {
     if (currentRoom && rooms[currentRoom]) {

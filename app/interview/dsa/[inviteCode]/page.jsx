@@ -269,6 +269,9 @@ export default function DSALiveRoomPage() {
         body: JSON.stringify({
           sourceCode: code,
           language,
+          questionId: roomState.question?.titleSlug || roomState.question?.id || 'daily-challenge',
+          roomId: roomCode,
+          userId: auth.currentUser?.uid || currentParticipant?.userId || 'usr_guest',
           testCases: roomState.question?.testCases || [],
         }),
       });

@@ -248,6 +248,9 @@ export default function DSALiveRoomPage() {
     }
   };
 
+  const [submissionResult, setSubmissionResult] = useState(null);
+  const [activeTestCaseTab, setActiveTestCaseTab] = useState(0);
+
   // Submit and verify code
   const handleSubmit = async () => {
     if (!code.trim() || submitting) return;
@@ -255,6 +258,7 @@ export default function DSALiveRoomPage() {
     setSubmitting(true);
     setSubmitStatus(null);
     setTestResults(null);
+    setSubmissionResult(null);
 
     toast.info("Running your solution against test cases...");
 
@@ -284,6 +288,8 @@ export default function DSALiveRoomPage() {
         passed: passedCount,
         total: totalCases,
       });
+      setSubmissionResult(data);
+      setActiveTestCaseTab(0);
 
       if (allPassed) {
         toast.success("Accepted! You solved the problem!");
@@ -442,6 +448,92 @@ export default function DSALiveRoomPage() {
               />
             </div>
           </div>
+
+          {/* Test Case / Code Execution Results Panel */}
+          {submissionResult && (
+            <div className="bg-slate-900/40 border border-slate-900 rounded-xl p-5 space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                  Submission Test Results
+                </h3>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                  submissionResult.allPassed 
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                }`}>
+                  {submissionResult.allPassed 
+                    ? `Accepted (${submissionResult.passed}/${submissionResult.totalTests} passed)` 
+                    : `Failed (${submissionResult.passed}/${submissionResult.totalTests} passed)`}
+                </span>
+              </div>
+
+              {/* Case Tabs */}
+              <div className="flex gap-2 border-b border-slate-850 pb-2">
+                {submissionResult.results?.map((res, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setActiveTestCaseTab(index)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border ${
+                      activeTestCaseTab === index
+                        ? res.passed
+                          ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                          : 'bg-red-500/15 border-red-500/30 text-red-400'
+                        : 'bg-slate-950 border-slate-900 text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    <span>Case {index + 1}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${res.passed ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                  </button>
+                ))}
+              </div>
+
+              {/* Active Tab Details */}
+              {submissionResult.results?.[activeTestCaseTab] && (() => {
+                const tc = submissionResult.results[activeTestCaseTab];
+                return (
+                  <div className="space-y-4 text-sm font-mono">
+                    {tc.error ? (
+                      <div className="space-y-2 bg-red-500/5 border border-red-500/10 p-4 rounded-lg">
+                        <div className="text-red-400 font-bold text-sm uppercase flex items-center gap-1.5">
+                          <AlertCircle size={16} /> Runtime Error
+                        </div>
+                        <pre className="text-xs text-red-300/90 whitespace-pre-wrap leading-relaxed overflow-x-auto bg-slate-950/40 p-3 rounded-md">
+                          {tc.error}
+                        </pre>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1.5">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Input</div>
+                          <pre className="bg-slate-950 p-3 rounded-lg text-xs text-slate-300 overflow-x-auto border border-slate-850">
+                            {tc.testInput}
+                          </pre>
+                        </div>
+                        
+                        <div className="space-y-1.5">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Output</div>
+                          <pre className={`p-3 rounded-lg text-xs overflow-x-auto border ${
+                            tc.passed 
+                              ? 'bg-slate-950 text-emerald-400 border-slate-850' 
+                              : 'bg-slate-950 text-red-400 border-red-950/30'
+                          }`}>
+                            {tc.output || "(no output)"}
+                          </pre>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Expected</div>
+                          <pre className="bg-slate-950 p-3 rounded-lg text-xs text-slate-400 overflow-x-auto border border-slate-850">
+                            {tc.expectedOutput}
+                          </pre>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Right/Bottom Section: Players status & scoreboard */}
           <div className="bg-slate-900/40 border border-slate-900 rounded-xl p-5">

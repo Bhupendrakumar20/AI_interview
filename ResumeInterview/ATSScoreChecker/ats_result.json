@@ -1,0 +1,382 @@
+{
+  "final_score": 57.49,
+  "skills_score": 69.44,
+  "experience_score": 69.9,
+  "projects_score": 29.36,
+  "education_score": 56.67,
+  "achievements_score": 21.2,
+  "formatting_score": 90.0,
+  "matched_skills": [
+    "docker",
+    "kubernetes",
+    "aws",
+    "git",
+    "event-driven architecture",
+    "flask",
+    "distributed systems",
+    "github actions",
+    "fastapi",
+    "kafka",
+    "rest apis",
+    "mysql",
+    "ci/cd pipelines",
+    "ci/cd",
+    "python",
+    "ai",
+    "mongodb",
+    "microservices",
+    "jenkins",
+    "django",
+    "github",
+    "redis",
+    "postgresql",
+    "concurrency",
+    "linux"
+  ],
+  "missing_skills": [
+    "rabbitmq",
+    "scalability",
+    "google cloud",
+    "backend development",
+    "devops",
+    "performance optimization",
+    "ml",
+    "caching",
+    "gcp",
+    "azure",
+    "system design"
+  ],
+  "experience_details": {
+    "years_required_jd": 2.0,
+    "years_in_resume": 3.84,
+    "years_score": 100.0,
+    "years_reason": "Candidate has 3.84y >= required 2.0y",
+    "skill_score": 63.46,
+    "skill_details": {
+      "skill_score": 63.46,
+      "jd_skills_count": 36,
+      "exact_exp_match": [
+        "aws",
+        "backend development",
+        "caching",
+        "ci/cd",
+        "ci/cd pipelines",
+        "django",
+        "docker",
+        "event-driven architecture",
+        "fastapi",
+        "flask",
+        "git",
+        "jenkins",
+        "kafka",
+        "kubernetes",
+        "microservices",
+        "python",
+        "redis",
+        "rest apis",
+        "system design"
+      ],
+      "exact_proj_match": [
+        "ai",
+        "concurrency",
+        "ml",
+        "mongodb"
+      ],
+      "semantic_exp_match": {
+        "github": [
+          "git",
+          0.759
+        ],
+        "mysql": [
+          "sql",
+          0.687
+        ]
+      },
+      "semantic_proj_match": {},
+      "missing_skills": [
+        "azure",
+        "devops",
+        "distributed systems",
+        "gcp",
+        "github actions",
+        "google cloud",
+        "linux",
+        "performance optimization",
+        "postgresql",
+        "rabbitmq",
+        "scalability"
+      ],
+      "weighted_score": 22.85
+    },
+    "seniority_score": 50.0,
+    "seniority_reason": "Under-qualified: candidate=junior, JD=senior",
+    "final_score": 69.9,
+    "weights": {
+      "skills": "55%",
+      "years": "25%",
+      "seniority": "20%"
+    },
+    "experience_entries": [
+      {
+        "type": "experience",
+        "title": "Backend Software Engineer",
+        "company": "High-Growth Tech Startup (Stealth/Contract)",
+        "duration": "Jan 2024 \u2013 Present",
+        "years": 2.42,
+        "matched_skills": [
+          "aws",
+          "backend development",
+          "caching",
+          "ci/cd",
+          "ci/cd pipelines",
+          "docker",
+          "ec2",
+          "event-driven architecture",
+          "fastapi",
+          "git",
+          "jenkins",
+          "kafka",
+          "kubernetes",
+          "microservices",
+          "mq",
+          "python",
+          "rds",
+          "redis",
+          "s3",
+          "sql"
+        ]
+      },
+      {
+        "type": "experience",
+        "title": "Google Developer Group, IIIT Surat",
+        "company": "Google Developer Group Lead (Promoted from Core Member)",
+        "duration": "Jan 2025 \u2013 Present",
+        "years": 1.42,
+        "matched_skills": [
+          "backend development",
+          "django",
+          "flask",
+          "iiit",
+          "owasp",
+          "rest apis",
+          "system design"
+        ]
+      }
+    ],
+    "project_count": 2,
+    "semantic_threshold": 0.65
+  },
+  "projects_details": {
+    "final_score": 29.36,
+    "project_count": 2,
+    "score_weights": {
+      "semantic": "30%",
+      "keyword": "25%",
+      "quality": "45%"
+    },
+    "pipeline": "rescale \u2192 recency multiply \u2192 sigmoid boost \u2192 exp-decay aggregate",
+    "projects": {
+      "project_1": {
+        "name": "AI-Integrated Mock Interview Platform",
+        "semantic_score": 56.46,
+        "keyword_score": 18.87,
+        "quality_score": 27.2,
+        "recency_multiplier": 1.0,
+        "composite_score": 25.21,
+        "quality_breakdown": {
+          "impact": 0.0,
+          "tech": 24.0,
+          "richness": 90.14
+        }
+      },
+      "project_2": {
+        "name": "High-Throughput Distributed Key-Value Store",
+        "semantic_score": 16.22,
+        "keyword_score": 10.07,
+        "quality_score": 73.6,
+        "recency_multiplier": 0.95,
+        "composite_score": 31.63,
+        "quality_breakdown": {
+          "impact": 65.0,
+          "tech": 12.0,
+          "richness": 84.41
+        }
+      }
+    }
+  },
+  "education_details": {
+    "overall_score": 56.67,
+    "overall_reason": "Bachelor satisfied. Master satisfied. PhD missing. 1/6 field clusters matched",
+    "score_breakdown": {
+      "bachelor_score": 26.67,
+      "master_score": 26.67,
+      "phd_score": 0.0,
+      "field_score": 3.33,
+      "final_score": 56.67,
+      "per_tier_weight": 26.67
+    },
+    "jd_requirements": {
+      "require_bachelor": true,
+      "require_master": true,
+      "require_phd": true,
+      "accepted_clusters": [
+        "software_engineering",
+        "distributed_systems",
+        "ai_ml",
+        "information_technology",
+        "electronics",
+        "computer_science"
+      ]
+    },
+    "candidate_profile": {
+      "has_bachelor": true,
+      "has_master": true,
+      "has_phd": false,
+      "all_field_clusters": [
+        "computer_science"
+      ]
+    },
+    "education_entries": {
+      "education_1": {
+        "degree": "M.Tech in Computer Science",
+        "field": "Computer Science",
+        "institution": "Indian Institute of Information Technology Surat",
+        "degree_level": 3,
+        "field_cluster": "computer_science"
+      },
+      "education_2": {
+        "degree": "B.Tech in Computer Science",
+        "field": "Computer Science",
+        "institution": "Indian Institute of Information Technology Surat",
+        "degree_level": 2,
+        "field_cluster": "computer_science"
+      }
+    }
+  },
+  "achievements_details": {
+    "final_score": 21.2,
+    "jd_domains_detected": [
+      "ai",
+      "algorithms",
+      "backend",
+      "cloud",
+      "data",
+      "database",
+      "devops",
+      "frontend",
+      "ml",
+      "security"
+    ],
+    "weights": {
+      "certifications": "15%",
+      "hackathons": "20%",
+      "leadership": "20%",
+      "courses": "20%",
+      "coding_profiles": "25%"
+    },
+    "sub_scores": {
+      "certifications": 0.0,
+      "hackathons": 68.5,
+      "leadership": 0.0,
+      "courses": 0.0,
+      "coding_profiles": 30
+    },
+    "details": {
+      "certifications": {
+        "reason": "No certifications found",
+        "details": []
+      },
+      "hackathons": {
+        "hackathon_count": 2,
+        "entries": [
+          {
+            "title": "Smart India Hackathon Runner-Up: Engineered a scalable technical solution, securing second place nationally among thousands of participants.",
+            "score": 85.0
+          },
+          {
+            "title": "Algorithmic Problem Solving: Reached Codeforces 7-Star status and actively solve Leet Code challenges, maintaining a strong grasp of complex data structures and algorithms.",
+            "score": 30.0
+          }
+        ],
+        "final_hackathon_score": 68.5
+      },
+      "leadership": {
+        "reason": "No leadership entries found",
+        "entries": []
+      },
+      "courses": {
+        "reason": "No course entries detected",
+        "entries": []
+      },
+      "coding_profiles": {
+        "coding_profile_count": 1,
+        "entries": [
+          {
+            "title": "Algorithmic Problem Solving: Reached Codeforces 7-Star status and actively solve Leet Code challenges, maintaining a strong grasp of complex data structures and algorithms.",
+            "score": 30
+          }
+        ],
+        "final_coding_score": 30
+      }
+    }
+  },
+  "formatting_details": {
+    "required_sections": {
+      "present": [
+        "name",
+        "email",
+        "skills",
+        "experience",
+        "education"
+      ],
+      "missing": [],
+      "score": 20.0
+    },
+    "contact_formatting": {
+      "email_valid": true,
+      "phone_valid": true,
+      "score": 10.0
+    },
+    "skills_formatting": {
+      "total_skills": 29,
+      "score": 10.0
+    },
+    "experience_alignment": {
+      "total_experience": 2,
+      "well_described_experience": 2,
+      "score": 15.0
+    },
+    "project_quality": {
+      "total_projects": 2,
+      "good_projects": 2,
+      "score": 25.0,
+      "project_feedback": [
+        {
+          "project_name": "AI-Integrated Mock Interview Platform",
+          "project_score": 20,
+          "action_verbs_found": [
+            "developed",
+            "integrated",
+            "engineered"
+          ],
+          "has_metrics": false
+        },
+        {
+          "project_name": "High-Throughput Distributed Key-Value Store",
+          "project_score": 25,
+          "action_verbs_found": [
+            "built",
+            "implemented"
+          ],
+          "has_metrics": true
+        }
+      ]
+    },
+    "education_quality": {
+      "total_education": 2,
+      "proper_entries": 2,
+      "score": 10.0
+    },
+    "final_score": 90.0
+  }
+}

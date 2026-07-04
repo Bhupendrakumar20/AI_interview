@@ -1,0 +1,126 @@
+{
+    "profile": {
+        "name": "BHUPENDRA KUMAR",
+        "email": "ui23cs13@iiitsurat.ac.in",
+        "phone": "7850047076",
+        "location": "",
+        "linkedin_url": "",
+        "github_url": "",
+        "summary": "Senior-level Backend Developer with 2.5+ years of hands-on experience engineering scalable, distributed systems and cloud-native applications. Specializes in building high-performance REST APIs and real-time data processing pipelines utilizing Python, FastAPI, and Kafka. Proven track record in orchestrating containerized deployments via Kubernetes and Docker, optimizing database operations, and architecting fault-tolerant microservices. Passionate about AI/ML integrations and driving end-to-end feature delivery through robust CI/CD workﬂows."
+    },
+    "educations": [
+        {
+            "school": "Indian Institute of Information Technology Surat",
+            "degree": "M.Tech in Computer Science",
+            "gpa": "",
+            "date": "2029",
+            "descriptions": []
+        },
+        {
+            "school": "Indian Institute of Information Technology Surat",
+            "degree": "B.Tech in Computer Science",
+            "gpa": "8.0",
+            "date": "2027",
+            "descriptions": []
+        }
+    ],
+    "workExperiences": [
+        {
+            "company": "High-Growth Tech Startup (Stealth/Contract)",
+            "jobTitle": "Backend Software Engineer",
+            "date": "Jan 2024 – Present",
+            "location": "",
+            "descriptions": [
+                "Designed and maintained highly scalable, production-grade backend systems using Python and FastAPI, serving over 50,000 daily active requests.",
+                "Architected a distributed, event-driven microservices ecosystem utilizing Kafka and Rabbit MQ, ensuring fault tolerance and high-throughput real-time data processing.",
+                "Optimized application performance and complex SQL operations; implemented Redis caching layers that reduced average database query load times by 45%.",
+                "Integrated backend services with AWS cloud infrastructure (EC2, S3, RDS) and managed containerized application deployments using Docker and Kubernetes orchestration.",
+                "Spearheaded the implementation of automated CI/CD deployment workﬂows using Git Hub Actions and Jenkins, cutting deployment friction and improving system reliability."
+            ]
+        },
+        {
+            "company": "Google Developer Group Lead (Promoted from Core Member)",
+            "jobTitle": "Google Developer Group, IIIT Surat",
+            "date": "Jan 2025 – Present",
+            "location": "",
+            "descriptions": [
+                "Collaborate directly with cross-functional teams (frontend, Dev Ops) to lead 15 developers in building a highly scalable, full-stack event management platform.",
+                "Built secure REST APIs using Django and Flask, enforcing strict authentication, authorization, and backend security best practices (OWASP standards).",
+                "Organized and led large-scale technical events, including the ”Prompt Craft” and ”Reimagination Hackathon”, mentoring students in system design and backend architecture."
+            ]
+        }
+    ],
+    "projects": [
+        {
+            "project": "AI-Integrated Mock Interview Platform",
+            "techStack": [
+                "Docker",
+                "FastAPI",
+                "AI",
+                "Python"
+            ],
+            "date": "2025",
+            "descriptions": [
+                "Developed an AI/ML-integrated backend system capable of conducting mock technical interviews and generating real-time, context-aware evaluations.",
+                "Engineered secure, low-latency RESTful APIs using FastAPI to communicate with LLM endpoints, processing candidate responses with high efﬁciency.",
+                "Utilized Mongo DB to structure and store large volumes of historical user session data and performance metrics for ongoing model reﬁnement and analytics."
+            ]
+        },
+        {
+            "project": "High-Throughput Distributed Key-Value Store",
+            "techStack": [
+                "Consistent Hashing",
+                "RAFT"
+            ],
+            "date": "2024",
+            "descriptions": [
+                "Built a resilient, distributed key-value store from scratch, successfully handling 15,000+ requests per second while maintaining 99.99% uptime.",
+                "Implemented the RAFT leader election protocol to guarantee strong consistency and fault tolerance across distributed nodes.",
+                "Applied advanced concurrency concepts and memory optimization techniques, outperforming baseline Redis write performance benchmarks by 25%."
+            ]
+        }
+    ],
+    "skills": [
+        "Python",
+        "C++",
+        "SQL",
+        "Bash",
+        "Java Script",
+        "FastAPI",
+        "Django",
+        "Flask",
+        "RESTful APIs",
+        "Postgre SQL",
+        "Mongo DB",
+        "My SQL",
+        "Redis",
+        "AWS",
+        "Docker",
+        "Kubernetes",
+        "Jenkins",
+        "Git Hub Actions",
+        "Linux",
+        "Git",
+        "Microservices",
+        "Distributed Systems",
+        "Event",
+        "Driven Architecture (Kafka",
+        "Rabbit MQ)",
+        "High Availability",
+        "Concurrency",
+        "CI/CD",
+        "Data Structures & Algorithms"
+    ],
+    "achievements": {
+        "achievements": [
+            "Smart India Hackathon Runner-Up: Engineered a scalable technical solution, securing second place nationally among thousands of participants.",
+            "Open Source Contributor (GSSo C): Actively participate in open-source Python projects, enhancing system reliability, resolving bugs, and improving documentation.",
+            "Algorithmic Problem Solving: Reached Codeforces 7-Star status and actively solve Leet Code challenges, maintaining a strong grasp of complex data structures and algorithms."
+        ],
+        "certifications": [],
+        "awards": []
+    },
+    "custom": {
+        "descriptions": []
+    }
+}

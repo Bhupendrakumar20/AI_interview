@@ -604,11 +604,11 @@ const InterviewBuddy = ({ userId }) => {
 
           {/* DSA Room Mode Card */}
           <div
-            onClick={() => setDsaRoomActive(true)}
+            onClick={() => window.location.href = "/dsa-room"}
             className="relative p-6 rounded-2xl border border-slate-800 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/50 cursor-pointer transition-all opacity-85 hover:opacity-100"
           >
             <span className="absolute top-4 right-4 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              Coming Soon
+              Live Duel
             </span>
             <div className="mb-3 text-emerald-400">
               <Trophy size={32} />

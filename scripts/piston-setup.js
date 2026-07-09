@@ -12,21 +12,20 @@
  *   docker compose up -d       ← must be running first
  */
 
-const PISTON_URL = process.env.PISTON_API_URL || 'http://localhost:2000/api/v2/piston';
+const PISTON_URL = process.env.PISTON_API_URL || 'http://localhost:2000/api/v2';
 
 // ── Languages to install (name must match Piston package names) ───
-// Get full list: GET http://localhost:2000/api/v2/piston/packages
+// Get full list: GET http://localhost:2000/api/v2/packages
 const RUNTIMES_TO_INSTALL = [
   { language: 'python',     version: '3.10.0' },
-  { language: 'javascript', version: '18.15.0' },
+  { language: 'node',       version: '18.15.0' },
   { language: 'typescript', version: '5.0.3' },
   { language: 'java',       version: '15.0.2' },
-  { language: 'cpp',        version: '10.2.0' },
-  { language: 'c',          version: '10.2.0' },
+  { language: 'gcc',        version: '10.2.0' },
   { language: 'go',         version: '1.16.2' },
-  { language: 'rust',       version: '1.50.0' },
+  { language: 'rust',       version: '1.68.2' },
   { language: 'ruby',       version: '3.0.1' },
-  { language: 'bash',       version: '5.1.0' },
+  { language: 'bash',       version: '5.2.0' },
 ];
 
 // ANSI colours

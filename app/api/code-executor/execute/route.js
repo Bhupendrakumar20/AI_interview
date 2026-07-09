@@ -643,6 +643,447 @@ function injectAutoDriver(sourceCode, language) {
         return driverCode;
       }
     }
+  } else if (lang === 'cpp' || lang === 'c++') {
+    if (sourceCode.includes('int main(')) {
+      return sourceCode;
+    }
+    
+    const solIndex = sourceCode.indexOf("class Solution");
+    if (solIndex === -1) return sourceCode;
+    
+    const classBody = sourceCode.slice(solIndex);
+    const methodMatch = classBody.match(/(?:public|private|protected)?\s+([a-zA-Z0-9_<>\*&:]+)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+    if (!methodMatch) return sourceCode;
+    
+    const returnType = methodMatch[1].trim();
+    const methodName = methodMatch[2].trim();
+    const paramsStr = methodMatch[3].trim();
+    
+    const params = paramsStr.split(',').map(p => {
+      const parts = p.trim().split(/\s+/);
+      const name = parts[parts.length - 1].replace(/[*&]/g, '');
+      const type = parts.slice(0, parts.length - 1).join(' ') + (p.includes('*') ? '*' : '') + (p.includes('&') ? '&' : '');
+      return { type: type.trim(), name: name.trim() };
+    }).filter(p => p.name && p.type);
+    
+    console.log(`[Auto-Driver Injection] C++ Method: ${returnType} ${methodName}(${params.map(p=>p.type+' '+p.name).join(', ')})`);
+    
+    const parserLines = [];
+    const callArgs = [];
+    params.forEach((param, idx) => {
+      const lineVar = `line_${idx}`;
+      parserLines.push(`    std::string ${lineVar};`);
+      parserLines.push(`    if (!std::getline(std::cin, ${lineVar})) return 0;`);
+      
+      const type = param.type.replace(/&/g, '').trim();
+      const valVar = `val_${idx}`;
+      
+      if (type === 'int') {
+        parserLines.push(`    int ${valVar} = std::stoi(${lineVar});`);
+        callArgs.push(valVar);
+      } else if (type === 'double' || type === 'float') {
+        parserLines.push(`    double ${valVar} = std::stod(${lineVar});`);
+        callArgs.push(valVar);
+      } else if (type === 'std::string' || type === 'string') {
+        parserLines.push(`    std::string ${valVar} = ${lineVar};`);
+        parserLines.push(`    if (${valVar}.front() == '"' && ${valVar}.back() == '"') ${valVar} = ${valVar}.substr(1, ${valVar}.size() - 2);`);
+        callArgs.push(valVar);
+      } else if (type === 'TreeNode*') {
+        parserLines.push(`    TreeNode* ${valVar} = arrayToTree(${lineVar});`);
+        callArgs.push(valVar);
+      } else if (type === 'ListNode*') {
+        parserLines.push(`    ListNode* ${valVar} = arrayToLinkedList(${lineVar});`);
+        callArgs.push(valVar);
+      } else if (type.includes('vector<int>') || type.includes('std::vector<int>')) {
+        parserLines.push(`    std::vector<int> ${valVar};`);
+        parserLines.push(`    {`);
+        parserLines.push(`      std::string s = ${lineVar};`);
+        parserLines.push(`      s.erase(std::remove(s.begin(), s.end(), '['), s.end());`);
+        parserLines.push(`      s.erase(std::remove(s.begin(), s.end(), ']'), s.end());`);
+        parserLines.push(`      std::stringstream ss(s);`);
+        parserLines.push(`      std::string item;`);
+        parserLines.push(`      while (std::getline(ss, item, ',')) {`);
+        parserLines.push(`        if (!item.empty()) ${valVar}.push_back(std::stoi(item));`);
+        parserLines.push(`      }`);
+        parserLines.push(`    }`);
+        callArgs.push(valVar);
+      } else {
+        parserLines.push(`    std::string ${valVar} = ${lineVar};`);
+        callArgs.push(valVar);
+      }
+    });
+    
+    let outputCode = '';
+    const cleanRetType = returnType.replace(/&/g, '').trim();
+    if (cleanRetType === 'void') {
+      outputCode = `    sol.${methodName}(${callArgs.join(', ')});`;
+    } else if (cleanRetType === 'TreeNode*') {
+      outputCode = `    TreeNode* res = sol.${methodName}(${callArgs.join(', ')});\n    printTree(res);`;
+    } else if (cleanRetType === 'ListNode*') {
+      outputCode = `    ListNode* res = sol.${methodName}(${callArgs.join(', ')});\n    printLinkedList(res);`;
+    } else if (cleanRetType.includes('vector<int>') || cleanRetType.includes('std::vector<int>')) {
+      outputCode = `    std::vector<int> res = sol.${methodName}(${callArgs.join(', ')});\n    std::cout << "[";\n    for (size_t i = 0; i < res.size(); ++i) {\n        if (i > 0) std::cout << ",";\n        std::cout << res[i];\n    }\n    std::cout << "]" << std::endl;`;
+    } else if (cleanRetType === 'bool') {
+      outputCode = `    bool res = sol.${methodName}(${callArgs.join(', ')});\n    std::cout << (res ? "true" : "false") << std::endl;`;
+    } else {
+      outputCode = `    auto res = sol.${methodName}(${callArgs.join(', ')});\n    std::cout << res << std::endl;`;
+    }
+    
+    const driver = [
+      `// ── Predefined Data Structures ──`,
+      `#ifndef STRUCT_TREENODE`,
+      `#define STRUCT_TREENODE`,
+      `struct TreeNode {`,
+      `    int val;`,
+      `    TreeNode *left;`,
+      `    TreeNode *right;`,
+      `    TreeNode() : val(0), left(nullptr), right(nullptr) {}`,
+      `    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}`,
+      `    TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}`,
+      `};`,
+      `#endif`,
+      ``,
+      `#ifndef STRUCT_LISTNODE`,
+      `#define STRUCT_LISTNODE`,
+      `struct ListNode {`,
+      `    int val;`,
+      `    ListNode *next;`,
+      `    ListNode() : val(0), next(nullptr) {}`,
+      `    ListNode(int x) : val(x), next(nullptr) {}`,
+      `    ListNode(int x, ListNode *next) : val(x), next(next) {}`,
+      `};`,
+      `#endif`,
+      ``,
+      `#include <iostream>`,
+      `#include <vector>`,
+      `#include <string>`,
+      `#include <sstream>`,
+      `#include <queue>`,
+      `#include <algorithm>`,
+      ``,
+      `inline TreeNode* arrayToTree(const std::string& str) {`,
+      `    std::string s = str;`,
+      `    s.erase(std::remove(s.begin(), s.end(), '['), s.end());`,
+      `    s.erase(std::remove(s.begin(), s.end(), ']'), s.end());`,
+      `    s.erase(std::remove(s.begin(), s.end(), ' '), s.end());`,
+      `    s.erase(std::remove(s.begin(), s.end(), '\\r'), s.end());`,
+      `    s.erase(std::remove(s.begin(), s.end(), '\\n'), s.end());`,
+      `    if (s.empty()) return nullptr;`,
+      `    std::vector<std::string> nodes;`,
+      `    std::stringstream ss(s);`,
+      `    std::string item;`,
+      `    while (std::getline(ss, item, ',')) {`,
+      `        nodes.push_back(item);`,
+      `    }`,
+      `    if (nodes.empty() || nodes[0] == "null") return nullptr;`,
+      `    TreeNode* root = new TreeNode(std::stoi(nodes[0]));`,
+      `    std::queue<TreeNode*> q;`,
+      `    q.push(root);`,
+      `    size_t i = 1;`,
+      `    while (!q.empty() && i < nodes.size()) {`,
+      `        TreeNode* curr = q.front();`,
+      `        q.pop();`,
+      `        if (i < nodes.size()) {`,
+      `            if (nodes[i] != "null" && !nodes[i].empty()) {`,
+      `                curr->left = new TreeNode(std::stoi(nodes[i]));`,
+      `                q.push(curr->left);`,
+      `            }`,
+      `            i++;`,
+      `        }`,
+      `        if (i < nodes.size()) {`,
+      `            if (nodes[i] != "null" && !nodes[i].empty()) {`,
+      `                curr->right = new TreeNode(std::stoi(nodes[i]));`,
+      `                q.push(curr->right);`,
+      `            }`,
+      `            i++;`,
+      `        }`,
+      `    }`,
+      `    return root;`,
+      `}`,
+      ``,
+      `inline void printTree(TreeNode* root) {`,
+      `    if (!root) {`,
+      `        std::cout << "[]" << std::endl;`,
+      `        return;`,
+      `    }`,
+      `    std::vector<std::string> res;`,
+      `    std::queue<TreeNode*> q;`,
+      `    q.push(root);`,
+      `    while (!q.empty()) {`,
+      `        TreeNode* curr = q.front();`,
+      `        q.pop();`,
+      `        if (curr) {`,
+      `            res.push_back(std::to_string(curr->val));`,
+      `            q.push(curr->left);`,
+      `            q.push(curr->right);`,
+      `        } else {`,
+      `            res.push_back("null");`,
+      `        }`,
+      `    }`,
+      `    while (!res.empty() && res.back() == "null") {`,
+      `        res.pop_back();`,
+      `    }`,
+      `    std::cout << "[";`,
+      `    for (size_t i = 0; i < res.size(); ++i) {`,
+      `        if (i > 0) std::cout << ",";`,
+      `        std::cout << res[i];`,
+      `    }`,
+      `    std::cout << "]" << std::endl;`,
+      `}`,
+      ``,
+      `inline ListNode* arrayToLinkedList(const std::string& str) {`,
+      `    std::string s = str;`,
+      `    s.erase(std::remove(s.begin(), s.end(), '['), s.end());`,
+      `    s.erase(std::remove(s.begin(), s.end(), ']'), s.end());`,
+      `    s.erase(std::remove(s.begin(), s.end(), ' '), s.end());`,
+      `    if (s.empty()) return nullptr;`,
+      `    std::vector<int> vals;`,
+      `    std::stringstream ss(s);`,
+      `    std::string item;`,
+      `    while (std::getline(ss, item, ',')) {`,
+      `        if (item != "null" && !item.empty()) {`,
+      `            vals.push_back(std::stoi(item));`,
+      `        }`,
+      `    }`,
+      `    if (vals.empty()) return nullptr;`,
+      `    ListNode* dummy = new ListNode(0);`,
+      `    ListNode* curr = dummy;`,
+      `    for (int val : vals) {`,
+      `        curr->next = new ListNode(val);`,
+      `        curr = curr->next;`,
+      `    }`,
+      `    return dummy->next;`,
+      `}`,
+      ``,
+      `inline void printLinkedList(ListNode* head) {`,
+      `    std::cout << "[";`,
+      `    ListNode* curr = head;`,
+      `    bool first = true;`,
+      `    while (curr != nullptr) {`,
+      `        if (!first) std::cout << ",";`,
+      `        std::cout << curr->val;`,
+      `        first = false;`,
+      `        curr = curr->next;`,
+      `    }`,
+      `    std::cout << "]" << std::endl;`,
+      `}`,
+      ``,
+      sourceCode,
+      ``,
+      `int main() {`,
+      ...parserLines,
+      `    Solution sol;`,
+      ...outputCode.split('\n'),
+      `    return 0;`,
+      `}`
+    ].join('\n');
+    
+    return driver;
+  } else if (lang === 'java') {
+    if (sourceCode.includes('public static void main(')) {
+      return sourceCode;
+    }
+    
+    const solIndex = sourceCode.indexOf("class Solution");
+    if (solIndex === -1) return sourceCode;
+    
+    const classBody = sourceCode.slice(solIndex);
+    const methodMatch = classBody.match(/(?:public|private|protected)?\s+([a-zA-Z0-9_<>\*&:[\]]+)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+    if (!methodMatch) return sourceCode;
+    
+    const returnType = methodMatch[1].trim();
+    const methodName = methodMatch[2].trim();
+    const paramsStr = methodMatch[3].trim();
+    
+    const params = paramsStr.split(',').map(p => {
+      const parts = p.trim().split(/\s+/);
+      const name = parts[parts.length - 1];
+      const type = parts.slice(0, parts.length - 1).join(' ');
+      return { type: type.trim(), name: name.trim() };
+    }).filter(p => p.name && p.type);
+    
+    console.log(`[Auto-Driver Injection] Java Method: ${returnType} ${methodName}(${params.map(p=>p.type+' '+p.name).join(', ')})`);
+    
+    const parserLines = [];
+    const callArgs = [];
+    
+    params.forEach((param, idx) => {
+      const lineVar = `line_${idx}`;
+      parserLines.push(`        String ${lineVar} = br.readLine();`);
+      parserLines.push(`        if (${lineVar} == null) return;`);
+      
+      const type = param.type;
+      const valVar = `val_${idx}`;
+      
+      if (type === 'int') {
+        parserLines.push(`        int ${valVar} = Integer.parseInt(${lineVar}.trim());`);
+        callArgs.push(valVar);
+      } else if (type === 'double') {
+        parserLines.push(`        double ${valVar} = Double.parseDouble(${lineVar}.trim());`);
+        callArgs.push(valVar);
+      } else if (type === 'String') {
+        parserLines.push(`        String ${valVar} = ${lineVar}.trim();`);
+        parserLines.push(`        if (${valVar}.startsWith("\\"") && ${valVar}.endsWith("\\"")) ${valVar} = ${valVar}.substring(1, ${valVar}.length() - 1);`);
+        callArgs.push(valVar);
+      } else if (type === 'TreeNode') {
+        parserLines.push(`        TreeNode ${valVar} = arrayToTree(${lineVar}.trim());`);
+        callArgs.push(valVar);
+      } else if (type === 'ListNode') {
+        parserLines.push(`        ListNode ${valVar} = arrayToLinkedList(${lineVar}.trim());`);
+        callArgs.push(valVar);
+      } else if (type.includes('[]') || type.includes('List<') || type.includes('ArrayList<')) {
+        parserLines.push(`        int[] ${valVar} = parseJsonArray(${lineVar}.trim());`);
+        callArgs.push(valVar);
+      } else {
+        parserLines.push(`        String ${valVar} = ${lineVar}.trim();`);
+        callArgs.push(valVar);
+      }
+    });
+    
+    let outputCode = '';
+    const cleanRetType = returnType.trim();
+    if (cleanRetType === 'void') {
+      outputCode = `        sol.${methodName}(${callArgs.join(', ')});`;
+    } else if (cleanRetType === 'TreeNode') {
+      outputCode = `        TreeNode res = sol.${methodName}(${callArgs.join(', ')});\n        System.out.println(treeToArrayString(res));`;
+    } else if (cleanRetType === 'ListNode') {
+      outputCode = `        ListNode res = sol.${methodName}(${callArgs.join(', ')});\n        System.out.println(linkedListToArrayString(res));`;
+    } else if (cleanRetType.includes('[]')) {
+      outputCode = `        int[] res = sol.${methodName}(${callArgs.join(', ')});\n        System.out.println(Arrays.toString(res).replace(" ", ""));`;
+    } else if (cleanRetType.includes('List<')) {
+      outputCode = `        List<Integer> res = sol.${methodName}(${callArgs.join(', ')});\n        System.out.println(res.toString().replace(" ", ""));`;
+    } else {
+      outputCode = `        System.out.println(sol.${methodName}(${callArgs.join(', ')}));`;
+    }
+    
+    const driver = [
+      `import java.io.*;`,
+      `import java.util.*;`,
+      ``,
+      `class TreeNode {`,
+      `    int val;`,
+      `    TreeNode left;`,
+      `    TreeNode right;`,
+      `    TreeNode() {}`,
+      `    TreeNode(int val) { this.val = val; }`,
+      `    TreeNode(int val, TreeNode left, TreeNode right) {`,
+      `        this.val = val;`,
+      `        this.left = left;`,
+      `        this.right = right;`,
+      `    }`,
+      `}`,
+      ``,
+      `class ListNode {`,
+      `    int val;`,
+      `    ListNode next;`,
+      `    ListNode() {}`,
+      `    ListNode(int val) { this.val = val; }`,
+      `    ListNode(int val, ListNode next) { this.val = val; this.next = next; }`,
+      `}`,
+      ``,
+      sourceCode,
+      ``,
+      `public class Main {`,
+      `    public static void main(String[] args) throws IOException {`,
+      `        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));`,
+      `        Solution sol = new Solution();`,
+      `        try {`,
+      ...parserLines,
+      ...outputCode.split('\n'),
+      `        } catch (Exception e) {`,
+      `            e.printStackTrace();`,
+      `        }`,
+      `    }`,
+      ``,
+      `    private static TreeNode arrayToTree(String str) {`,
+      `        str = str.replace("[", "").replace("]", "").replace(" ", "").trim();`,
+      `        if (str.isEmpty()) return null;`,
+      `        String[] nodes = str.split(",");`,
+      `        if (nodes.length == 0 || nodes[0].equals("null")) return null;`,
+      `        TreeNode root = new TreeNode(Integer.parseInt(nodes[0]));`,
+      `        Queue<TreeNode> q = new LinkedList<>();`,
+      `        q.add(root);`,
+      `        int i = 1;`,
+      `        while (!q.isEmpty() && i < nodes.length) {`,
+      `            TreeNode curr = q.poll();`,
+      `            if (i < nodes.length) {`,
+      `                if (!nodes[i].equals("null") && !nodes[i].isEmpty()) {`,
+      `                    curr.left = new TreeNode(Integer.parseInt(nodes[i]));`,
+      `                    q.add(curr.left);`,
+      `                }`,
+      `                i++;`,
+      `            }`,
+      `            if (i < nodes.length) {`,
+      `                if (!nodes[i].equals("null") && !nodes[i].isEmpty()) {`,
+      `                    curr.right = new TreeNode(Integer.parseInt(nodes[i]));`,
+      `                    q.add(curr.right);`,
+      `                }`,
+      `                i++;`,
+      `            }`,
+      `        }`,
+      `        return root;`,
+      `    }`,
+      ``,
+      `    private static String treeToArrayString(TreeNode root) {`,
+      `        if (root == null) return "[]";`,
+      `        List<String> res = new ArrayList<>();`,
+      `        Queue<TreeNode> q = new LinkedList<>();`,
+      `        q.add(root);`,
+      `        while (!q.isEmpty()) {`,
+      `            TreeNode curr = q.poll();`,
+      `            if (curr != null) {`,
+      `                res.add(String.valueOf(curr.val));`,
+      `                q.add(curr.left);`,
+      `                q.add(curr.right);`,
+      `            } else {`,
+      `                res.add("null");`,
+      `            }`,
+      `        }`,
+      `        while (!res.isEmpty() && res.get(res.size() - 1).equals("null")) {`,
+      `            res.remove(res.size() - 1);`,
+      `        }`,
+      `        return res.toString().replace(" ", "");`,
+      `    }`,
+      ``,
+      `    private static ListNode arrayToLinkedList(String str) {`,
+      `        str = str.replace("[", "").replace("]", "").replace(" ", "").trim();`,
+      `        if (str.isEmpty()) return null;`,
+      `        String[] nodes = str.split(",");`,
+      `        ListNode dummy = new ListNode(0);`,
+      `        ListNode curr = dummy;`,
+      `        for (String node : nodes) {`,
+      `            if (!node.equals("null") && !node.isEmpty()) {`,
+      `                curr.next = new ListNode(Integer.parseInt(node));`,
+      `                curr = curr.next;`,
+      `            }`,
+      `        }`,
+      `        return dummy.next;`,
+      `    }`,
+      ``,
+      `    private static String linkedListToArrayString(ListNode head) {`,
+      `        List<Integer> res = new ArrayList<>();`,
+      `        ListNode curr = head;`,
+      `        while (curr != null) {`,
+      `            res.add(curr.val);`,
+      `            curr = curr.next;`,
+      `        }`,
+      `        return res.toString().replace(" ", "");`,
+      `    }`,
+      ``,
+      `    private static int[] parseJsonArray(String str) {`,
+      `        str = str.replace("[", "").replace("]", "").replace(" ", "").trim();`,
+      `        if (str.isEmpty()) return new int[0];`,
+      `        String[] items = str.split(",");`,
+      `        int[] res = new int[items.length];`,
+      `        for (int i = 0; i < items.length; i++) {`,
+      `            res[i] = Integer.parseInt(items[i]);`,
+      `        }`,
+      `        return res;`,
+      `    }`,
+      `}`
+    ].join('\n');
+    
+    return driver;
   }
   
   return sourceCode;

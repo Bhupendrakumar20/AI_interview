@@ -12,6 +12,7 @@ export default function DSARoomPage() {
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [difficulty, setDifficulty] = useState('Medium');
+  const [questionCount, setQuestionCount] = useState(2);
 
   useEffect(() => {
     // Prefill username if logged in
@@ -38,7 +39,7 @@ export default function DSARoomPage() {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
 
-    router.push(`/interview/dsa/${code}?username=${encodeURIComponent(username.trim())}&difficulty=${difficulty}&host=true`);
+    router.push(`/interview/dsa/${code}?username=${encodeURIComponent(username.trim())}&difficulty=${difficulty}&questionCount=${questionCount}&host=true`);
   };
 
   const handleJoinRoom = () => {
@@ -127,7 +128,7 @@ export default function DSARoomPage() {
           {/* Create Room */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Create a Room</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Difficulty</label>
               <div className="flex gap-2">
                 {['Easy', 'Medium', 'Hard'].map((diff) => (
                   <button
@@ -140,6 +141,25 @@ export default function DSARoomPage() {
                     }`}
                   >
                     {diff}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400">No. of Questions</label>
+              <div className="flex gap-2">
+                {[2, 3, 4].map((num) => (
+                  <button
+                    key={num}
+                    onClick={() => setQuestionCount(num)}
+                    className={`px-3.5 py-1 rounded text-xs font-semibold border transition ${
+                      questionCount === num
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                        : 'bg-transparent text-slate-500 border-slate-800 hover:text-slate-300'
+                    }`}
+                  >
+                    {num} Qs
                   </button>
                 ))}
               </div>

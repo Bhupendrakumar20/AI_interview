@@ -114,6 +114,7 @@ io.on("connection", (socket) => {
         roomCode: cleanRoomId,
         status: "lobby",
         participants: {},
+        questions: [],
         question: null,
         startTime: null,
         solvedCount: 0
@@ -153,7 +154,8 @@ io.on("connection", (socket) => {
       attempts: 0,
       passedCount: 0,
       totalCases: 0,
-      timeTaken: null
+      timeTaken: null,
+      questionStatuses: {} // questionId -> { progress, status, attempts, passedCount, totalCases, timeTaken }
     };
 
     console.log(`⚔️ User ${username} joined DSA room [${cleanRoomId}] (Host: ${isHost})`);
@@ -162,42 +164,74 @@ io.on("connection", (socket) => {
     io.to(`dsa-${cleanRoomId}`).emit("dsa-lobby-update", {
       roomId: cleanRoomId,
       status: room.status,
+      questions: room.questions || [],
       question: room.question,
       startTime: room.startTime,
       participants: Object.values(room.participants)
     });
   });
 
-  socket.on("dsa-start-game", ({ roomId, question }) => {
+  socket.on("dsa-start-game", ({ roomId, questions }) => {
     const cleanRoomId = roomId?.toUpperCase();
     const room = dsaRooms[cleanRoomId];
     if (room && room.participants[socket.id]?.isHost) {
       room.status = "playing";
-      room.question = question;
+      room.questions = questions || [];
+      room.question = questions && questions.length > 0 ? questions[0] : null;
       room.startTime = Date.now();
       room.solvedCount = 0;
 
+      // Initialize questionStatuses for all participants
+      for (const p of Object.values(room.participants)) {
+        p.questionStatuses = {};
+        for (const q of room.questions) {
+          p.questionStatuses[q.id] = {
+            progress: 0,
+            status: "coding",
+            attempts: 0,
+            passedCount: 0,
+            totalCases: 0,
+            timeTaken: null
+          };
+        }
+      }
+
       io.to(`dsa-${cleanRoomId}`).emit("dsa-game-started", {
-        question,
+        questions: room.questions,
+        question: room.question,
         startTime: room.startTime
       });
     }
   });
 
-  socket.on("dsa-status-update", ({ roomId, progress, status, attempts, passedCount, totalCases }) => {
+  socket.on("dsa-status-update", ({ roomId, questionId, progress, status, attempts, passedCount, totalCases }) => {
     const cleanRoomId = roomId?.toUpperCase();
     const room = dsaRooms[cleanRoomId];
     if (room && room.participants[socket.id]) {
       const p = room.participants[socket.id];
-      p.progress = progress !== undefined ? progress : p.progress;
-      p.status = status !== undefined ? status : p.status;
-      p.attempts = attempts !== undefined ? attempts : p.attempts;
-      p.passedCount = passedCount !== undefined ? passedCount : p.passedCount;
-      p.totalCases = totalCases !== undefined ? totalCases : p.totalCases;
+      if (questionId) {
+        if (!p.questionStatuses) p.questionStatuses = {};
+        if (!p.questionStatuses[questionId]) {
+          p.questionStatuses[questionId] = { progress: 0, status: "coding", attempts: 0, passedCount: 0, totalCases: 0, timeTaken: null };
+        }
+        const qStatus = p.questionStatuses[questionId];
+        qStatus.progress = progress !== undefined ? progress : qStatus.progress;
+        qStatus.status = status !== undefined ? status : qStatus.status;
+        qStatus.attempts = attempts !== undefined ? attempts : qStatus.attempts;
+        qStatus.passedCount = passedCount !== undefined ? passedCount : qStatus.passedCount;
+        qStatus.totalCases = totalCases !== undefined ? totalCases : qStatus.totalCases;
+      } else {
+        p.progress = progress !== undefined ? progress : p.progress;
+        p.status = status !== undefined ? status : p.status;
+        p.attempts = attempts !== undefined ? attempts : p.attempts;
+        p.passedCount = passedCount !== undefined ? passedCount : p.passedCount;
+        p.totalCases = totalCases !== undefined ? totalCases : p.totalCases;
+      }
 
       io.to(`dsa-${cleanRoomId}`).emit("dsa-lobby-update", {
         roomId: cleanRoomId,
         status: room.status,
+        questions: room.questions || [],
         question: room.question,
         startTime: room.startTime,
         participants: Object.values(room.participants)
@@ -205,34 +239,67 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("dsa-code-submit", ({ roomId, isCorrect, code, passedCount, totalCases }) => {
+  socket.on("dsa-code-submit", ({ roomId, questionId, isCorrect, code, passedCount, totalCases }) => {
     const cleanRoomId = roomId?.toUpperCase();
     const room = dsaRooms[cleanRoomId];
     if (room && room.participants[socket.id]) {
       const p = room.participants[socket.id];
-      p.attempts = (p.attempts || 0) + 1;
-      p.passedCount = passedCount;
-      p.totalCases = totalCases;
+      if (!p.questionStatuses) p.questionStatuses = {};
+      if (!p.questionStatuses[questionId]) {
+        p.questionStatuses[questionId] = {
+          progress: 0,
+          status: "coding",
+          attempts: 0,
+          passedCount: 0,
+          totalCases: 0,
+          timeTaken: null
+        };
+      }
 
-      if (isCorrect && p.status !== "solved") {
-        p.status = "solved";
-        p.progress = 100;
-        p.timeTaken = Date.now() - room.startTime;
+      const qStatus = p.questionStatuses[questionId];
+      qStatus.attempts = (qStatus.attempts || 0) + 1;
+      qStatus.passedCount = passedCount;
+      qStatus.totalCases = totalCases;
+
+      if (isCorrect && qStatus.status !== "solved") {
+        qStatus.status = "solved";
+        qStatus.progress = 100;
+        qStatus.timeTaken = Date.now() - room.startTime;
         room.solvedCount += 1;
 
         io.to(`dsa-${cleanRoomId}`).emit("dsa-user-solved", {
           username: p.username,
-          timeTaken: p.timeTaken,
+          questionId,
+          timeTaken: qStatus.timeTaken,
           participants: Object.values(room.participants)
         });
       } else {
-        p.progress = totalCases > 0 ? Math.floor((passedCount / totalCases) * 100) : 0;
+        qStatus.progress = totalCases > 0 ? Math.floor((passedCount / totalCases) * 100) : 0;
+        qStatus.status = "testing";
+      }
+
+      // Compute overall stats for backwards compatibility
+      p.attempts = Object.values(p.questionStatuses).reduce((sum, curr) => sum + (curr.attempts || 0), 0);
+      const solvedAll = room.questions && room.questions.length > 0 &&
+        room.questions.every(q => p.questionStatuses[q.id]?.status === "solved");
+
+      if (solvedAll) {
+        p.status = "solved";
+        p.progress = 100;
+      } else {
         p.status = "testing";
+        if (room.questions && room.questions.length > 0) {
+          const totalProg = room.questions.reduce((sum, q) => sum + (p.questionStatuses[q.id]?.progress || 0), 0);
+          p.progress = Math.floor(totalProg / room.questions.length);
+        } else {
+          p.progress = qStatus.progress;
+        }
       }
 
       io.to(`dsa-${cleanRoomId}`).emit("dsa-lobby-update", {
         roomId: cleanRoomId,
         status: room.status,
+        questions: room.questions || [],
         question: room.question,
         startTime: room.startTime,
         participants: Object.values(room.participants)

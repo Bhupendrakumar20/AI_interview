@@ -23,10 +23,12 @@ export default function DSALiveRoomPage() {
     status: 'lobby',
     participants: [],
     question: null,
+    questions: [],
     startTime: null,
   });
 
-  const [code, setCode] = useState('');
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [codeMap, setCodeMap] = useState({});
   const [language, setLanguage] = useState('javascript');
   const [timerText, setTimerText] = useState('30:00');
   const [isLowTime, setIsLowTime] = useState(false);
@@ -36,12 +38,21 @@ export default function DSALiveRoomPage() {
 
   const socketRef = useRef(null);
 
+  const activeQuestion = roomState.questions?.[activeQuestionIndex] || roomState.question;
+
   // Sync Timer
   useEffect(() => {
     if (roomState.status === 'playing' && roomState.startTime) {
       const interval = setInterval(() => {
         const timePassed = Math.floor((Date.now() - roomState.startTime) / 1000);
-        const limitSeconds = 30 * 60; // 30 mins
+        
+        const qCount = roomState.questions?.length || 2;
+        let limitMinutes = 30;
+        if (qCount === 4) limitMinutes = 90;
+        else if (qCount === 3) limitMinutes = 60;
+        else if (qCount === 2) limitMinutes = 40;
+        
+        const limitSeconds = limitMinutes * 60;
         const remaining = Math.max(0, limitSeconds - timePassed);
         
         const m = String(Math.floor(remaining / 60)).padStart(2, '0');
@@ -59,7 +70,38 @@ export default function DSALiveRoomPage() {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [roomState.status, roomState.startTime]);
+  }, [roomState.status, roomState.startTime, roomState.questions]);
+
+  // Handle language switch to auto-extract snippets if not modified yet
+  const handleLanguageChange = (newLang) => {
+    setLanguage(newLang);
+    if (roomState.questions && roomState.questions.length > 0) {
+      setCodeMap((prev) => {
+        const updated = { ...prev };
+        roomState.questions.forEach((q) => {
+          const snippet = q?.codeSnippets?.find(
+            (s) => s.lang.toLowerCase().includes(newLang)
+          )?.code || '';
+          updated[q.id] = snippet;
+        });
+        return updated;
+      });
+    } else if (roomState.question) {
+      const snippet = roomState.question?.codeSnippets?.find(
+        (s) => s.lang.toLowerCase().includes(newLang)
+      )?.code || '';
+      setCodeMap({ [roomState.question.id]: snippet });
+    }
+  };
+
+  const handleCodeChange = (newCode) => {
+    if (activeQuestion) {
+      setCodeMap((prev) => ({
+        ...prev,
+        [activeQuestion.id]: newCode
+      }));
+    }
+  };
 
   // Connect to Sockets
   useEffect(() => {
@@ -89,27 +131,48 @@ export default function DSALiveRoomPage() {
     socketIo.on('dsa-lobby-update', (state) => {
       console.log('👥 Room Lobby Update:', state);
       setRoomState(state);
+
+      if (state.status === 'playing' && state.questions && state.questions.length > 0) {
+        setCodeMap((prev) => {
+          const updated = { ...prev };
+          let changed = false;
+          state.questions.forEach((q) => {
+            if (updated[q.id] === undefined) {
+              const snippet = q?.codeSnippets?.find(
+                (s) => s.lang.toLowerCase().includes(language)
+              )?.code || '';
+              updated[q.id] = snippet;
+              changed = true;
+            }
+          });
+          return changed ? updated : prev;
+        });
+      }
     });
 
-    socketIo.on('dsa-game-started', ({ question, startTime }) => {
+    socketIo.on('dsa-game-started', ({ questions, startTime }) => {
       toast.success("The competitive round has started!");
       
-      // Auto-extract starter code for selected language
-      const snippet = question?.codeSnippets?.find(
-        (s) => s.lang.toLowerCase().includes(language)
-      )?.code || '';
+      const initialCodeMap = {};
+      questions?.forEach((q) => {
+        const snippet = q?.codeSnippets?.find(
+          (s) => s.lang.toLowerCase().includes(language)
+        )?.code || '';
+        initialCodeMap[q.id] = snippet;
+      });
 
-      setCode(snippet);
+      setCodeMap(initialCodeMap);
+      setActiveQuestionIndex(0);
       setRoomState((prev) => ({
         ...prev,
         status: 'playing',
-        question,
+        questions,
         startTime,
       }));
     });
 
-    socketIo.on('dsa-user-solved', ({ username, timeTaken, participants }) => {
-      toast.success(`🎉 ${username} solved the problem in ${Math.floor(timeTaken / 60000)}m ${Math.floor((timeTaken % 60000) / 1000)}s!`);
+    socketIo.on('dsa-user-solved', ({ username, questionId, timeTaken, participants }) => {
+      toast.success(`🎉 ${username} solved a challenge in ${Math.floor(timeTaken / 60000)}m ${Math.floor((timeTaken % 60000) / 1000)}s!`);
       setRoomState((prev) => ({
         ...prev,
         participants,
@@ -128,118 +191,30 @@ export default function DSALiveRoomPage() {
     return () => {
       socketIo.disconnect();
     };
-  }, [roomCode, usernameParam]);
+  }, [roomCode, usernameParam, language]);
 
   // Fetch and Start Game
   const handleStartGame = async () => {
     if (!socketRef.current) return;
 
-    toast.info("Fetching challenge from LeetCode...");
+    toast.info("Fetching random challenges from database...");
+
+    const questionCountParam = parseInt(searchParams.get('questionCount') || '2');
 
     try {
-      // 1. Fetch daily challenge question
-      const dailyRes = await fetch('/api/leetcode/daily-question');
-      const dailyData = await dailyRes.json();
+      const res = await fetch(`/api/leetcode/random-question?difficulty=${difficultyParam}&count=${questionCountParam}`);
+      const data = await res.json();
       
-      if (!dailyData.success || !dailyData.question?.titleSlug) {
-        throw new Error("Could not fetch daily LeetCode challenge.");
+      if (!data.success || !data.questions) {
+        throw new Error(data.error || "Could not fetch random challenges.");
       }
 
-      const slug = dailyData.question.titleSlug;
-
-      // 2. Fetch full details of the challenge
-      const query = `
-        query questionDetail($titleSlug: String!) {
-          question(titleSlug: $titleSlug) {
-            questionId
-            title
-            content
-            difficulty
-            exampleTestcases
-            topicTags {
-              name
-            }
-            codeSnippets {
-              lang
-              code
-            }
-          }
-        }
-      `;
-
-      const detailsRes = await fetch('/api/leetcode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { titleSlug: slug } }),
-      });
-
-      const detailsData = await detailsRes.json();
-      const question = detailsData.data?.question;
-
-      if (!question) {
-        throw new Error("Could not fetch details for LeetCode challenge.");
-      }
-
-      const parseTestCasesFromDescription = (htmlContent) => {
-        if (!htmlContent) return [];
-        const text = htmlContent
-          .replace(/<br\s*\/?>/gi, '\n')
-          .replace(/<\/p>/gi, '\n')
-          .replace(/<\/div>/gi, '\n')
-          .replace(/<[^>]*>/g, '');
-        
-        const cases = [];
-        const regex = /Input:\s*([\s\S]*?)\n\s*Output:\s*([\s\S]*?)(?=\n\s*(?:Explanation|Input|Note|Constraints|Example)|$)/gi;
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-          let inputRaw = match[1].trim();
-          let outputRaw = match[2].trim();
-          
-          // Split by variables like: target = 9, roads = ...
-          const parts = inputRaw.split(/,\s*\w+\s*=/);
-          let stdin = "";
-          if (parts.length > 1) {
-            const firstPartVal = parts[0].substring(parts[0].indexOf('=') + 1).trim();
-            stdin = firstPartVal;
-            for (let j = 1; j < parts.length; j++) {
-              stdin += "\n" + parts[j].trim();
-            }
-          } else {
-            if (inputRaw.includes('=')) {
-              stdin = inputRaw.substring(inputRaw.indexOf('=') + 1).trim();
-            } else {
-              stdin = inputRaw;
-            }
-          }
-          cases.push({
-            stdin,
-            expectedOutput: outputRaw
-          });
-        }
-        return cases;
-      };
-
-      // Format test cases
-      let testCases = parseTestCasesFromDescription(question.content);
-      
-      // Fallback if HTML parsing found nothing
-      if (testCases.length === 0) {
-        const testCasesRaw = question.exampleTestcases?.trim().split('\n') || [];
-        for (let i = 0; i < testCasesRaw.length; i += 2) {
-          if (testCasesRaw[i]) {
-            testCases.push({
-              stdin: testCasesRaw[i],
-              expectedOutput: testCasesRaw[i + 1] || '',
-            });
-          }
-        }
-      }
-      question.testCases = testCases;
+      const questions = data.questions;
 
       // Emit to start game for all users in the room
       socketRef.current.emit('dsa-start-game', {
         roomId: roomCode,
-        question,
+        questions,
       });
 
     } catch (err) {
@@ -253,7 +228,8 @@ export default function DSALiveRoomPage() {
 
   // Submit and verify code
   const handleSubmit = async () => {
-    if (!code.trim() || submitting) return;
+    const activeCode = codeMap[activeQuestion?.id] || '';
+    if (!activeCode.trim() || submitting) return;
 
     setSubmitting(true);
     setSubmitStatus(null);
@@ -267,12 +243,12 @@ export default function DSALiveRoomPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceCode: code,
+          sourceCode: activeCode,
           language,
-          questionId: roomState.question?.titleSlug || roomState.question?.id || 'daily-challenge',
+          questionId: activeQuestion?.titleSlug || activeQuestion?.id || 'daily-challenge',
           roomId: roomCode,
           userId: auth.currentUser?.uid || currentParticipant?.userId || 'usr_guest',
-          testCases: roomState.question?.testCases || [],
+          testCases: activeQuestion?.testCases || [],
         }),
       });
 
@@ -295,7 +271,7 @@ export default function DSALiveRoomPage() {
       setActiveTestCaseTab(0);
 
       if (allPassed) {
-        toast.success("Accepted! You solved the problem!");
+        toast.success("Accepted! You solved this question!");
       } else {
         toast.error(`Failed: Passed ${passedCount}/${totalCases} test cases.`);
       }
@@ -303,8 +279,9 @@ export default function DSALiveRoomPage() {
       // Notify server of submit status
       socketRef.current?.emit('dsa-code-submit', {
         roomId: roomCode,
+        questionId: activeQuestion?.id,
         isCorrect: allPassed,
-        code,
+        code: activeCode,
         passedCount,
         totalCases,
       });
@@ -335,13 +312,13 @@ export default function DSALiveRoomPage() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             ROOM <b className="text-white">#{roomCode}</b>
           </div>
-          {roomState.question && (
+          {activeQuestion && (
             <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
-              roomState.question.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-              roomState.question.difficulty === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+              activeQuestion.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+              activeQuestion.difficulty === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
               'bg-red-500/10 text-red-400 border border-red-500/20'
             }`}>
-              {roomState.question.difficulty}
+              {activeQuestion.difficulty}
             </span>
           )}
         </div>
@@ -395,9 +372,31 @@ export default function DSALiveRoomPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <h2 className="text-2xl font-black">{roomState.question?.title}</h2>
+              {roomState.questions && roomState.questions.length > 0 && (
+                <div className="flex gap-2 border-b border-slate-800 pb-3 flex-wrap">
+                  {roomState.questions.map((q, idx) => {
+                    const isSolved = currentParticipant?.questionStatuses?.[q.id]?.status === 'solved';
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveQuestionIndex(idx)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border flex items-center gap-1.5 ${
+                          activeQuestionIndex === idx
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold'
+                            : 'bg-slate-950 border-slate-900 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>Q{idx + 1}</span>
+                        {isSolved && <span className="text-emerald-500 text-[10px] font-bold">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <h2 className="text-2xl font-black">{activeQuestion?.title}</h2>
               <div className="flex gap-2">
-                {roomState.question?.topicTags?.map((tag, i) => (
+                {activeQuestion?.topicTags?.map((tag, i) => (
                   <span key={i} className="text-xs bg-slate-900 border border-slate-800 px-2.5 py-1 rounded text-slate-400">
                     {tag.name}
                   </span>
@@ -406,7 +405,7 @@ export default function DSALiveRoomPage() {
               <hr className="border-slate-800" />
               <div 
                 className="text-sm leading-relaxed text-slate-300 space-y-4 problem-content"
-                dangerouslySetInnerHTML={{ __html: roomState.question?.content || '' }}
+                dangerouslySetInnerHTML={{ __html: activeQuestion?.content || '' }}
               />
             </div>
           )}
@@ -420,7 +419,7 @@ export default function DSALiveRoomPage() {
                 <span className="text-xs font-bold text-slate-400">LANGUAGE</span>
                 <select
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
+                  onChange={(e) => handleLanguageChange(e.target.value)}
                   className="bg-slate-950 border border-slate-800 text-xs text-slate-300 font-bold px-3 py-1.5 rounded-lg focus:outline-none"
                 >
                   <option value="javascript">JavaScript</option>
@@ -436,7 +435,7 @@ export default function DSALiveRoomPage() {
                   disabled={submitting || roomState.status !== 'playing'}
                   className="px-5 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold rounded-lg transition hover:scale-105"
                 >
-                  {submitting ? 'Verifying...' : 'Submit & Test'}
+                  {submitting ? 'Verifying...' : 'Submit'}
                 </button>
               </div>
             </div>
@@ -444,10 +443,10 @@ export default function DSALiveRoomPage() {
             <div className="flex-1 min-h-0 border border-slate-900 rounded-lg overflow-hidden">
               <CodeEditorPanel
                 language={language}
-                onLanguageChange={setLanguage}
-                onChange={setCode}
-                initialCode={code}
-                testCases={roomState.question?.testCases || []}
+                onLanguageChange={handleLanguageChange}
+                onChange={handleCodeChange}
+                initialCode={codeMap[activeQuestion?.id] || ''}
+                testCases={activeQuestion?.testCases || []}
               />
             </div>
           </div>
@@ -542,36 +541,122 @@ export default function DSALiveRoomPage() {
           <div className="bg-slate-900/40 border border-slate-900 rounded-xl p-5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Leaderboard & Live Progress</h3>
             <div className="space-y-4">
-              {roomState.participants.map((p, i) => (
-                <div key={i} className="bg-slate-950 p-4 rounded-xl border border-slate-900 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-sm text-slate-200">
-                      {p.username} {p.socketId === socket?.id && <span className="text-[10px] text-emerald-400">(You)</span>}
-                    </span>
-                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                      p.status === 'solved' ? 'bg-emerald-500/10 text-emerald-400' :
-                      p.status === 'testing' ? 'bg-amber-500/10 text-amber-400' :
-                      'bg-blue-500/10 text-blue-400'
-                    }`}>
-                      {p.status}
-                    </span>
-                  </div>
+              {(() => {
+                const getSolvedCount = (p) => {
+                  if (!p.questionStatuses) return 0;
+                  return Object.values(p.questionStatuses).filter(q => q.status === 'solved').length;
+                };
 
-                  <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                const getLastSolveTime = (p) => {
+                  if (!p.questionStatuses) return Infinity;
+                  const solvedQs = Object.values(p.questionStatuses).filter(q => q.status === 'solved');
+                  if (solvedQs.length === 0) return Infinity;
+                  return Math.max(...solvedQs.map(q => q.timeTaken || 0));
+                };
+
+                const formatTime = (ms) => {
+                  if (!ms) return '';
+                  const mins = Math.floor(ms / 60000);
+                  const secs = Math.floor((ms % 60000) / 1000);
+                  return `${mins}m ${secs}s`;
+                };
+
+                const sortedParticipants = [...(roomState.participants || [])].sort((a, b) => {
+                  const solvedA = getSolvedCount(a);
+                  const solvedB = getSolvedCount(b);
+                  if (solvedB !== solvedA) {
+                    return solvedB - solvedA;
+                  }
+                  const timeA = getLastSolveTime(a);
+                  const timeB = getLastSolveTime(b);
+                  return timeA - timeB;
+                });
+
+                return sortedParticipants.map((p, i) => {
+                  const isFirst = i === 0;
+                  const solvedCount = getSolvedCount(p);
+                  const showCrown = isFirst && solvedCount > 0;
+                  const totalQuestions = roomState.questions?.length || 2;
+                  const hasWinnerTag = showCrown && solvedCount === totalQuestions;
+
+                  return (
                     <div 
-                      className={`h-full transition-all duration-500 ${
-                        p.status === 'solved' ? 'bg-emerald-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                      key={i} 
+                      className={`bg-slate-950 p-4 rounded-xl border space-y-3 relative overflow-hidden transition-all duration-300 ${
+                        showCrown 
+                          ? 'border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.05)]' 
+                          : 'border-slate-900'
                       }`}
-                      style={{ width: `${p.progress || 0}%` }}
-                    />
-                  </div>
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm text-slate-200 flex items-center gap-1.5">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                            isFirst ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'
+                          }`}>
+                            #{i + 1}
+                          </span>
+                          {p.username} 
+                          {p.socketId === socket?.id && <span className="text-[10px] text-emerald-400">(You)</span>}
+                          {showCrown && <span className="text-xs" title="Current Leader">👑</span>}
+                          {hasWinnerTag && <span className="text-[9px] bg-amber-500/25 border border-amber-500/40 text-amber-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider scale-90">Winner</span>}
+                        </span>
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase ${
+                          p.status === 'solved' ? 'bg-emerald-500/10 text-emerald-400' :
+                          p.status === 'testing' ? 'bg-amber-500/10 text-amber-400' :
+                          'bg-blue-500/10 text-blue-400'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </div>
 
-                  <div className="flex justify-between text-xs text-slate-500">
-                    <span>Passed {p.passedCount || 0}/{p.totalCases || 0} Cases</span>
-                    <span>Attempts: {p.attempts || 0}</span>
-                  </div>
-                </div>
-              ))}
+                      <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-500 ${
+                            p.status === 'solved' ? 'bg-emerald-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                          }`}
+                          style={{ width: `${p.progress || 0}%` }}
+                        />
+                      </div>
+
+                      <div className="flex justify-between text-xs text-slate-500">
+                        <span>Passed {p.passedCount || 0}/{p.totalCases || 0} Cases</span>
+                        <span>Attempts: {p.attempts || 0}</span>
+                      </div>
+
+                      {/* Per-question Ticks */}
+                      {roomState.questions && roomState.questions.length > 0 && (
+                        <div className="flex gap-2 mt-2 pt-2 border-t border-slate-900/60">
+                          {roomState.questions.map((q, qIdx) => {
+                            const qStatus = p.questionStatuses?.[q.id];
+                            const isSolved = qStatus?.status === 'solved';
+                            return (
+                              <div
+                                key={qIdx}
+                                className={`flex-1 py-1.5 px-2 rounded-lg border text-center text-xs font-semibold flex flex-col items-center justify-center gap-0.5 transition ${
+                                  isSolved
+                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                    : qStatus?.attempts > 0
+                                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                                    : 'bg-slate-900 border-slate-800 text-slate-500'
+                                }`}
+                              >
+                                <span className="opacity-90">Q{qIdx + 1}</span>
+                                <span className="text-[10px] font-bold">
+                                  {isSolved 
+                                    ? `✓ (${formatTime(qStatus.timeTaken)})` 
+                                    : qStatus?.attempts > 0 
+                                      ? `${qStatus.passedCount}/${qStatus.totalCases}` 
+                                      : '—'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>

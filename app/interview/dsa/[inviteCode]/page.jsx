@@ -8,6 +8,37 @@ import { ArrowLeft, Play, Send, Trophy, Users, Zap, CheckCircle2, XCircle, Alert
 import { auth } from '@/firebase/client';
 import CodeEditorPanel from '@/components/CodeEditorPanel';
 
+// Robust language code snippet extractor
+const getSnippetForLanguage = (codeSnippets, targetLang) => {
+  if (!codeSnippets || !targetLang) return '';
+  const target = targetLang.toLowerCase();
+  
+  // Exact match first
+  let snippetObj = codeSnippets.find(s => s.lang.toLowerCase() === target);
+  if (snippetObj) return snippetObj.code;
+  
+  if (target === 'cpp' || target === 'c++') {
+    return codeSnippets.find(s => {
+      const l = s.lang.toLowerCase();
+      return l === 'c++' || l === 'cpp' || l.includes('c++') || l.includes('cpp');
+    })?.code || '';
+  }
+  
+  if (target === 'python' || target === 'python3') {
+    return codeSnippets.find(s => s.lang.toLowerCase().includes('python'))?.code || '';
+  }
+  
+  if (target === 'java') {
+    return codeSnippets.find(s => s.lang.toLowerCase() === 'java')?.code || '';
+  }
+  
+  if (target === 'javascript' || target === 'js') {
+    return codeSnippets.find(s => s.lang.toLowerCase().includes('javascript') || s.lang.toLowerCase() === 'js')?.code || '';
+  }
+  
+  return codeSnippets.find(s => s.lang.toLowerCase().includes(target))?.code || '';
+};
+
 export default function DSALiveRoomPage() {
   const params = useParams();
   const router = useRouter();
@@ -79,17 +110,13 @@ export default function DSALiveRoomPage() {
       setCodeMap((prev) => {
         const updated = { ...prev };
         roomState.questions.forEach((q) => {
-          const snippet = q?.codeSnippets?.find(
-            (s) => s.lang.toLowerCase().includes(newLang)
-          )?.code || '';
+          const snippet = getSnippetForLanguage(q?.codeSnippets, newLang);
           updated[q.id] = snippet;
         });
         return updated;
       });
     } else if (roomState.question) {
-      const snippet = roomState.question?.codeSnippets?.find(
-        (s) => s.lang.toLowerCase().includes(newLang)
-      )?.code || '';
+      const snippet = getSnippetForLanguage(roomState.question?.codeSnippets, newLang);
       setCodeMap({ [roomState.question.id]: snippet });
     }
   };
@@ -138,9 +165,7 @@ export default function DSALiveRoomPage() {
           let changed = false;
           state.questions.forEach((q) => {
             if (updated[q.id] === undefined) {
-              const snippet = q?.codeSnippets?.find(
-                (s) => s.lang.toLowerCase().includes(language)
-              )?.code || '';
+              const snippet = getSnippetForLanguage(q?.codeSnippets, language);
               updated[q.id] = snippet;
               changed = true;
             }
@@ -155,9 +180,7 @@ export default function DSALiveRoomPage() {
       
       const initialCodeMap = {};
       questions?.forEach((q) => {
-        const snippet = q?.codeSnippets?.find(
-          (s) => s.lang.toLowerCase().includes(language)
-        )?.code || '';
+        const snippet = getSnippetForLanguage(q?.codeSnippets, language);
         initialCodeMap[q.id] = snippet;
       });
 

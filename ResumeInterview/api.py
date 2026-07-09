@@ -116,7 +116,18 @@ is responsible for passing `parsedResume` / `atsResult` along), so every
 step can be called and tested independently.
 """
 
+import sys
 import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from dotenv import load_dotenv
+# Load root .env.local file to ensure we get correct environment variables (like OLLAMA_URL and OLLAMA_MODEL)
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env_local_path = os.path.join(root_dir, ".env.local")
+if os.path.exists(env_local_path):
+    load_dotenv(env_local_path)
+else:
+    load_dotenv()
 import shutil
 import tempfile
 from typing import Any, Dict, Optional
@@ -153,7 +164,7 @@ class AtsScoreRequest(BaseModel):
 
 class FeedbackRequest(BaseModel):
     atsResult: Dict[str, Any]
-    jobDescription: str = Form(...)
+    jobDescription: str
 
 
 class GenerateQuestionsRequest(BaseModel):

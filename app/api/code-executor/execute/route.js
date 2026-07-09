@@ -87,13 +87,32 @@ export async function POST(req) {
   }
 
   try {
+    const modifiedSourceCode = injectAutoDriver(sourceCode, language);
     let testCases = [];
 
     // Phase 1 & 2: Database Registry Lookup
     if (questionId) {
+      let resolvedId = questionId;
+      if (!questionId.startsWith('lc_')) {
+        // If it's a slug, look it up in dsa_questions to get the real ID (e.g. lc_206)
+        const questionDoc = await db.collection("dsa_questions")
+          .where("titleSlug", "==", questionId)
+          .limit(1)
+          .get();
+        if (!questionDoc.empty) {
+          resolvedId = questionDoc.docs[0].id;
+        } else {
+          // Try checking by document ID directly in case the doc ID itself is the slug
+          const docDirect = await db.collection("dsa_questions").doc(questionId).get();
+          if (docDirect.exists) {
+            resolvedId = docDirect.id;
+          }
+        }
+      }
+
       const snapshot = await db
         .collection("dsa_test_cases")
-        .where("questionId", "==", questionId)
+        .where("questionId", "==", resolvedId)
         .get();
 
       if (!snapshot.empty) {
@@ -106,36 +125,6 @@ export async function POST(req) {
           });
         });
       }
-    }
-
-    // Dynamic Seeding on first run
-    if (testCases.length === 0 && clientTestCases.length > 0 && questionId) {
-      const batch = db.batch();
-      
-      const questionRef = db.collection("dsa_questions").doc(questionId);
-      batch.set(questionRef, {
-        id: questionId,
-        timeLimitMs: 5000,
-        createdAt: new Date(),
-      }, { merge: true });
-
-      clientTestCases.forEach((tc, idx) => {
-        const caseRef = db.collection("dsa_test_cases").doc(`${questionId}_case_${idx}`);
-        batch.set(caseRef, {
-          questionId,
-          stdin: tc.stdin || '',
-          expectedOutput: tc.expectedOutput || '',
-          isHidden: idx >= 2, // Mark cases beyond first 2 as hidden
-        });
-        
-        testCases.push({
-          stdin: tc.stdin || '',
-          expectedOutput: tc.expectedOutput || '',
-          isHidden: idx >= 2,
-        });
-      });
-      
-      await batch.commit();
     }
 
     // Fallback if no questionId or database cases found
@@ -155,7 +144,7 @@ export async function POST(req) {
 
       // Piston Call
       const result = await executeCode({
-        sourceCode,
+        sourceCode: modifiedSourceCode,
         language,
         stdin: tc.stdin || '',
       });
@@ -169,10 +158,11 @@ export async function POST(req) {
         errorMsg += "\n[System: Output truncated due to size limit]";
       }
 
-      const hasRuntimeError = result.exitCode !== 0 || !!errorMsg;
+      const hasRuntimeError = result.exitCode !== 0;
       const actual = output.trim();
       const expected = (tc.expectedOutput || '').trim();
-      const passed = !hasRuntimeError && actual === expected;
+      const normalize = (str) => str.replace(/\s+/g, '');
+      const passed = !hasRuntimeError && (actual === expected || normalize(actual) === normalize(expected));
 
       const tcResult = {
         passed,
@@ -229,9 +219,12 @@ export async function POST(req) {
           roomDoc = await roomRef.get();
         }
         const roomData = roomDoc.data();
-        const timeFromStart = roomData && roomData.startTime 
+        let timeFromStart = roomData && roomData.startTime 
           ? Math.max(0, Date.now() - (roomData.startTime.toDate ? roomData.startTime.toDate().getTime() : roomData.startTime))
           : 0;
+        if (timeFromStart > 3599999) {
+          timeFromStart = 3599999;
+        }
 
         await recordDSASubmission(
           roomId,
@@ -293,4 +286,69 @@ export async function POST(req) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Automatically inject standard input parsing and execution driver
+ * for standard LeetCode-style function signatures (Choice 1 & 2 integration)
+ */
+function injectAutoDriver(sourceCode, language) {
+  const lang = language.toLowerCase();
+  
+  if (lang === 'javascript' || lang === 'js') {
+    // If user already wrote driver, don't inject
+    if (sourceCode.includes("require('fs')") || sourceCode.includes('fs.readFileSync')) {
+      return sourceCode;
+    }
+    
+    // Find JS function name
+    let funcName = null;
+    let match = sourceCode.match(/(?:var|const|let)\s+([a-zA-Z0-9_]+)\s*=\s*function/);
+    if (match) funcName = match[1];
+    
+    if (!funcName) {
+      match = sourceCode.match(/function\s+([a-zA-Z0-9_]+)\s*\(/);
+      if (match) funcName = match[1];
+    }
+    
+    if (!funcName) {
+      match = sourceCode.match(/(?:var|const|let)\s+([a-zA-Z0-9_]+)\s*=\s*\([^\)]*\)\s*=>/);
+      if (match) funcName = match[1];
+    }
+    
+    if (funcName) {
+      console.log(`[Auto-Driver Injection] Detected JavaScript function: "${funcName}"`);
+      return sourceCode + `\n\n// ── Auto-Generated Driver Code ──\nconst fs = require('fs');\ntry {\n  const lines = fs.readFileSync(0, 'utf-8').replace(/\\r/g, '').trim().split('\\n');\n  if (lines.length > 0 && lines[0] !== '') {\n    const parsedArgs = lines.map(line => {\n      try {\n        return JSON.parse(line);\n      } catch (e) {\n        return line;\n      }\n    });\n    if (typeof ${funcName} === 'function') {\n      console.log(JSON.stringify(${funcName}(...parsedArgs)));\n    }\n  }\n} catch (e) {}\n`;
+    }
+  } else if (lang === 'python' || lang === 'python3' || lang === 'py') {
+    // If they already read stdin, don't inject
+    if (sourceCode.includes('sys.stdin') || sourceCode.includes('input(')) {
+      return sourceCode;
+    }
+    
+    // Find Python Class Method or normal function
+    let classMethod = null;
+    let methodMatch = sourceCode.match(/def\s+([a-zA-Z0-9_]+)\s*\(\s*self\s*,/);
+    if (methodMatch) {
+      classMethod = methodMatch[1];
+    }
+    
+    if (classMethod) {
+      console.log(`[Auto-Driver Injection] Detected Python class method: "${classMethod}"`);
+      return sourceCode + `\n\n# ── Auto-Generated Driver Code ──\nimport sys, json\ntry:\n    lines = sys.stdin.read().replace('\\r', '').strip().split('\\n')\n    if lines and lines[0]:\n        parsed = []\n        for line in lines:\n            try:\n                parsed.append(json.loads(line))\n            except:\n                parsed.append(line)\n        sol = Solution()\n        print(json.dumps(getattr(sol, "${classMethod}")(*parsed)))\nexcept Exception as e:\n    pass\n`;
+    } else {
+      let funcName = null;
+      let funcMatch = sourceCode.match(/def\s+([a-zA-Z0-9_]+)\s*\(/);
+      if (funcMatch) {
+        funcName = funcMatch[1];
+      }
+      
+      if (funcName) {
+        console.log(`[Auto-Driver Injection] Detected Python function: "${funcName}"`);
+        return sourceCode + `\n\n# ── Auto-Generated Driver Code ──\nimport sys, json\ntry:\n    lines = sys.stdin.read().replace('\\r', '').strip().split('\\n')\n    if lines and lines[0]:\n        parsed = []\n        for line in lines:\n            try:\n                parsed.append(json.loads(line))\n            except:\n                parsed.append(line)\n        print(json.dumps(${funcName}(*parsed)))\nexcept Exception as e:\n    pass\n`;
+      }
+    }
+  }
+  
+  return sourceCode;
 }

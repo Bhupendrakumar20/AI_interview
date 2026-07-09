@@ -77,18 +77,33 @@ RESUME_SCHEMA_EXAMPLE = {
     "certifications": ["Certification 1"]
 }
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "llama3:latest"
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
+    OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
 
 
 def ask_ollama(prompt):
-    response = requests.post(
-        OLLAMA_URL,
-        json={"model": MODEL_NAME, "prompt": prompt, "stream": False,
-              "options": {"temperature": 0.3, "top_p": 0.9}}
-    )
-    response.raise_for_status()
-    return response.json()["response"]
+    try:
+        try:
+            from llm_fallback import generate_with_fallback
+        except ImportError:
+            import sys
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if parent_dir not in sys.path:
+                sys.path.append(parent_dir)
+            from llm_fallback import generate_with_fallback
+        return generate_with_fallback(prompt, temperature=0.3, top_p=0.9)
+    except Exception as e:
+        print(f"[Fallback Import/Execution Warning] Using direct Ollama request due to: {e}")
+        response = requests.post(
+            OLLAMA_URL,
+            json={"model": MODEL_NAME, "prompt": prompt, "stream": False,
+                  "options": {"temperature": 0.3, "top_p": 0.9}}
+        )
+        response.raise_for_status()
+        return response.json()["response"]
+
 
 
 def normalize_resume(raw):

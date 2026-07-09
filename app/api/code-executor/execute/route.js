@@ -296,12 +296,10 @@ function injectAutoDriver(sourceCode, language) {
   const lang = language.toLowerCase();
   
   if (lang === 'javascript' || lang === 'js') {
-    // If user already wrote driver, don't inject
     if (sourceCode.includes("require('fs')") || sourceCode.includes('fs.readFileSync')) {
       return sourceCode;
     }
     
-    // Find JS function name
     let funcName = null;
     let match = sourceCode.match(/(?:var|const|let)\s+([a-zA-Z0-9_]+)\s*=\s*function/);
     if (match) funcName = match[1];
@@ -313,29 +311,280 @@ function injectAutoDriver(sourceCode, language) {
     
     if (!funcName) {
       match = sourceCode.match(/(?:var|const|let)\s+([a-zA-Z0-9_]+)\s*=\s*\([^\)]*\)\s*=>/);
-      if (match) funcName = match[1];
+      if (funcName) funcName = match[1];
     }
     
     if (funcName) {
-      console.log(`[Auto-Driver Injection] Detected JavaScript function: "${funcName}"`);
-      return sourceCode + `\n\n// ── Auto-Generated Driver Code ──\nconst fs = require('fs');\ntry {\n  const lines = fs.readFileSync(0, 'utf-8').replace(/\\r/g, '').trim().split('\\n');\n  if (lines.length > 0 && lines[0] !== '') {\n    const parsedArgs = lines.map(line => {\n      try {\n        return JSON.parse(line);\n      } catch (e) {\n        return line;\n      }\n    });\n    if (typeof ${funcName} === 'function') {\n      console.log(JSON.stringify(${funcName}(...parsedArgs)));\n    }\n  }\n} catch (e) {}\n`;
+      console.log("[Auto-Driver Injection] Detected JavaScript function: " + funcName);
+      
+      const driverParts = [
+        "// ── Predefined Data Structures ──",
+        "class ListNode {",
+        "  constructor(val, next) {",
+        "    this.val = (val === undefined ? 0 : val);",
+        "    this.next = (next === undefined ? null : next);",
+        "  }",
+        "}",
+        "",
+        "class TreeNode {",
+        "  constructor(val, left, right) {",
+        "    this.val = (val === undefined ? 0 : val);",
+        "    this.left = (left === undefined ? null : left);",
+        "    this.right = (right === undefined ? null : right);",
+        "  }",
+        "}",
+        "",
+        "function arrayToLinkedList(arr) {",
+        "  if (!arr || !Array.isArray(arr) || arr.length === 0) return null;",
+        "  let dummy = new ListNode(0);",
+        "  let curr = dummy;",
+        "  for (let val of arr) {",
+        "    curr.next = new ListNode(val);",
+        "    curr = curr.next;",
+        "  }",
+        "  return dummy.next;",
+        "}",
+        "",
+        "function linkedListToArray(head) {",
+        "  let arr = [];",
+        "  let curr = head;",
+        "  while (curr !== null) {",
+        "    arr.push(curr.val);",
+        "    curr = curr.next;",
+        "  }",
+        "  return arr;",
+        "}",
+        "",
+        "function arrayToTree(arr) {",
+        "  if (!arr || !Array.isArray(arr) || arr.length === 0) return null;",
+        "  let root = new TreeNode(arr[0]);",
+        "  let queue = [root];",
+        "  let i = 1;",
+        "  while (queue.length > 0 && i < arr.length) {",
+        "    let curr = queue.shift();",
+        "    if (curr === null) continue;",
+        "    ",
+        "    if (i < arr.length) {",
+        "      let val = arr[i++];",
+        "      if (val !== null && val !== undefined) {",
+        "        curr.left = new TreeNode(val);",
+        "        queue.push(curr.left);",
+        "      }",
+        "    }",
+        "    ",
+        "    if (i < arr.length) {",
+        "      let val = arr[i++];",
+        "      if (val !== null && val !== undefined) {",
+        "        curr.right = new TreeNode(val);",
+        "        queue.push(curr.right);",
+        "      }",
+        "    }",
+        "  }",
+        "  return root;",
+        "}",
+        "",
+        "function treeToArray(root) {",
+        "  if (!root) return [];",
+        "  let result = [];",
+        "  let queue = [root];",
+        "  while (queue.length > 0) {",
+        "    let curr = queue.shift();",
+        "    if (curr) {",
+        "      result.push(curr.val);",
+        "      queue.push(curr.left);",
+        "      queue.push(curr.right);",
+        "    } else {",
+        "      result.push(null);",
+        "    }",
+        "  }",
+        "  while (result.length > 0 && result[result.length - 1] === null) {",
+        "    result.pop();",
+        "  }",
+        "  return result;",
+        "}",
+        "",
+        sourceCode,
+        "",
+        "// ── Auto-Generated Driver Code ──",
+        "const fs = require('fs');",
+        "try {",
+        "  const lines = fs.readFileSync(0, 'utf-8').replace(/\\r/g, '').trim().split('\\n');",
+        "  if (lines.length > 0 && lines[0] !== '') {",
+        "    const parsedArgs = lines.map(line => {",
+        "      try {",
+        "        return JSON.parse(line);",
+        "      } catch (e) {",
+        "        return line;",
+        "      }",
+        "    });",
+        "",
+        "    if (typeof " + funcName + " === 'function') {",
+        "      const fnStr = " + funcName + ".toString().replace(/((\\/\\/.*$)|(\\/\\* [\\s\\S]*?\\*\\/))/mg, '');",
+        "      const paramMatch = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(/([^\\s,]+)/g);",
+        "      const params = paramMatch || [];",
+        "",
+        "      const convertedArgs = parsedArgs.map((arg, idx) => {",
+        "        if (Array.isArray(arg)) {",
+        "          const paramName = (params[idx] || '').toLowerCase();",
+        "          if (paramName === 'head' || paramName === 'list' || paramName.startsWith('list') || paramName.startsWith('l') || paramName === 'node') {",
+        "            return arrayToLinkedList(arg);",
+        "          }",
+        "          if (paramName === 'root' || paramName.includes('tree')) {",
+        "            return arrayToTree(arg);",
+        "          }",
+        "        }",
+        "        return arg;",
+        "      });",
+        "",
+        "      let result = " + funcName + "(...convertedArgs);",
+        "",
+        "      if (result !== null && typeof result === 'object') {",
+        "        if ('next' in result) {",
+        "          result = linkedListToArray(result);",
+        "        } else if ('left' in result || 'right' in result) {",
+        "          result = treeToArray(result);",
+        "        }",
+        "      }",
+        "",
+        "      console.log(JSON.stringify(result));",
+        "    }",
+        "  }",
+        "} catch (e) {}"
+      ];
+      
+      return driverParts.join("\n");
     }
   } else if (lang === 'python' || lang === 'python3' || lang === 'py') {
-    // If they already read stdin, don't inject
     if (sourceCode.includes('sys.stdin') || sourceCode.includes('input(')) {
       return sourceCode;
     }
     
-    // Find Python Class Method or normal function
     let classMethod = null;
     let methodMatch = sourceCode.match(/def\s+([a-zA-Z0-9_]+)\s*\(\s*self\s*,/);
     if (methodMatch) {
       classMethod = methodMatch[1];
     }
     
+    const predefClasses = [
+      "import sys, json",
+      "",
+      "class ListNode:",
+      "    def __init__(self, val=0, next=None):",
+      "        self.val = val",
+      "        self.next = next",
+      "",
+      "class TreeNode:",
+      "    def __init__(self, val=0, left=None, right=None):",
+      "        self.val = val",
+      "        self.left = left",
+      "        self.right = right",
+      "",
+      "def arrayToLinkedList(arr):",
+      "    if not arr: return None",
+      "    dummy = ListNode(0)",
+      "    curr = dummy",
+      "    for val in arr:",
+      "        curr.next = ListNode(val)",
+      "        curr = curr.next",
+      "    return dummy.next",
+      "",
+      "def linkedListToArray(head):",
+      "    arr = []",
+      "    curr = head",
+      "    while curr:",
+      "        arr.append(curr.val)",
+      "        curr = curr.next",
+      "    return arr",
+      "",
+      "def arrayToTree(arr):",
+      "    if not arr: return None",
+      "    root = TreeNode(arr[0])",
+      "    queue = [root]",
+      "    i = 1",
+      "    while queue and i < len(arr):",
+      "        curr = queue.pop(0)",
+      "        if not curr: continue",
+      "        if i < len(arr):",
+      "            val = arr[i]",
+      "            i += 1",
+      "            if val is not None:",
+      "                curr.left = TreeNode(val)",
+      "                queue.append(curr.left)",
+      "        if i < len(arr):",
+      "            val = arr[i]",
+      "            i += 1",
+      "            if val is not None:",
+      "                curr.right = TreeNode(val)",
+      "                queue.append(curr.right)",
+      "    return root",
+      "",
+      "def treeToArray(root):",
+      "    if not root: return []",
+      "    result = []",
+      "    queue = [root]",
+      "    while queue:",
+      "        curr = queue.pop(0)",
+      "        if curr:",
+      "            result.append(curr.val)",
+      "            queue.append(curr.left)",
+      "            queue.append(curr.right)",
+      "        else:",
+      "            result.append(None)",
+      "    while result and result[-1] is None:",
+      "        result.pop()",
+      "    return result"
+    ].join("\n");
+
     if (classMethod) {
-      console.log(`[Auto-Driver Injection] Detected Python class method: "${classMethod}"`);
-      return sourceCode + `\n\n# ── Auto-Generated Driver Code ──\nimport sys, json\ntry:\n    lines = sys.stdin.read().replace('\\r', '').strip().split('\\n')\n    if lines and lines[0]:\n        parsed = []\n        for line in lines:\n            try:\n                parsed.append(json.loads(line))\n            except:\n                parsed.append(line)\n        sol = Solution()\n        print(json.dumps(getattr(sol, "${classMethod}")(*parsed)))\nexcept Exception as e:\n    pass\n`;
+      console.log("[Auto-Driver Injection] Detected Python class method: " + classMethod);
+      
+      const driverCode = [
+        predefClasses,
+        sourceCode,
+        "# ── Auto-Generated Driver Code ──",
+        "try:",
+        "    lines = sys.stdin.read().replace('\\r', '').strip().split('\\n')",
+        "    if lines and lines[0]:",
+        "        parsed = []",
+        "        for line in lines:",
+        "            try:",
+        "                parsed.append(json.loads(line))",
+        "            except:",
+        "                parsed.append(line)",
+        "        ",
+        "        import inspect",
+        "        sol = Solution()",
+        "        method = getattr(sol, \"" + classMethod + "\")",
+        "        sig = inspect.signature(method)",
+        "        params = list(sig.parameters.keys())",
+        "        ",
+        "        converted = []",
+        "        for idx, arg in enumerate(parsed):",
+        "            if isinstance(arg, list):",
+        "                param_name = params[idx].lower() if idx < len(params) else \"\"",
+        "                if param_name in [\"head\", \"list\", \"node\"] or param_name.startswith(\"list\") or param_name.startswith(\"l\"): ",
+        "                    converted.append(arrayToLinkedList(arg))",
+        "                elif param_name == \"root\" or \"tree\" in param_name:",
+        "                    converted.append(arrayToTree(arg))",
+        "                else:",
+        "                    converted.append(arg)",
+        "            else:",
+        "                converted.append(arg)",
+        "        ",
+        "        res = method(*converted)",
+        "        ",
+        "        if res is not None:",
+        "            if hasattr(res, 'next'):",
+        "                res = linkedListToArray(res)",
+        "            elif hasattr(res, 'left') or hasattr(res, 'right'):",
+        "                res = treeToArray(res)",
+        "        ",
+        "        print(json.dumps(res))",
+        "except Exception as e:",
+        "    pass"
+      ].join("\n");
+      
+      return driverCode;
     } else {
       let funcName = null;
       let funcMatch = sourceCode.match(/def\s+([a-zA-Z0-9_]+)\s*\(/);
@@ -344,8 +593,54 @@ function injectAutoDriver(sourceCode, language) {
       }
       
       if (funcName) {
-        console.log(`[Auto-Driver Injection] Detected Python function: "${funcName}"`);
-        return sourceCode + `\n\n# ── Auto-Generated Driver Code ──\nimport sys, json\ntry:\n    lines = sys.stdin.read().replace('\\r', '').strip().split('\\n')\n    if lines and lines[0]:\n        parsed = []\n        for line in lines:\n            try:\n                parsed.append(json.loads(line))\n            except:\n                parsed.append(line)\n        print(json.dumps(${funcName}(*parsed)))\nexcept Exception as e:\n    pass\n`;
+        console.log("[Auto-Driver Injection] Detected Python function: " + funcName);
+        
+        const driverCode = [
+          predefClasses,
+          sourceCode,
+          "# ── Auto-Generated Driver Code ──",
+          "try:",
+          "    lines = sys.stdin.read().replace('\\r', '').strip().split('\\n')",
+          "    if lines and lines[0]:",
+          "        parsed = []",
+          "        for line in lines:",
+          "            try:",
+          "                parsed.append(json.loads(line))",
+          "            except:",
+          "                parsed.append(line)",
+          "        ",
+          "        import inspect",
+          "        func = globals().get(\"" + funcName + "\")",
+          "        sig = inspect.signature(func)",
+          "        params = list(sig.parameters.keys())",
+          "        ",
+          "        converted = []",
+          "        for idx, arg in enumerate(parsed):",
+          "            if isinstance(arg, list):",
+          "                param_name = params[idx].lower() if idx < len(params) else \"\"",
+          "                if param_name in [\"head\", \"list\", \"node\"] or param_name.startswith(\"list\") or param_name.startswith(\"l\"): ",
+          "                    converted.append(arrayToLinkedList(arg))",
+          "                elif param_name == \"root\" or \"tree\" in param_name:",
+          "                    converted.append(arrayToTree(arg))",
+          "                else:",
+          "                    converted.append(arg)",
+          "            else:",
+          "                converted.append(arg)",
+          "        ",
+          "        res = func(*converted)",
+          "        ",
+          "        if res is not None:",
+          "            if hasattr(res, 'next'):",
+          "                res = linkedListToArray(res)",
+          "            elif hasattr(res, 'left') or hasattr(res, 'right'):",
+          "                res = treeToArray(res)",
+          "        ",
+          "        print(json.dumps(res))",
+          "except Exception as e:",
+          "    pass"
+        ].join("\n");
+        
+        return driverCode;
       }
     }
   }

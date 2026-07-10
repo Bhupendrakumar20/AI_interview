@@ -13,3 +13,4 @@ requests
 pymupdf
 spacy
 rapidfuzz
+pytest

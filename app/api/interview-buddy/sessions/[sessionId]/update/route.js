@@ -28,9 +28,12 @@ function getMasterKeyIfAvailable() {
 }
 
 export async function PUT(request, { params }) {
+  let currentUser = null;
+  let sessionId = null;
+
   try {
     // ✅ FIX #4: Verify user authentication
-    const currentUser = await getCurrentUser();
+    currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: "User not authenticated" },
@@ -38,8 +41,8 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // Handle both sync and async params (Next.js 14/15 vs 16)
-    const sessionId = params?.sessionId || (await params)?.sessionId;
+    const resolvedParams = await params;
+    sessionId = resolvedParams?.sessionId;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -187,8 +190,21 @@ export async function PUT(request, { params }) {
  * Delete a session (only creator)
  */
 export async function DELETE(request, { params }) {
+  let currentUser = null;
+  let sessionId = null;
+
   try {
-    const { sessionId } = params;
+    currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: "User not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const resolvedParams = await params;
+    sessionId = resolvedParams?.sessionId;
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
 

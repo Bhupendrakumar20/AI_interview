@@ -1,4 +1,5 @@
 # api.py
+import os
 import uuid
 import time
 import logging
@@ -20,6 +21,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("adaptive_interview")
 
 app = FastAPI(title="Adaptive AI Buddy Interview API")
+
+from dotenv import load_dotenv
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env_local_path = os.path.join(root_dir, ".env.local")
+if os.path.exists(env_local_path):
+    load_dotenv(env_local_path)
+else:
+    load_dotenv()
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,285 +1,233 @@
-// AI Buddy Interview Session - Shows Questions and Tracks Answers
+// AI Buddy Interview Session - Adaptive, backed by FastAPI
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import {
-  getInterviewQuestions,
-  speakQuestion,
-  stopSpeech,
-} from '@/lib/utils/ai-buddy-questions';
-import { createFeedback } from '@/lib/actions/general.action';
+import { startAdaptiveSession, submitAdaptiveAnswer, endAdaptiveSessionEarly } from '@/lib/api/adaptive-interview';
 import CodeEditorPanel from '@/components/CodeEditorPanel';
 
 const AiBuddyInterviewSession = ({
-  sessionId,
+  interviewId,
+  persona = 'Hiring Manager',
   selectedTopics = [],
-  difficulty = 'Medium',
   duration = 30,
   onSessionEnd,
   onClose,
 }) => {
-  const [questions, setQuestions] = useState([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState({});
-  const [currentAnswerText, setCurrentAnswerText] = useState(''); // Track answer text without saving
+  const [adaptiveSessionId, setAdaptiveSessionId] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [questionNumber, setQuestionNumber] = useState(1);
+  const [maxQuestions, setMaxQuestions] = useState(Math.max(3, Math.ceil(duration / 10)));
+  const [difficulty, setDifficulty] = useState(3);
+  const [lockedTopic, setLockedTopic] = useState(null);
+  const [lastEvaluation, setLastEvaluation] = useState(null);
+
+  const [currentAnswerText, setCurrentAnswerText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isRecording, setIsRecording] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(duration * 60); // Convert to seconds
+  const [timeRemaining, setTimeRemaining] = useState(duration * 60);
   const [sessionStarted, setSessionStarted] = useState(false);
-  const [answerMode, setAnswerMode] = useState('text'); // 'text' or 'code'
+  const [answerMode, setAnswerMode] = useState('text');
   const [codeLanguage, setCodeLanguage] = useState('javascript');
 
-  // Initialize Interview
+  const performanceHistoryRef = useRef([]);
+  const hasInitialized = useRef(false); // blocks React StrictMode's duplicate mount-time effect run
+
+  const isDSAQuestion =
+    String(currentQuestion?.topic ?? '').trim().toLowerCase() === 'dsa' ||
+    String(currentQuestion?.topic ?? '').trim().toLowerCase() === 'data structures and algorithms' ||
+    String(currentQuestion?.source ?? '').trim().toLowerCase() === 'leetcode';
+
+  // Start the adaptive session — guarded so it only ever fires once,
+  // even though StrictMode runs effects twice in dev.
   useEffect(() => {
-    const initializeInterview = async () => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    const init = async () => {
       try {
         setLoading(true);
-        
-        // Calculate question count based on duration
-        const questionCount = Math.max(3, Math.ceil(duration / 10));
-        
-        // Get questions from LeetCode API or fallback DSA questions
-        const newQuestions = await getInterviewQuestions(
-          selectedTopics,
-          difficulty.toLowerCase(),
-          questionCount
-        );
+        const topicFocus = selectedTopics.length ? selectedTopics : ['dsa'];
+        const data = await startAdaptiveSession({
+          persona,
+          topicFocus,
+          maxQuestions,
+        });
 
-        console.log('[Interview Buddy] Loaded questions:', newQuestions);
-
-        if (newQuestions.length === 0) {
-          toast.error('No interview questions available');
-          onClose?.();
-          return;
-        }
-
-        setQuestions(newQuestions);
+        setAdaptiveSessionId(data.session_id);
+        setCurrentQuestion(data.question);
+        setDifficulty(data.difficulty);
+        setQuestionNumber(data.question_number);
         setSessionStarted(true);
-        toast.success(`Interview Started! ${newQuestions.length} questions loaded. Click the speaker icon to hear the first question.`);
-        
-        // Auto-read first question
-        setTimeout(() => {
-          if (newQuestions[0]) {
-            readCurrentQuestion();
-          }
-        }, 500);
-      } catch (error) {
-        console.error('[Interview Buddy] Init error:', error);
-        toast.error('Failed to initialize interview');
+
+        toast.success(`Interview started — question 1 of ${maxQuestions}`);
+        setTimeout(() => readCurrentQuestion(data.question), 500);
+      } catch (err) {
+        console.error('[Adaptive Interview] Init error:', err);
+        toast.error('Failed to start interview — check the backend is running');
         onClose?.();
       } finally {
         setLoading(false);
       }
     };
 
-    initializeInterview();
-  }, [selectedTopics, difficulty, duration]);
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Timer countdown
+  useEffect(() => {
+    setAnswerMode(isDSAQuestion ? 'code' : 'text');
+  }, [isDSAQuestion]);
+
+  // Timer
   useEffect(() => {
     if (!sessionStarted || timeRemaining <= 0) return;
-
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
-          handleSessionEnd();
+          finishEarly();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionStarted, timeRemaining]);
 
-  // Update current answer text when question changes
-  useEffect(() => {
-    const currentQuestion = questions[currentQuestionIndex];
-    if (currentQuestion) {
-      setCurrentAnswerText(userAnswers[currentQuestion.id] || '');
-    }
-  }, [currentQuestionIndex, questions, userAnswers]);
+  const readCurrentQuestion = (question = currentQuestion) => {
+    if (!question) return;
+    setIsSpeaking(true);
 
-  const readCurrentQuestion = () => {
-    if (questions.length > 0 && currentQuestionIndex < questions.length) {
-      const currentQuestion = questions[currentQuestionIndex];
-      setIsSpeaking(true);
-      
-      // Use Web Speech API
-      if ('speechSynthesis' in window) {
-        stopSpeech();
-        
-        const text = `Question ${currentQuestionIndex + 1}. ${currentQuestion.title}. ${currentQuestion.description}`;
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        utterance.rate = 0.9;
-        utterance.pitch = 1;
-        utterance.volume = 1;
-        utterance.lang = 'en-US';
+    if ('speechSynthesis' in window) {
+      speechSynthesis.cancel(); // intentionally interrupts any prior utterance
+      const text = `Question ${questionNumber}. ${question.title}. ${question.description}`;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
 
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => {
-          setIsSpeaking(false);
-          toast.error('Failed to read question');
-        };
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
 
-        speechSynthesis.speak(utterance);
-      } else {
+      utterance.onerror = (event) => {
         setIsSpeaking(false);
-        toast.error('Text-to-speech not supported in this browser');
-      }
+        // 'interrupted'/'canceled' fire whenever we deliberately cut off
+        // speech to read the next question — that's expected, not a real error.
+        if (event.error !== 'interrupted' && event.error !== 'canceled') {
+          toast.error('Failed to read question');
+        }
+      };
+
+      speechSynthesis.speak(utterance);
+    } else {
+      setIsSpeaking(false);
     }
   };
 
-  const handleSessionEnd = async () => {
-    setSessionStarted(false);
-    stopSpeech();
-    
-    // Calculate results
-    const totalQuestions = questions.length;
-    const answeredQuestions = Object.keys(userAnswers).length;
-    
-    try {
-      // Create transcript for feedback generation
-      const transcript = questions.map((q, idx) => ({
-        role: 'system',
-        content: `Question ${idx + 1}: ${q.title}. ${q.description}`,
-        question: q.title,
-        answer: userAnswers[idx] || '',
-      }));
+  const stopSpeech = () => {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    setIsSpeaking(false);
+  };
 
-      // Generate real feedback using AI
-      console.log('[Interview Buddy] Generating feedback for interview...');
-      const feedbackResult = await createFeedback({
-        interviewId: sessionId,
-        userId: sessionId, // Use sessionId as userId for buddy interviews
-        transcript: transcript,
+  const handleAnswerChange = (text) => setCurrentAnswerText(text);
+
+  const handleSubmitAndAdvance = async () => {
+    if (!currentAnswerText.trim()) {
+      toast.warning('Please type an answer before submitting');
+      return;
+    }
+    if (!adaptiveSessionId) return;
+
+    setSubmitting(true);
+    stopSpeech();
+
+    try {
+      const result = await submitAdaptiveAnswer({
+        sessionId: adaptiveSessionId,
+        answer: currentAnswerText,
       });
 
-      if (feedbackResult.success) {
-        console.log('[Interview Buddy] Feedback generated successfully:', {
-          totalScore: feedbackResult.totalScore,
-          success: feedbackResult.success,
-        });
-        
-        // Pass comprehensive results to parent - use AI feedback score as primary
-        const aiScore = feedbackResult.totalScore || 0;
-        const results = {
-          totalQuestions,
-          answeredQuestions,
-          score: aiScore, // Use AI feedback score, not just answered/total
-          feedback: feedbackResult, // Include actual AI-generated feedback
-          transcript: transcript,
-          timestamp: new Date().toISOString(),
-        };
-        
-        toast.success(`Interview completed! Score: ${aiScore}%`);
-        onSessionEnd?.(results);
-      } else {
-        console.error('[Interview Buddy] Feedback generation failed:', feedbackResult.error);
-        // Still end the session with basic results even if feedback failed
-        toast.warning('Interview completed but feedback generation failed. Please try again.');
-        const basicResults = {
-          totalQuestions,
-          answeredQuestions,
-          score: totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0,
-          feedback: null,
-          error: feedbackResult.error,
-        };
-        onSessionEnd?.(basicResults);
+      performanceHistoryRef.current.push({
+        topic: currentQuestion.topic,
+        question: currentQuestion.description,
+        answer: currentAnswerText,
+        score: result.evaluation.score,
+      });
+
+      toast.success(`Scored ${result.evaluation.score}/10 — ${result.evaluation.feedback}`, { duration: 3500 });
+      setLastEvaluation(result.evaluation);
+
+      if (result.done) {
+        onSessionEnd?.(buildResultsFromReport(result.report));
+        return;
       }
-    } catch (error) {
-      console.error('[Interview Buddy] Error in handleSessionEnd:', error);
-      toast.error('Failed to complete interview: ' + error.message);
-      
-      // Still call onSessionEnd with basic results
-      const basicResults = {
-        totalQuestions,
-        answeredQuestions,
-        score: totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0,
-        feedback: null,
-        error: error.message,
-      };
-      onSessionEnd?.(basicResults);
+
+      setCurrentQuestion(result.next_question);
+      setDifficulty(result.difficulty);
+      setLockedTopic(result.locked_topic);
+      setQuestionNumber(result.question_number);
+      setCurrentAnswerText('');
+
+      if (result.topic_locked) {
+        toast.warning(`Focusing on ${result.locked_topic} — let's shore this up before moving on`, { duration: 4000 });
+      }
+
+      setTimeout(() => readCurrentQuestion(result.next_question), 300);
+    } catch (err) {
+      console.error('[Adaptive Interview] Answer submission failed:', err);
+      toast.error(err.message || 'Failed to evaluate answer — try again');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleRecordAnswer = (questionId, answer) => {
-    // 🔥 ONLY called from handleSaveAnswer button click, NEVER from typing
-    if (!questionId || !answer.trim()) return;
-    
-    setUserAnswers(prev => ({
-      ...prev,
-      [questionId]: answer,
-    }));
-    // Toast ONLY shows on explicit Save button click
-    toast.success('✓ Answer saved', { duration: 2000 });
-    console.log('[AiBuddy] Answer saved for question:', questionId);
-  };
-  
-  const handleAnswerChange = (text) => {
-    // 🔥 PURE TYPING - No state updates, no toasts, no side effects
-    // This is called on EVERY keystroke but does NOT save anything
-    setCurrentAnswerText(text);
-    // Intentionally NOT calling toast.success() or any other notifications
-  };
-  
-  const handleSaveAnswer = () => {
-    // 🔥 ONLY this function saves answers when user clicks the green Save button
-    if (!currentQuestion) {
-      toast.error('No question available');
-      return;
-    }
-    
-    if (!currentAnswerText.trim()) {
-      toast.warning('Please type an answer before saving');
-      return;
-    }
-    
-    // Save the answer ONLY when clicking the Save button
-    handleRecordAnswer(currentQuestion.id, currentAnswerText);
-  };
-
-  const handleNextQuestion = () => {
+  const finishEarly = async () => {
+    setSessionStarted(false);
     stopSpeech();
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-      setTimeout(() => readCurrentQuestion(), 300);
-    } else {
-      toast.info('No more questions');
+    if (!adaptiveSessionId) return;
+    try {
+      const result = await endAdaptiveSessionEarly(adaptiveSessionId);
+      onSessionEnd?.(buildResultsFromReport(result.report));
+    } catch (err) {
+      console.error('[Adaptive Interview] Early end failed:', err);
+      onSessionEnd?.({
+        totalQuestions: maxQuestions,
+        answeredQuestions: performanceHistoryRef.current.length,
+        performanceHistory: performanceHistoryRef.current,
+      });
     }
   };
 
-  const handleSkipQuestion = () => {
-    stopSpeech();
-    handleNextQuestion();
-    toast.info('Question skipped');
-  };
+  const buildResultsFromReport = (report) => ({
+    totalQuestions: maxQuestions,
+    answeredQuestions: report.performance_history.length,
+    avgByTopic: report.avg_by_topic,
+    topWeakAreas: report.top_weak_areas,
+    scoreProgression: report.score_progression,
+    performanceHistory: report.performance_history,
+    overallScore: Math.round(
+      (report.score_progression.reduce((a, b) => a + b, 0) / report.score_progression.length) * 10
+    ),
+    timestamp: new Date().toISOString(),
+  });
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-950">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-slate-200">Loading interview questions...</p>
+          <p className="text-slate-200">Starting your adaptive interview...</p>
         </div>
       </div>
     );
   }
 
-  if (questions.length === 0) {
+  if (!currentQuestion) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-950">
         <div className="text-center">
-          <p className="text-slate-200 mb-2">No questions available</p>
-          <p className="text-slate-400 text-sm mb-4">Selected topics might not have matching questions</p>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white"
-          >
+          <p className="text-slate-200 mb-4">No question available</p>
+          <button onClick={onClose} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white">
             Close
           </button>
         </div>
@@ -287,21 +235,20 @@ const AiBuddyInterviewSession = ({
     );
   }
 
-  const currentQuestion = questions[currentQuestionIndex];
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
+  const difficultyLabel = difficulty <= 3 ? 'Easy' : difficulty <= 7 ? 'Medium' : 'Hard';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 overflow-y-auto">
-      {/* Header with Timer and Progress */}
       <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-4 z-50">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">AI Interview Session</h1>
-            <p className="text-slate-400 text-sm">Question {currentQuestionIndex + 1} of {questions.length}</p>
+            <h1 className="text-2xl font-bold text-white">Adaptive AI Interview</h1>
+            <p className="text-slate-400 text-sm">
+              Question {questionNumber} of {maxQuestions} · Difficulty {difficulty.toFixed(1)}/10
+            </p>
           </div>
-
-          {/* Timer */}
           <div className={`text-center ${timeRemaining < 60 ? 'text-red-400' : 'text-blue-400'}`}>
             <div className="text-3xl font-bold font-mono">
               {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
@@ -310,241 +257,130 @@ const AiBuddyInterviewSession = ({
           </div>
         </div>
 
-        {/* Progress Bar */}
+        {lockedTopic && (
+          <div className="mb-3 px-4 py-2 bg-amber-900/30 border border-amber-700/50 rounded-lg text-amber-300 text-sm">
+            🎯 Focused practice mode: reinforcing <span className="font-semibold">{lockedTopic}</span> until you show consistent improvement
+          </div>
+        )}
+
         <div className="w-full bg-slate-800 rounded-full h-2">
           <div
             className="bg-linear-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
-            style={{
-              width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`,
-            }}
+            style={{ width: `${(questionNumber / maxQuestions) * 100}%` }}
           ></div>
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Question Card */}
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-8">
-          {/* Difficulty Badge */}
           <div className="flex items-center gap-3 mb-6">
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              currentQuestion.difficulty === 'Easy' ? 'bg-green-900/30 text-green-300' :
-              currentQuestion.difficulty === 'Medium' ? 'bg-yellow-900/30 text-yellow-300' :
+              difficultyLabel === 'Easy' ? 'bg-green-900/30 text-green-300' :
+              difficultyLabel === 'Medium' ? 'bg-yellow-900/30 text-yellow-300' :
               'bg-red-900/30 text-red-300'
             }`}>
-              {currentQuestion.difficulty}
+              {difficultyLabel}
             </span>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 capitalize">
               {currentQuestion.topic}
+            </span>
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-500">
+              {currentQuestion.source === 'leetcode' ? 'LeetCode' : 'AI-generated'}
             </span>
           </div>
 
-          {/* Question Title */}
-          <h2 className="text-3xl font-bold text-white mb-4">
-            {currentQuestion.title}
-          </h2>
+          <h2 className="text-2xl font-bold text-white mb-4">{currentQuestion.title}</h2>
 
-          {/* Read Question Button */}
           <button
-            onClick={readCurrentQuestion}
+            onClick={() => readCurrentQuestion()}
             disabled={isSpeaking}
             className={`mb-6 px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-              isSpeaking
-                ? 'bg-purple-600/50 text-purple-200 cursor-not-allowed'
-                : 'bg-purple-600 hover:bg-purple-700 text-white'
+              isSpeaking ? 'bg-purple-600/50 text-purple-200 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 text-white'
             }`}
           >
-            {isSpeaking ? (
-              <>
-                <span className="inline-block animate-pulse">♪</span>
-                Reading...
-              </>
-            ) : (
-              <>
-                <span>♪</span>
-                Read Question Aloud
-              </>
-            )}
+            {isSpeaking ? 'Reading...' : '♪ Read Question Aloud'}
           </button>
 
-          {/* Question Description */}
-          <p className="text-slate-300 text-lg leading-relaxed mb-8">
-            {currentQuestion.description}
-          </p>
-
-          {/* Complexity Info */}
-          {currentQuestion.complexity && (
-            <div className="bg-slate-800/50 rounded-lg p-4 mb-8">
-              <p className="text-sm text-slate-300">
-                <span className="font-semibold text-slate-100">Time Complexity:</span> {currentQuestion.complexity.time}
-              </p>
-              <p className="text-sm text-slate-300">
-                <span className="font-semibold text-slate-100">Space Complexity:</span> {currentQuestion.complexity.space}
-              </p>
-            </div>
-          )}
+          <p className="text-slate-300 text-lg leading-relaxed">{currentQuestion.description}</p>
         </div>
 
-        {/* Answer Recording Section */}
+        {lastEvaluation && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-4 mb-8 text-sm">
+            <span className="text-slate-400">Previous answer: </span>
+            <span className="font-semibold text-blue-300">{lastEvaluation.score}/10</span>
+            <span className="text-slate-400"> — {lastEvaluation.feedback}</span>
+          </div>
+        )}
+
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-8">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-white">Your Answer</h3>
-            
-            {/* Toggle between Text and Code Input */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setAnswerMode('text')}
-                className={`px-3 py-1 text-sm font-medium rounded-lg transition ${
-                  answerMode === 'text'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                📝 Text Answer
-              </button>
-              <button
-                onClick={() => setAnswerMode('code')}
-                className={`px-3 py-1 text-sm font-medium rounded-lg transition ${
-                  answerMode === 'code'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                💻 Code Solution
-              </button>
-            </div>
-          </div>
-
-          {/* TEXT MODE */}
-          {answerMode === 'text' && (
-            <div className="space-y-4">
-              {/* Recording Indicator */}
-              <div className="flex items-center justify-between p-4 bg-slate-800 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-slate-600'}`}></div>
-                  <span className="text-slate-300">
-                    {isRecording ? 'Recording your answer...' : 'Click below to record your answer'}
-                  </span>
-                </div>
+            {isDSAQuestion && (
+              <div className="flex gap-2">
                 <button
-                  onClick={() => setIsRecording(!isRecording)}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    isRecording
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  onClick={() => setAnswerMode('text')}
+                  className={`px-3 py-1 text-sm font-medium rounded-lg transition ${
+                    answerMode === 'text' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                   }`}
                 >
-                  {isRecording ? 'Stop Recording' : 'Start Recording'}
+                  Text Answer
+                </button>
+                <button
+                  onClick={() => setAnswerMode('code')}
+                  className={`px-3 py-1 text-sm font-medium rounded-lg transition ${
+                    answerMode === 'code' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  Code Solution
                 </button>
               </div>
+            )}
+          </div>
 
-              {/* Transcript Area */}
+          {answerMode === 'text' || !isDSAQuestion ? (
+            <div className="space-y-4">
               <textarea
-                placeholder="Your answer will appear here if you enable microphone, or you can type your answer..."
-                className="w-full h-32 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
+                placeholder="Type your answer here..."
+                className="w-full h-40 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
                 value={currentAnswerText}
                 onChange={(e) => handleAnswerChange(e.target.value)}
-              ></textarea>
-
-              {/* Save Answer Button */}
+              />
               <button
-                onClick={handleSaveAnswer}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all"
+                onClick={handleSubmitAndAdvance}
+                disabled={submitting}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-all"
               >
-                ✓ Save Answer
+                {submitting ? 'Evaluating your answer...' : questionNumber >= maxQuestions ? 'Submit & Finish' : 'Submit & Next Question →'}
               </button>
             </div>
-          )}
-
-          {/* CODE MODE */}
-          {answerMode === 'code' && (
+          ) : (
             <div className="space-y-4">
               <div style={{ height: '400px' }}>
                 <CodeEditorPanel
                   language={codeLanguage}
                   onLanguageChange={setCodeLanguage}
                   initialCode={currentAnswerText}
-                  testCases={currentQuestion?.testCases || []}
-                  onExecute={(result) => {
-                    setCurrentAnswerText(result.code);
-                  }}
                   onChange={handleAnswerChange}
                 />
               </div>
-
-              {/* Save Code Answer Button */}
               <button
-                onClick={() => {
-                  handleAnswerChange(currentAnswerText);
-                  handleSaveAnswer();
-                }}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all"
+                onClick={handleSubmitAndAdvance}
+                disabled={submitting}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-700 text-white font-semibold py-3 rounded-lg transition-all"
               >
-                ✓ Save Code Solution
+                {submitting ? 'Evaluating your code...' : 'Submit & Next Question →'}
               </button>
             </div>
           )}
         </div>
 
-        {/* Navigation Buttons */}
-        <div className="flex gap-4 justify-between items-center mb-8">
+        <div className="flex justify-center mb-8">
           <button
-            onClick={() => {
-              stopSpeech();
-              if (currentQuestionIndex > 0) {
-                setCurrentQuestionIndex(prev => prev - 1);
-                setTimeout(() => readCurrentQuestion(), 300);
-              }
-            }}
-            disabled={currentQuestionIndex === 0}
-            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all"
+            onClick={finishEarly}
+            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition-all"
           >
-            ← Previous
+            End Interview Early
           </button>
-
-          <button
-            onClick={handleSkipQuestion}
-            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-all"
-          >
-            Skip Question
-          </button>
-
-          {currentQuestionIndex < questions.length - 1 ? (
-            <button
-              onClick={handleNextQuestion}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all"
-            >
-              Next →
-            </button>
-          ) : (
-            <button
-              onClick={handleSessionEnd}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all"
-            >
-              Finish Interview
-            </button>
-          )}
-        </div>
-
-        {/* Answered Questions Preview */}
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Session Summary</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-slate-800 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-blue-400">{questions.length}</p>
-              <p className="text-sm text-slate-400">Total Questions</p>
-            </div>
-            <div className="bg-slate-800 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-green-400">{Object.keys(userAnswers).length}</p>
-              <p className="text-sm text-slate-400">Questions Answered</p>
-            </div>
-            <div className="bg-slate-800 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-purple-400">
-                {questions.length > 0 ? Math.round((Object.keys(userAnswers).length / questions.length) * 100) : 0}%
-              </p>
-              <p className="text-sm text-slate-400">Progress</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

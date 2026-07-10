@@ -1,468 +1,172 @@
-// AI Buddy Interview Results Screen
+// AI Buddy Interview Results Screen - reads the adaptive session report directly
 'use client';
 
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { Target, MessageCircle, Brain } from 'lucide-react';
-import { createFeedback } from '@/lib/actions/general.action';
+import { Target, TrendingUp, AlertTriangle } from 'lucide-react';
 
-const AiBuddyResultsScreen = ({
-  sessionId,
-  results = {},
-  sessionDetails = {},
-  onClose,
-  onRetry,
-}) => {
-  const [feedback, setFeedback] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const AiBuddyResultsScreen = ({ results = {}, onClose, onRetry }) => {
+  const {
+    overallScore = 0,
+    totalQuestions = 0,
+    answeredQuestions = 0,
+    avgByTopic = {},
+    topWeakAreas = [],
+    scoreProgression = [],
+    performanceHistory = [],
+  } = results;
 
-  useEffect(() => {
-    const fetchResults = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Check if feedback already exists in results
-        if (results.feedback && results.feedback.success) {
-          console.log('[Results Screen] Using feedback from results:', results.feedback);
-          
-          // Extract actual feedback data
-          const feedbackData = results.feedback;
-          
-          // Map to display format
-          const displayFeedback = {
-            clarity: feedbackData.categoryScores?.[0]?.score || 80,
-            technicalAccuracy: feedbackData.categoryScores?.[1]?.score || 78,
-            communication: feedbackData.categoryScores?.[2]?.score || 85,
-            confidence: feedbackData.categoryScores?.[3]?.score || 80,
-            pacing: feedbackData.categoryScores?.[4]?.score || 84,
-            fillerWords: 12,
-            overallScore: feedbackData.totalScore || results.score || 0,
-            strengths: feedbackData.strengths || [],
-            weaknesses: feedbackData.areasForImprovement || [],
-            summary: feedbackData.finalAssessment || '',
-          };
-          
-          setFeedback(displayFeedback);
-        } else if (results.transcript && results.transcript.length > 0) {
-          // If transcript exists but feedback doesn't, generate it
-          console.log('[Results Screen] Generating feedback from transcript...');
-          const feedbackResult = await createFeedback({
-            interviewId: sessionId,
-            userId: sessionId,
-            transcript: results.transcript,
-          });
-          
-          if (feedbackResult.success) {
-            const displayFeedback = {
-              clarity: feedbackResult.categoryScores?.[0]?.score || 80,
-              technicalAccuracy: feedbackResult.categoryScores?.[1]?.score || 78,
-              communication: feedbackResult.categoryScores?.[2]?.score || 85,
-              confidence: feedbackResult.categoryScores?.[3]?.score || 80,
-              pacing: feedbackResult.categoryScores?.[4]?.score || 84,
-              fillerWords: 12,
-              overallScore: feedbackResult.totalScore || results.score || 0,
-              strengths: feedbackResult.strengths || [],
-              weaknesses: feedbackResult.areasForImprovement || [],
-              summary: feedbackResult.finalAssessment || '',
-            };
-            setFeedback(displayFeedback);
-          } else {
-            throw new Error(feedbackResult.error || 'Failed to generate feedback');
-          }
-        } else {
-          // Fallback to basic feedback if no transcript
-          console.warn('[Results Screen] No transcript available, using default feedback');
-          setFeedback({
-            clarity: 80,
-            technicalAccuracy: 75,
-            communication: 82,
-            confidence: 78,
-            pacing: 80,
-            fillerWords: 14,
-            overallScore: results.score || 0,
-            strengths: [],
-            weaknesses: [],
-            summary: 'Interview completed. Please refresh to see detailed analysis.',
-          });
-        }
-      } catch (err) {
-        console.error('[Results Screen] Error fetching results:', err);
-        setError(err.message);
-        toast.error('Failed to load results: ' + err.message);
-        
-        // Set fallback feedback
-        setFeedback({
-          clarity: results.score || 0,
-          technicalAccuracy: results.score || 0,
-          communication: results.score || 0,
-          confidence: results.score || 0,
-          pacing: results.score || 0,
-          fillerWords: 0,
-          overallScore: results.score || 0,
-          strengths: [],
-          weaknesses: [],
-          summary: 'Unable to load detailed feedback. Please try again.',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchResults();
-  }, [sessionId, results]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-950">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-slate-200">Calculating your results...</p>
-        </div>
-      </div>
-    );
-  }
+  const performanceLabel =
+    overallScore >= 80 ? 'Excellent Performance!' :
+    overallScore >= 70 ? 'Good Job!' :
+    overallScore >= 60 ? 'Fair Performance' : 'Keep Practicing';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 overflow-y-auto">
-      {/* Header */}
       <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-6 z-50">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-black text-white">Interview Complete</h1>
-            <p className="text-slate-400 text-sm mt-2">Here's your detailed performance report</p>
-            <p className="text-yellow-400 text-xs mt-2">⭐ <span className="font-semibold">Note:</span> Feedback evaluates answer CORRECTNESS, not just communication quality. Wrong answers with good explanations will score low on Technical Correctness.</p>
+            <p className="text-slate-400 text-sm mt-2">Adaptive session report — per-question scoring, not a single holistic grade</p>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-semibold transition-all"
-          >
+          <button onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-semibold">
             ✕ Close
           </button>
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 py-12">
-        {/* Overall Score */}
-        <div className="mb-12">
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Score Card */}
-            <div className="bg-linear-to-br from-blue-900/30 to-purple-900/30 border border-blue-500/50 rounded-2xl p-8">
-              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">Overall Score</h2>
-              <div className="text-center">
-                <div className="text-7xl font-black bg-linear-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                  {feedback?.overallScore || 0}%
-                </div>
-                <p className="text-slate-300 text-lg">
-                  {feedback?.overallScore >= 80
-                    ? 'Excellent Performance!'
-                    : feedback?.overallScore >= 70
-                    ? 'Good Job!'
-                    : feedback?.overallScore >= 60
-                    ? 'Fair Performance'
-                    : 'Keep Practicing'}
-                </p>
-
-                {/* Questions Summary */}
-                <div className="mt-8 pt-8 border-t border-slate-700 space-y-3 text-left">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Total Questions</span>
-                    <span className="text-white font-bold">{results.totalQuestions || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Questions Answered</span>
-                    <span className="text-green-400 font-bold">{results.answeredQuestions || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Completion Rate</span>
-                    <span className="text-blue-400 font-bold">
-                      {results.totalQuestions > 0
-                        ? Math.round((results.answeredQuestions / results.totalQuestions) * 100)
-                        : 0}
-                      %
-                    </span>
-                  </div>
-                </div>
+        <div className="grid md:grid-cols-2 gap-8 mb-12">
+          {/* Overall score */}
+          <div className="bg-linear-to-br from-blue-900/30 to-purple-900/30 border border-blue-500/50 rounded-2xl p-8">
+            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">Overall Score</h2>
+            <div className="text-center">
+              <div className="text-7xl font-black bg-linear-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
+                {overallScore}%
               </div>
-            </div>
+              <p className="text-slate-300 text-lg">{performanceLabel}</p>
 
-            {/* Detailed Metrics */}
-            <div className="space-y-4">
-              {/* Technical Correctness - MOST IMPORTANT */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-300 font-semibold text-sm">Technical Correctness ⭐</span>
-                  <span className="text-red-400 font-bold">{feedback?.technicalAccuracy}%</span>
+              <div className="mt-8 pt-8 border-t border-slate-700 space-y-3 text-left">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Questions Answered</span>
+                  <span className="text-white font-bold">{answeredQuestions} / {totalQuestions}</span>
                 </div>
-                <div className="w-full bg-slate-800 rounded-full h-2">
-                  <div
-                    className="bg-linear-to-r from-red-500 to-red-400 h-2 rounded-full"
-                    style={{ width: `${feedback?.technicalAccuracy}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-slate-400 mt-2">Accuracy of technical answers (most important)</p>
-              </div>
-
-              {/* Clarity */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-300 font-semibold text-sm">Clarity</span>
-                  <span className="text-blue-400 font-bold">{feedback?.clarity}%</span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-2">
-                  <div
-                    className="bg-linear-to-r from-blue-500 to-blue-400 h-2 rounded-full"
-                    style={{ width: `${feedback?.clarity}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Communication */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-300 font-semibold text-sm">Communication</span>
-                  <span className="text-emerald-400 font-bold">{feedback?.communication}%</span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-2">
-                  <div
-                    className="bg-linear-to-r from-emerald-500 to-emerald-400 h-2 rounded-full"
-                    style={{ width: `${feedback?.communication}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Confidence */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-300 font-semibold text-sm">Confidence</span>
-                  <span className="text-yellow-400 font-bold">{feedback?.confidence}%</span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-2">
-                  <div
-                    className="bg-linear-to-r from-yellow-500 to-yellow-400 h-2 rounded-full"
-                    style={{ width: `${feedback?.confidence}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-slate-400 mt-2">Note: High confidence in wrong answers = lower score</p>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* More Metrics */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          {/* Pacing */}
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-white">Pacing</h3>
-              <span className="text-2xl font-bold text-orange-400">{feedback?.pacing}%</span>
-            </div>
-            <p className="text-sm text-slate-400 mb-4">
-              You maintained good speed throughout the interview
-            </p>
-            <div className="w-full bg-slate-800 rounded-full h-3">
-              <div
-                className="bg-linear-to-r from-orange-500 to-orange-400 h-3 rounded-full"
-                style={{ width: `${feedback?.pacing}%` }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Filler Words */}
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-white">Filler Words</h3>
-              <span className="text-2xl font-bold text-red-400">{feedback?.fillerWords}</span>
-            </div>
-            <p className="text-sm text-slate-400 mb-4">
-              {feedback?.fillerWords < 5
-                ? 'Excellent control of filler words'
-                : feedback?.fillerWords < 15
-                ? 'Good - could reduce slightly'
-                : 'Work on reducing filler words'}
-            </p>
-            <div className="text-xs text-slate-500">Lower is better</div>
-          </div>
-
-          {/* Strengths */}
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-            <h3 className="font-semibold text-white mb-4">Key Strength</h3>
-            <div className="text-3xl mb-2 text-lime-400">
-              {feedback?.clarity >= 85 ? (
-                <Target size={32} />
-              ) : feedback?.communication >= 85 ? (
-                <MessageCircle size={32} />
-              ) : (
-                <Brain size={32} />
-              )}
-            </div>
-            <p className="text-sm text-slate-300">
-              {feedback?.clarity >= 85
-                ? 'Excellent Clarity in explaining concepts'
-                : feedback?.communication >= 85
-                ? 'Strong Communication Skills'
-                : 'Good Technical Knowledge'}
-            </p>
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
-          <h2 className="text-xl font-bold text-white mb-6">Recommendations for Improvement</h2>
+          {/* Per-topic averages */}
           <div className="space-y-4">
-            {feedback?.clarity < 80 && (
-              <div className="flex gap-4">
-                <div className="text-2xl text-blue-400">▲</div>
-                <div>
-                  <h3 className="font-semibold text-white mb-1">Improve Clarity</h3>
-                  <p className="text-slate-400 text-sm">
-                    Try to explain your thought process more clearly. Break down complex ideas into simpler steps.
-                  </p>
+            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Score by Topic</h2>
+            {Object.entries(avgByTopic).map(([topic, avg]) => (
+              <div key={topic} className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-300 font-semibold text-sm capitalize">{topic}</span>
+                  <span className="text-blue-400 font-bold">{avg}/10</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-2">
+                  <div className="bg-linear-to-r from-blue-500 to-blue-400 h-2 rounded-full" style={{ width: `${(avg / 10) * 100}%` }}></div>
                 </div>
               </div>
-            )}
-
-            {feedback?.technicalAccuracy < 80 && (
-              <div className="flex gap-4">
-                <div className="text-2xl">⚙</div>
-                <div>
-                  <h3 className="font-semibold text-white mb-1">Deepen Technical Knowledge</h3>
-                  <p className="text-slate-400 text-sm">
-                    Review the data structures and algorithms you struggled with. Practice similar problems.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {feedback?.communication < 80 && (
-              <div className="flex gap-4">
-                <div className="text-2xl">◆</div>
-                <div>
-                  <h3 className="font-semibold text-white mb-1">Enhance Communication</h3>
-                  <p className="text-slate-400 text-sm">
-                    Practice articulating your thoughts more fluently. Record yourself and listen back.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {feedback?.fillerWords > 15 && (
-              <div className="flex gap-4">
-                <div className="text-2xl">●</div>
-                <div>
-                  <h3 className="font-semibold text-white mb-1">Reduce Filler Words</h3>
-                  <p className="text-slate-400 text-sm">
-                    Use pause instead of "um", "uh", "like". Practice speaking with comfortable silences.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-4">
-              <div className="text-2xl">◐</div>
-              <div>
-                <h3 className="font-semibold text-white mb-1">Practice More Sessions</h3>
-                <p className="text-slate-400 text-sm">
-                  Consistency is key. Try to practice at least 2-3 sessions per week for continuous improvement.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* AI-Generated Detailed Feedback */}
-        {feedback?.strengths && feedback.strengths.length > 0 && (
+       {scoreProgression.length > 0 && (
+  <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
+    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+      <TrendingUp className="w-5 h-5 text-blue-400" /> Score Progression
+    </h2>
+    <div className="flex items-end gap-2" style={{ height: '128px' }}>
+      {scoreProgression.map((score, idx) => {
+        const safeScore = Number.isFinite(score) ? score : 0;
+        const barHeightPx = Math.max(4, (safeScore / 10) * 128); // 128px = container height
+        return (
+          <div key={idx} className="flex-1 flex flex-col items-center justify-end gap-1" style={{ height: '128px' }}>
+            <div
+              className="w-full bg-linear-to-t from-blue-600 to-blue-400 rounded-t"
+              style={{ height: `${barHeightPx}px` }}
+            ></div>
+            <span className="text-xs text-slate-500 absolute mt-1">Q{idx + 1}</span>
+          </div>
+        );
+      })}
+    </div>
+    <div className="flex gap-2 mt-1">
+      {scoreProgression.map((_, idx) => (
+        <div key={idx} className="flex-1 text-center">
+          <span className="text-xs text-slate-500">Q{idx + 1}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+        {/* Top weak areas */}
+        {topWeakAreas.length > 0 && (
           <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="text-green-400">✓</span> Identified Strengths
+              <AlertTriangle className="w-5 h-5 text-yellow-400" /> Areas to Focus On
             </h2>
-            <div className="space-y-4">
-              {feedback.strengths.map((strength, idx) => (
-                <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-green-500">
-                  <h3 className="font-semibold text-green-400 mb-1">
-                    {typeof strength === 'string' ? strength : strength.category || `Strength ${idx + 1}`}
-                  </h3>
-                  {typeof strength !== 'string' && strength.description && (
-                    <p className="text-slate-300 text-sm">{strength.description}</p>
-                  )}
+            <div className="space-y-3">
+              {topWeakAreas.map(([tag, severity], idx) => (
+                <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-yellow-500 flex justify-between items-center">
+                  <span className="font-semibold text-yellow-300 capitalize">{tag}</span>
+                  <span className="text-xs text-slate-400">severity {severity.toFixed(1)}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {feedback?.weaknesses && feedback.weaknesses.length > 0 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="text-yellow-400">!</span> Areas for Improvement
-            </h2>
-            <div className="space-y-4">
-              {feedback.weaknesses.map((weakness, idx) => (
-                <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-yellow-500">
-                  <h3 className="font-semibold text-yellow-400 mb-1">
-                    {typeof weakness === 'string' ? weakness : weakness.category || `Area ${idx + 1}`}
-                  </h3>
-                  {typeof weakness !== 'string' && weakness.description && (
-                    <p className="text-slate-300 text-sm">{weakness.description}</p>
-                  )}
-                </div>
+        {/* Per-question breakdown */}
+{performanceHistory.length > 0 && (
+  <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
+    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+      <Target className="w-5 h-5 text-blue-400" /> Question-by-Question Breakdown
+    </h2>
+    <div className="space-y-4">
+      {performanceHistory.map((item, idx) => (
+        <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-blue-500">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="font-semibold text-blue-300 capitalize">{item.topic}</h3>
+            <span className="text-sm font-bold text-slate-300">{item.score}/10</span>
+          </div>
+
+          <p className="text-slate-300 text-sm mb-3">{item.question}</p>
+
+          {/* NEW — candidate's actual answer */}
+          <div className="bg-slate-900/60 rounded-lg p-3 mb-3">
+            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Your answer</p>
+            <p className="text-slate-400 text-sm italic">
+              {item.answer?.trim() ? `"${item.answer}"` : '(No answer provided)'}
+            </p>
+          </div>
+
+          {item.feedback && (
+            <p className="text-xs text-slate-500 mb-2">
+              <span className="text-slate-400 font-medium not-italic">Feedback: </span>
+              {item.feedback}
+            </p>
+          )}
+
+          {item.weak_tags?.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {item.weak_tags.map((tag, i) => (
+                <span key={i} className="text-xs px-2 py-0.5 bg-yellow-900/30 text-yellow-300 rounded-full capitalize">
+                  {tag}
+                </span>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
-        {/* Answer Accuracy Breakdown */}
-        {results.transcript && results.transcript.length > 0 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="text-blue-400">✓</span> Answer Evaluation
-            </h2>
-            <div className="space-y-4">
-              {results.transcript.map((item, idx) => (
-                <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-blue-500">
-                  <div className="mb-3">
-                    <h3 className="font-semibold text-blue-300 mb-1">Question {idx + 1}: {item.question}</h3>
-                    <p className="text-slate-400 text-sm italic mb-3">"{item.answer || '(No answer provided)'}"</p>
-                  </div>
-                  <div className="bg-slate-900/50 rounded p-2">
-                    <p className="text-xs text-slate-300">
-                      ⚠️ <span className="font-semibold">Note:</span> Review the feedback above for technical correctness evaluation. Some answers may have been partially correct or showed good approach with incorrect implementation.
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {feedback?.summary && (
-          <div className="bg-linear-to-br from-slate-900/50 to-slate-800/50 border border-slate-700 rounded-lg p-8 mb-12">
-            <h2 className="text-xl font-bold text-white mb-4">Interview Summary</h2>
-            <p className="text-slate-300 leading-relaxed">{feedback.summary}</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded-lg p-6 mb-12">
-            <h3 className="text-red-400 font-semibold mb-2">Feedback Error</h3>
-            <p className="text-red-300 text-sm">{error}</p>
-          </div>
-        )}
-
-        {/* Action Buttons */}
         <div className="flex gap-4 justify-center mb-12">
-          <button
-            onClick={onRetry}
-            className="px-8 py-3 bg-linear-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/30 hover:scale-105 active:scale-95 text-white font-semibold rounded-lg transition-all duration-300 flex items-center gap-2"
-          >
+          <button onClick={onRetry} className="px-8 py-3 bg-linear-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/30 text-white font-semibold rounded-lg transition-all">
             Practice Again
           </button>
-          <button
-            onClick={onClose}
-            className="px-8 py-3 bg-slate-800 hover:bg-slate-700 hover:scale-105 active:scale-95 text-white font-semibold rounded-lg transition-all duration-300"
-          >
+          <button onClick={onClose} className="px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg transition-all">
             Back to Dashboard
           </button>
         </div>

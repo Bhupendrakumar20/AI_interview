@@ -231,10 +231,16 @@ async def parse(resume: UploadFile = File(...)):
             tmp_path = tmp.name
 
         parsed_resume = parse_resume(tmp_path)
+        
+        # Extract raw text directly from the PDF to avoid heuristic parser data-loss
+        from ResumeParser.read_pdf import extract_text_from_pdf
+        raw_lines = extract_text_from_pdf(tmp_path)
+        raw_text = "\n".join(raw_lines)
 
         return {
             "success": True,
             "parsedResume": parsed_resume,
+            "rawText": raw_text,
         }
 
     except Exception as e:

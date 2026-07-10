@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Copy, Check, ExternalLink } from "lucide-react";
+import { X, Copy, Check, ExternalLink, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function QuestionDetailsModal({ question, onClose }) {
@@ -143,8 +143,8 @@ export default function QuestionDetailsModal({ question, onClose }) {
 
           {/* Algorithm Explanation */}
           <div className="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg">
-            <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-              ✨ Key Insights
+            <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-300 animate-pulse" /> Key Insights
             </h4>
             <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
               <li>• This problem tests your understanding of {question.topic}</li>

@@ -665,8 +665,9 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                 <p className="text-xs text-slate-500 italic">No nudges requested yet. Stuck? Click "Get Hint" for subtle directions.</p>
               ) : (
                 nudges.map((n, idx) => (
-                  <div key={idx} className="bg-blue-950/20 border border-blue-900/30 p-2.5 rounded-lg text-xs text-blue-300">
-                    💡 {n}
+                  <div key={idx} className="bg-blue-950/20 border border-blue-900/30 p-2.5 rounded-lg text-xs text-blue-300 flex items-start gap-1.5">
+                    <Lightbulb className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                    <span>{n}</span>
                   </div>
                 ))
               )}

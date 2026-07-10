@@ -1,11 +1,12 @@
 import dayjs from "dayjs";
 import Link from "next/link";
 import Image from "next/image";
+import { Briefcase } from "lucide-react";
 
 import { Button } from "./ui/button";
 import DisplayTechIcons from "./DisplayTechIcons";
 
-import { cn, getRandomInterviewCover } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { getFeedbackByInterviewId } from "@/lib/actions/general.action";
 
 const InterviewCard = async ({
@@ -51,14 +52,10 @@ const InterviewCard = async ({
             <p className="badge-text ">{normalizedType}</p>
           </div>
 
-          {/* Cover Image */}
-          <Image
-            src={getRandomInterviewCover()}
-            alt="cover-image"
-            width={90}
-            height={90}
-            className="rounded-full object-fit size-[90px]"
-          />
+          {/* Cover Icon */}
+          <div className="rounded-full bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 dark:from-cyan-500/20 dark:to-cyan-500/10 border border-cyan-500/20 dark:border-cyan-500/30 flex items-center justify-center w-[90px] h-[90px] shadow-inner">
+            <Briefcase className="w-10 h-10 text-cyan-500 dark:text-cyan-400" />
+          </div>
 
           {/* Interview Role */}
           <h3 className="mt-5 capitalize">{role} Interview</h3>

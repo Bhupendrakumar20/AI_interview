@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { FileText, Briefcase, User, Clock, CheckCircle, Upload, Shield, AlertTriangle, ArrowRight, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { FileText, Briefcase, User, Clock, CheckCircle, Upload, Shield, AlertTriangle, ArrowRight, Loader2, Sparkles, RefreshCw, Users, Rocket, Zap } from "lucide-react";
 
 export default function ResumeRoundSection() {
   const [selectedFocus, setSelectedFocus] = useState("Projects");
@@ -13,6 +13,7 @@ export default function ResumeRoundSection() {
   
   // Loading & Flow states
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAtsProcessing, setIsAtsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState("setup"); // setup -> interviewing -> report
   
   // Data states
@@ -36,25 +37,25 @@ export default function ResumeRoundSection() {
       id: "hiring-manager",
       name: "Hiring Manager",
       desc: "Deep dives on experience",
-      icon: "👔",
+      icon: Briefcase,
     },
     {
       id: "hr-partner",
       name: "HR Partner",
       desc: "Culture fit & soft skills",
-      icon: "🤝",
+      icon: Users,
     },
     {
       id: "founder",
       name: "Startup Founder",
       desc: "Vision & ownership",
-      icon: "🚀",
+      icon: Rocket,
     },
     {
       id: "drill-sergeant",
       name: "Drill Sergeant",
       desc: "High pressure, fast pace",
-      icon: "⚡",
+      icon: Zap,
     },
   ];
 
@@ -80,6 +81,77 @@ export default function ResumeRoundSection() {
     const droppedFile = e.dataTransfer.files?.[0];
     if (droppedFile) {
       setFile(droppedFile);
+    }
+  };
+
+  const checkAtsScoreDirectly = async () => {
+    if (!file) {
+      alert("Please upload a resume first.");
+      return;
+    }
+    if (!jobDescription.trim()) {
+      alert("Please enter a target Job Description.");
+      return;
+    }
+
+    setIsAtsProcessing(true);
+
+    try {
+      // Step 1: Upload and Parse Resume
+      const uploadFormData = new FormData();
+      uploadFormData.append("resume", file);
+      
+      const parseRes = await fetch("/api/resume/upload", {
+        method: "POST",
+        body: uploadFormData,
+      });
+      if (!parseRes.ok) throw new Error("Failed to parse resume PDF.");
+      const parseData = await parseRes.json();
+      const parsedData = parseData.parsedResume;
+      setParsedResume(parsedData);
+
+      // Step 2: Fetch ATS Score
+      const atsRes = await fetch("/api/resume/ats-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parsedResume: parsedData, jobDescription }),
+      });
+
+      if (!atsRes.ok) throw new Error("Failed to calculate ATS score.");
+      const atsData = await atsRes.json();
+      setAtsResult(atsData.atsResult);
+
+      // Step 3: Fetch Feedback and Optimized Resume in parallel
+      const [feedbackRes, optimizeRes] = await Promise.all([
+        fetch("/api/resume/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ atsResult: atsData.atsResult, jobDescription }),
+        }),
+        fetch("/api/resume/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ parsedResume: parsedData, atsResult: atsData.atsResult }),
+        }),
+      ]);
+
+      if (feedbackRes.ok) {
+        const feedbackData = await feedbackRes.json();
+        setFeedback(feedbackData.feedback);
+      }
+      if (optimizeRes.ok) {
+        const optimizeData = await optimizeRes.json();
+        setOptimizedResume(optimizeData.optimizedResume);
+      }
+
+      // Transition directly to report
+      setAnswers([]);
+      setCurrentStep("report");
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "An error occurred during ATS score calculation.");
+    } finally {
+      setIsAtsProcessing(false);
     }
   };
 
@@ -204,6 +276,8 @@ export default function ResumeRoundSection() {
     setQuestions([]);
     setFeedback("");
     setOptimizedResume(null);
+    setIsAtsProcessing(false);
+    setIsProcessing(false);
     setCurrentStep("setup");
   };
 
@@ -326,7 +400,9 @@ export default function ResumeRoundSection() {
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">{persona.icon}</span>
+                        <span className="p-2 rounded-lg bg-cyan-500/10 dark:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 flex items-center justify-center">
+                          <persona.icon className="w-5 h-5" />
+                        </span>
                         <div>
                           <p className="text-sm font-bold text-slate-900 dark:text-white">
                             {persona.name}
@@ -357,24 +433,43 @@ export default function ResumeRoundSection() {
                 </select>
               </div>
 
-              {/* Start Button */}
-              <button 
-                onClick={startResumeRound}
-                disabled={isProcessing || !file || !jobDescription.trim()}
-                className="w-full px-6 py-4 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg shadow-cyan-500/40 hover:shadow-cyan-500/60 flex items-center justify-center gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Ollama Parsing & Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5" />
-                    Start Resume Round
-                  </>
-                )}
-              </button>
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 mt-2">
+                <button 
+                  onClick={checkAtsScoreDirectly}
+                  disabled={isProcessing || isAtsProcessing || !file || !jobDescription.trim()}
+                  className="flex-1 px-6 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 flex items-center justify-center gap-2"
+                >
+                  {isAtsProcessing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Analyzing ATS Score...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-5 h-5" />
+                      Check ATS Score
+                    </>
+                  )}
+                </button>
+                <button 
+                  onClick={startResumeRound}
+                  disabled={isProcessing || isAtsProcessing || !file || !jobDescription.trim()}
+                  className="flex-1 px-6 py-4 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg shadow-cyan-500/40 hover:shadow-cyan-500/60 flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Ollama Parsing & Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      Start Resume Round
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -532,26 +627,28 @@ export default function ResumeRoundSection() {
           )}
 
           {/* Q&A Summary Review */}
-          <div className="bg-white border border-slate-200 dark:bg-slate-900/60 dark:border-slate-800 p-8 rounded-2xl">
-            <h4 className="text-lg font-bold mb-6">Verification Interview Log</h4>
-            <div className="space-y-6">
-              {answers.map((item, idx) => (
-                <div key={idx} className="p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <span className="flex items-center justify-center w-6 h-6 bg-cyan-500 text-white rounded-full text-xs font-bold shrink-0 mt-0.5">
-                      {idx + 1}
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.question}</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700 whitespace-pre-wrap">
-                        {item.answer}
-                      </p>
+          {answers && answers.length > 0 && (
+            <div className="bg-white border border-slate-200 dark:bg-slate-900/60 dark:border-slate-800 p-8 rounded-2xl">
+              <h4 className="text-lg font-bold mb-6">Verification Interview Log</h4>
+              <div className="space-y-6">
+                {answers.map((item, idx) => (
+                  <div key={idx} className="p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <span className="flex items-center justify-center w-6 h-6 bg-cyan-500 text-white rounded-full text-xs font-bold shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.question}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700 whitespace-pre-wrap">
+                          {item.answer}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action Footer */}
           <div className="flex justify-center gap-4">

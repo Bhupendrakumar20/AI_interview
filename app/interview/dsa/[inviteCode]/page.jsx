@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { io } from 'socket.io-client';
 import { toast } from 'sonner';
-import { ArrowLeft, Play, Send, Trophy, Users, Zap, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Play, Send, Trophy, Users, Zap, CheckCircle2, XCircle, AlertCircle, Timer, Crown } from 'lucide-react';
 import { auth } from '@/firebase/client';
 import CodeEditorPanel from '@/components/CodeEditorPanel';
 
@@ -347,7 +347,7 @@ export default function DSALiveRoomPage() {
         </div>
 
         <div className="flex items-center gap-2 text-xl font-mono font-semibold">
-          <span className="text-slate-400">⏱</span>
+          <Timer className="w-5 h-5 text-slate-400" />
           <span className={isLowTime ? 'text-red-400 animate-pulse' : 'text-slate-200'}>
             {timerText}
           </span>
@@ -620,7 +620,7 @@ export default function DSALiveRoomPage() {
                           </span>
                           {p.username} 
                           {p.socketId === socket?.id && <span className="text-[10px] text-emerald-400">(You)</span>}
-                          {showCrown && <span className="text-xs" title="Current Leader">👑</span>}
+                          {showCrown && <Crown className="w-3.5 h-3.5 text-amber-400 fill-amber-400 inline" title="Current Leader" />}
                           {hasWinnerTag && <span className="text-[9px] bg-amber-500/25 border border-amber-500/40 text-amber-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider scale-90">Winner</span>}
                         </span>
                         <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase ${

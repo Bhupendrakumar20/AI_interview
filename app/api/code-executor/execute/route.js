@@ -661,8 +661,12 @@ function injectAutoDriver(sourceCode, language) {
     
     const params = paramsStr.split(',').map(p => {
       const parts = p.trim().split(/\s+/);
-      const name = parts[parts.length - 1].replace(/[*&]/g, '');
-      const type = parts.slice(0, parts.length - 1).join(' ') + (p.includes('*') ? '*' : '') + (p.includes('&') ? '&' : '');
+      let name = parts[parts.length - 1];
+      let type = parts.slice(0, parts.length - 1).join(' ');
+      while (name.startsWith('*') || name.startsWith('&')) {
+        type += name[0];
+        name = name.slice(1);
+      }
       return { type: type.trim(), name: name.trim() };
     }).filter(p => p.name && p.type);
     

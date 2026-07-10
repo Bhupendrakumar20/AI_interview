@@ -1,4 +1,3 @@
-// app/(root)/page.jsx (updated)
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { getLatestInterviews, getInterviewsByUserId } from "@/lib/actions/general.action";
 import FeaturedCard from "@/components/FeaturedCard";
@@ -40,7 +39,7 @@ export default async function HomePage() {
       title: "tbo.com",
       description: "Stand a chance to win Rs 3 lacs prize money and gain interview opportunities",
       type: "competition",
-      prize: "₹3,00,000",
+      prize: "₹3,0,000",
       buttonText: "Learn More"
     },
     {

@@ -1,82 +1,46 @@
-
-import json
-import re
-from questionGeneration import  RUBRICS
-from taxonomy import SUBTOPIC_TAGS, WEAK_THRESHOLD
-from scoring import normalize_tag
-import requests
-
-
 # evaluator.py
 import json
 import re
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "gemma3:4b"
+import logging
+from llm_fallback import generate_with_fallback
+from questionGeneration import RUBRICS
+from taxonomy import SUBTOPIC_TAGS, WEAK_THRESHOLD
+from scoring import normalize_tag
 
-def call_ollama(prompt: str, temperature: float = 0.3, num_predict: int = 1024) -> str:
-    """Single shared Ollama call — used by both question generation and evaluation.
-    Matches the /api/generate endpoint you're already using elsewhere (not /api/chat)."""
-    response = requests.post(
-        OLLAMA_URL,
-        json={
-            "model": MODEL_NAME,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": temperature, "top_p": 0.9, "num_predict": num_predict},
-        },
-    )
-    response.raise_for_status()
-    try:
-        return response.json()["response"]
-    except ValueError:
-        text = response.text.strip()
-        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-        if match:
-            return json.loads(match.group(0))["response"]
-        raise
+logger = logging.getLogger("adaptive_interview")
+
+
+def looks_truncated(raw: str) -> bool:
+    cleaned = raw.strip().replace("```json", "").replace("```", "").strip()
+    return cleaned.count("{") != cleaned.count("}") or not cleaned.endswith("}")
 
 
 def extract_json(raw: str) -> dict:
     raw = raw.strip().replace("```json", "").replace("```", "")
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     if not match:
-        raise ValueError(f"No JSON object found in Ollama response: {raw[:300]}")
+        raise ValueError(f"No JSON object found in LLM response: {raw[:300]}")
 
     candidate = match.group(0)
-
     try:
         return json.loads(candidate)
     except json.JSONDecodeError:
-        pass  # fall through to repair attempts below
+        pass
 
     repaired = _repair_json(candidate)
     try:
         return json.loads(repaired)
     except json.JSONDecodeError as e:
-        raise ValueError(
-            f"Ollama returned malformed JSON even after repair attempt. "
-            f"Error: {e}. Raw candidate: {candidate[:500]}"
-        )
+        raise ValueError(f"Malformed JSON even after repair. Error: {e}. Raw: {candidate[:500]}")
 
 
 def _repair_json(text: str) -> str:
-    """Fixes the most common ways llama3 breaks JSON syntax:
-    Python-dict single quotes, trailing commas, and unquoted keys."""
-    # Remove trailing commas before } or ]
     text = re.sub(r',\s*([}\]])', r'\1', text)
-    text = re.sub(r"'([a-zA-Z_][a-zA-Z0-9_ ]*)'\s*:", r'"\1":', text)  # keys
-    text = re.sub(r':\s*\'([^\']*)\'', r': "\1"', text)                # simple values
-
-    # Quote bare/unquoted keys (e.g. {criterion_scores: ...} -> {"criterion_scores": ...})
+    text = re.sub(r"'([a-zA-Z_][a-zA-Z0-9_ ]*)'\s*:", r'"\1":', text)
+    text = re.sub(r':\s*\'([^\']*)\'', r': "\1"', text)
     text = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', text)
-
     return text
 
-def looks_truncated(raw: str) -> bool:
-    """A truncated JSON object won't have balanced braces, and won't end
-    with a closing brace after stripping whitespace/fences."""
-    cleaned = raw.strip().replace("```json", "").replace("```", "").strip()
-    return cleaned.count("{") != cleaned.count("}") or not cleaned.endswith("}")
 
 def evaluate_answer(topic: str, question: str, answer: str, persona: str, _retry: bool = True) -> dict:
     criteria = RUBRICS.get(topic, "overall correctness and clarity")
@@ -95,39 +59,60 @@ from this list: {tag_options}
 If nothing on the list fits, write "general {topic}".
 
 Return ONLY valid JSON using double quotes, no trailing commas, no markdown fences, no preamble.
-Keep the "note" field under 8 words.
+Keep any "note" field under 8 words.
 
-{{"criterion_scores": {{}}, "weak_tags": [{{"criterion": "...", "tag": "...", "note": "short phrase, max 8 words"}}], "feedback": "1 sentence, max 20 words"}}"""
+{{"criterion_scores": {{}}, "weak_tags": [{{"criterion": "...", "tag": "..."}}], "feedback": "1 sentence, max 20 words"}}"""
 
-    raw = call_ollama(prompt, temperature=0.2,num_predict=1024)
+    result = generate_with_fallback(prompt, temperature=0.2, num_predict=1024)
+    raw = result["text"]
+    logger.info(f"[evaluator] topic={topic} source={result['source']}")
+
     if looks_truncated(raw) and _retry:
-        #logger.warning("Evaluator response appears truncated, retrying with higher token budget")
-        raw = call_ollama(prompt, temperature=0.2, num_predict=2048)
-
+        logger.warning("Evaluator response appears truncated, retrying with higher token budget")
+        retry_result = generate_with_fallback(prompt, temperature=0.2, num_predict=2048)
+        raw = retry_result["text"]
 
     try:
-        result = extract_json(raw)
+        parsed = extract_json(raw)
     except ValueError as e:
         if _retry:
-            # one retry with an explicit correction nudge, since llama3 sometimes
-            # self-corrects when told directly what it got wrong
-            retry_prompt = prompt + f"\n\nYour previous attempt failed to parse as JSON: {e}\nReturn ONLY the corrected valid JSON object this time."
-            raw_retry = call_ollama(retry_prompt, temperature=0.2)
-            result = extract_json(raw_retry)  # let this raise if it fails again
+            retry_prompt = prompt + f"\n\nYour previous response was cut off or invalid: {e}\nReturn ONLY the complete, valid JSON object — be concise."
+            retry_result = generate_with_fallback(retry_prompt, temperature=0.2, num_predict=1024)
+            parsed = extract_json(retry_result["text"])
         else:
-            raise
+            raise ValueError(f"Did not get parseable JSON after retries: {e}. Raw: {raw[:400]}")
 
-    weights = {c: 1 / len(result["criterion_scores"]) for c in result["criterion_scores"]} \
-        if isinstance(criteria, str) else criteria
-    weighted_score = sum(result["criterion_scores"].get(c, 5) * w for c, w in weights.items())
-    result["score"] = round(weighted_score, 1)
+    raw_scores = parsed.get("criterion_scores", {})
+    clean_scores = {}
+    for k, v in raw_scores.items():
+        try:
+            clean_scores[k] = float(v)
+        except (TypeError, ValueError):
+            continue
+    parsed["criterion_scores"] = clean_scores
 
-    for w in result.get("weak_tags", []):
-        w["tag"] = normalize_tag(w.get("tag", f"general {topic}"), topic)
+    if not clean_scores:
+        logger.warning(f"No usable criterion_scores from LLM for topic={topic}, defaulting to 5.0")
+        parsed["score"] = 5.0
+    elif isinstance(criteria, dict):
+        weighted_score = sum(clean_scores.get(c, 5.0) * w for c, w in criteria.items())
+        parsed["score"] = round(weighted_score, 1)
+    else:
+        parsed["score"] = round(sum(clean_scores.values()) / len(clean_scores), 1)
+
+    for w in parsed.get("weak_tags", []):
+        tag = w.get("tag", f"general {topic}")
+        if isinstance(tag, list):
+            tag = tag[0] if tag else f"general {topic}"
+        if not isinstance(tag, str):
+            tag = str(tag)
+        w["tag"] = normalize_tag(tag, topic)
+
         criterion = w.get("criterion", "")
         if isinstance(criterion, list):
             criterion = criterion[0] if criterion else ""
-        crit_score = result["criterion_scores"].get(criterion, WEAK_THRESHOLD)
+        crit_score = clean_scores.get(criterion, WEAK_THRESHOLD)
         w["severity"] = round(WEAK_THRESHOLD - crit_score + 1, 1)
 
-    return result
+    parsed["llm_source"] = result["source"]  # optional, for debugging
+    return parsed

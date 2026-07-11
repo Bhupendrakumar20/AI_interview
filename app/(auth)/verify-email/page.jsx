@@ -119,11 +119,11 @@ const VerifyEmailPage = () => {
           {/* Logo */}
           <div className="flex flex-col gap-3 justify-center items-center">
             <Image
-              src="/prepwise_logo.png"
+              src="/logo_icon.png"
               alt="logo"
               height={40}
               width={40}
-              className="rounded-md"
+              className="object-contain"
             />
             <div className="text-center">
               <h2 className="text-primary-100 font-bold text-xl">PrepWise</h2>

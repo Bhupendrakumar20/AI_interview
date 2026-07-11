@@ -7,11 +7,11 @@ const Button = React.forwardRef(
     const baseStyles = "inline-flex items-center justify-center rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:scale-105 active:scale-95";
     
     const variants = {
-      default: "btn-primary bg-primary-200 text-dark-100 hover:bg-primary-300 hover:shadow-lg hover:shadow-primary-200/30",
-      secondary: "bg-dark-200 text-light-100 hover:bg-dark-300 hover:shadow-md hover:shadow-dark-200/50",
-      outline: "border border-dark-100 text-light-100 hover:bg-dark-200 hover:border-primary-200/50 hover:shadow-md",
-      ghost: "text-light-100 hover:bg-dark-200 hover:text-light-50",
-      destructive: "bg-red-500 text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/30",
+      default: "btn-primary bg-primary text-primary-foreground hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/20",
+      secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/40 hover:shadow-sm",
+      outline: "border border-border bg-transparent text-foreground hover:bg-secondary hover:text-secondary-foreground hover:shadow-sm",
+      ghost: "text-foreground hover:bg-secondary hover:text-foreground",
+      destructive: "bg-destructive text-white hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/20",
     };
 
     const sizes = {

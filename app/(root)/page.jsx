@@ -5,9 +5,16 @@ import InterviewCard from "@/components/InterviewCard";
 import QuickAccess from "@/components/QuickAccess";
 import ChallengeSection from "@/components/ChallengeSection";
 import StatsOverview from "@/components/StatsOverview";
+import LandingPage from "@/components/LandingPage";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
+  
+  const isLoggedIn = user && user.email !== "guest@example.com";
+
+  if (!isLoggedIn) {
+    return <LandingPage />;
+  }
   
   // Fetch data
   const latestInterviews = await getLatestInterviews({ 

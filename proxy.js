@@ -8,14 +8,23 @@ export async function proxy(request) {
   
   // Protect admin routes
   if (path.startsWith('/admin')) {
-    return adminMiddleware(request);
+    const adminRes = await adminMiddleware(request);
+    if (adminRes) return adminRes;
   }
   
-  return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", path);
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {
   matcher: [
     '/admin/:path*',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

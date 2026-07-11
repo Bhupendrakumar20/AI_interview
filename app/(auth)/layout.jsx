@@ -5,8 +5,10 @@ import { redirect } from "next/navigation";
 export default async function AuthLayout({ children }) {
   const user = await getCurrentUser();
   
+  const isLoggedIn = user && user.email !== "guest@example.com";
+  
   // If user is already logged in, redirect to home
-  if (user) {
+  if (isLoggedIn) {
     redirect("/");
   }
 

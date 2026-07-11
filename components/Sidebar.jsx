@@ -75,7 +75,7 @@ const Sidebar = ({ user }) => {
         {/* Logo */}
         <div className="p-4 border-b border-border bg-background/50">
           <Link href="/" className="flex items-center gap-3">
-            <Image src="/prepwise_logo.png" alt="logo" width={32} height={32} className="rounded-md" />
+            <Image src="/logo_icon.png" alt="logo" width={32} height={32} className="object-contain" />
             {!collapsed && (
               <div>
                 <h2 className="text-foreground font-bold text-lg leading-tight tracking-tight">PrepWise</h2>
@@ -86,9 +86,9 @@ const Sidebar = ({ user }) => {
         </div>
 
         {/* User Profile */}
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-full size-10 flex items-center justify-center shadow-md">
+        <div className="px-3 py-3 border-b border-border">
+          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/30 border border-border/50 hover:bg-secondary/50 transition-colors">
+            <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-lg size-10 flex items-center justify-center shadow-sm shrink-0">
               <span className="font-bold text-sm">
                 {user?.name?.charAt(0) || "U"}
               </span>
@@ -96,7 +96,7 @@ const Sidebar = ({ user }) => {
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-foreground truncate text-sm">{user?.name || "User"}</p>
-                <p className="text-xs text-muted-foreground">Student</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email || "No Email"}</p>
               </div>
             )}
           </div>

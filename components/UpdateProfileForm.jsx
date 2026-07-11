@@ -178,7 +178,7 @@ export default function UpdateProfileForm({ user }) {
               {String(user.id).slice(0, 10)}...
             </p>
 
-            <Button type="button" variant="secondary" onClick={copyUserId}>
+            <Button type="button" variant="outline" onClick={copyUserId}>
               Copy ID
             </Button>
           </div>
@@ -187,7 +187,7 @@ export default function UpdateProfileForm({ user }) {
         <div className="flex gap-3 flex-wrap mt-2">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             onClick={() => toast.info("✅ You are logged in!")}
           >
             Check Profile
@@ -312,13 +312,14 @@ export default function UpdateProfileForm({ user }) {
 
         {/* Buttons */}
         <div className="flex gap-3 flex-wrap">
-          <Button className="btn-primary w-fit" type="submit" disabled={isSaving}>
+          <Button variant="default" className="w-fit" type="submit" disabled={isSaving}>
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>
 
           <Button
             type="button"
-            className="btn-secondary w-fit"
+            variant="outline"
+            className="w-fit"
             onClick={handleReset}
             disabled={isSaving}
           >

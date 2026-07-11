@@ -123,13 +123,7 @@ export default function TopBar({ user }) {
     <nav className="sticky top-0 z-50 bg-card border-b border-border backdrop-blur-md">
       <div className="flex items-center justify-between px-6 py-3 h-16">
         {/* Left Section */}
-        <div className="flex items-center gap-2 flex-1">
-          <span className="text-lg font-semibold text-foreground">
-            {user?.name || "User"}
-          </span>
-          <span className="text-muted-foreground text-sm">•</span>
-          <span className="text-muted-foreground text-sm">{user?.email || "student"}</span>
-        </div>
+        <div className="flex-1" />
 
         {/* Right Section - Actions */}
         <div className="flex items-center gap-4">

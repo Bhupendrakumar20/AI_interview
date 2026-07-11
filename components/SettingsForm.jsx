@@ -297,7 +297,8 @@ export default function SettingsForm({ user }) {
         </div>
 
         <Button
-          className="btn-primary w-full md:w-fit"
+          variant="default"
+          className="w-full md:w-fit"
           type="submit"
           disabled={saving}
         >
@@ -319,7 +320,8 @@ export default function SettingsForm({ user }) {
         {!showPasswordForm ? (
           <Button
             type="button"
-            className="btn-secondary w-full md:w-fit"
+            variant="outline"
+            className="w-full md:w-fit"
             onClick={() => setShowPasswordForm(true)}
             disabled={changingPassword}
           >
@@ -386,14 +388,14 @@ export default function SettingsForm({ user }) {
             <div className="flex gap-3">
               <Button
                 type="submit"
-                className="btn-primary"
+                variant="default"
                 disabled={changingPassword}
               >
                 {changingPassword ? "Updating..." : "Update Password"}
               </Button>
               <Button
                 type="button"
-                className="btn-secondary"
+                variant="outline"
                 onClick={() => {
                   setShowPasswordForm(false);
                   setCurrentPassword("");
@@ -430,7 +432,8 @@ export default function SettingsForm({ user }) {
         {!showEmailForm ? (
           <Button
             type="button"
-            className="btn-secondary w-full md:w-fit"
+            variant="outline"
+            className="w-full md:w-fit"
             onClick={() => setShowEmailForm(true)}
             disabled={changingEmail || sendingVerification}
           >
@@ -473,14 +476,14 @@ export default function SettingsForm({ user }) {
             <div className="flex gap-3">
               <Button
                 type="submit"
-                className="btn-primary"
+                variant="default"
                 disabled={changingEmail}
               >
                 {changingEmail ? "Sending..." : "Send Verification Email"}
               </Button>
               <Button
                 type="button"
-                className="btn-secondary"
+                variant="outline"
                 onClick={() => {
                   setShowEmailForm(false);
                   setNewEmail("");
@@ -508,7 +511,8 @@ export default function SettingsForm({ user }) {
 
         <Button
           type="button"
-          className="btn-secondary bg-blue-600 hover:bg-blue-700 text-white w-full md:w-fit"
+          variant="outline"
+          className="w-full md:w-fit text-blue-500 border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-600"
           onClick={handleLogout}
           disabled={loggingOut}
         >
@@ -529,7 +533,8 @@ export default function SettingsForm({ user }) {
 
         <Button
           type="button"
-          className="btn-secondary bg-amber-600 hover:bg-amber-700 text-white w-full md:w-fit"
+          variant="outline"
+          className="w-full md:w-fit text-amber-500 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-600"
           onClick={clearHistory}
           disabled={clearing}
         >
@@ -550,7 +555,8 @@ export default function SettingsForm({ user }) {
 
         <Button
           type="button"
-          className="btn-secondary bg-red-600 hover:bg-red-700 text-white w-full md:w-fit"
+          variant="destructive"
+          className="w-full md:w-fit"
           onClick={deleteAccount}
           disabled={deleting}
         >

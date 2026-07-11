@@ -1,4 +1,3 @@
-// app/(root)/page.jsx (updated)
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { getLatestInterviews, getInterviewsByUserId } from "@/lib/actions/general.action";
 import FeaturedCard from "@/components/FeaturedCard";
@@ -6,9 +5,16 @@ import InterviewCard from "@/components/InterviewCard";
 import QuickAccess from "@/components/QuickAccess";
 import ChallengeSection from "@/components/ChallengeSection";
 import StatsOverview from "@/components/StatsOverview";
+import LandingPage from "@/components/LandingPage";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
+  
+  const isLoggedIn = user && user.email !== "guest@example.com";
+
+  if (!isLoggedIn) {
+    return <LandingPage />;
+  }
   
   // Fetch data
   const latestInterviews = await getLatestInterviews({ 
@@ -40,7 +46,7 @@ export default async function HomePage() {
       title: "tbo.com",
       description: "Stand a chance to win Rs 3 lacs prize money and gain interview opportunities",
       type: "competition",
-      prize: "₹3,00,000",
+      prize: "₹3,0,000",
       buttonText: "Learn More"
     },
     {

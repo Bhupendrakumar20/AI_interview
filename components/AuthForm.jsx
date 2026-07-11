@@ -101,7 +101,7 @@ const AuthForm = ({ type }) => {
     <div className="card-border lg:min-w-[566px]">
       <div className="flex flex-col gap-6 card py-14 px-10">
         <div className="flex flex-col gap-3 justify-center items-center">
-          <Image src="/prepwise_logo.png" alt="logo" height={40} width={40} className="rounded-md" />
+          <Image src="/logo_icon.png" alt="logo" height={40} width={40} className="object-contain" />
           <div className="text-center">
             <h2 className="text-foreground font-bold text-xl">PrepWise</h2>
             <p className="text-xs text-muted-foreground">Career Platform</p>

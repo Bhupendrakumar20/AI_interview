@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import InterviewCard from "@/components/InterviewCard";
 import InterviewSetup from "@/components/InterviewSetup";
-import ResumeRoundSection from "@/components/Resume RoundSection";
 
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import {
@@ -40,7 +39,7 @@ async function InterviewPage() {
           <div className="text-6xl">▲</div>
         </div>
       </section>
-
+      
       {/* Setup section */}
       <section className="grid gap-6 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-stretch">
         <div className="card-border w-full">
@@ -76,9 +75,6 @@ async function InterviewPage() {
           </div>
         </div>
       </section>
-
-      {/* Resume Round Section */}
-      <ResumeRoundSection />
 
       {/* Your Interviews */}
       <section className="flex flex-col gap-4 mt-2">

@@ -13,9 +13,15 @@ Refactored from your original script. Key changes:
      focusOptions (Projects/Experience/Skills/Gaps/Leadership/Metrics) and
      persona selector to actual resume content, then generates N questions
      by calling generate_rag_question() once per target.
+  4. NEW: Leadership questions no longer go through resume RAG context.
+     They're generated from a fixed bank of behavioral topics via
+     generate_generic_question(), which uses a resume-free prompt.
+     Skills/Experience/Projects/Education/Metrics/Gaps still use RAG
+     context as before.
 """
 
 import json
+import os
 import requests
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -29,8 +35,20 @@ PERSONA_STYLES = {
     "drill-sergeant": "You are a high-pressure interviewer who asks direct, fast-paced follow-up questions.",
 }
 
+# Fixed bank of behavioral/leadership topics — deliberately resume-agnostic.
+# Used for the "Leadership" focus so questions don't reference any specific
+# project, company, or skill from the candidate's resume.
+LEADERSHIP_TOPICS = [
+    "handling conflict within a team",
+    "taking initiative without being asked",
+    "influencing teammates without formal authority",
+    "dealing with a disagreement with a manager or senior",
+    "motivating a team member who was underperforming",
+    "making a decision under pressure with incomplete information",
+    "receiving critical feedback and acting on it",
+    "balancing competing priorities from multiple stakeholders",
+]
 
-import os
 
 class InMemRagQuestionGenerator:
 
@@ -131,9 +149,8 @@ class InMemRagQuestionGenerator:
             response.raise_for_status()
             return response.json()["response"]
 
-
     # ==========================================================
-    # GENERATE QUESTION
+    # GENERATE QUESTION — WITH RESUME CONTEXT (RAG)
     # ==========================================================
     def generate_rag_question(self, target_skill, persona="hiring-manager"):
         context = self.retrieve_context(query=target_skill)
@@ -157,6 +174,34 @@ Instructions:
 - If the resume contains relevant experience, ask about what the candidate built or implemented.
 - If there is no relevant experience, ask one practical beginner-level question about {target_skill}.
 - The question should be conversational, like a real campus placement interview.
+
+Return ONLY the interview question.
+"""
+        return self.ask_ollama(prompt)
+
+    # ==========================================================
+    # GENERATE QUESTION — WITHOUT RESUME CONTEXT
+    # ==========================================================
+    def generate_generic_question(self, topic, persona="hiring-manager"):
+        """
+        Used for behavioral/leadership questions. Deliberately does NOT call
+        retrieve_context() or reference the resume at all — these should be
+        standard behavioral/situational questions, not tied to any specific
+        project, company, or skill the candidate listed.
+        """
+        persona_line = PERSONA_STYLES.get(persona, PERSONA_STYLES["hiring-manager"])
+
+        prompt = f"""
+{persona_line} You are interviewing a fresher (0-2 years experience) for a behavioral/leadership round.
+
+Topic to probe: {topic}
+
+Instructions:
+- Ask ONLY ONE interview question.
+- Do NOT reference any specific resume, project, company, or skill — this is a general behavioral question.
+- The question should be a classic behavioral/situational interview question (e.g. "Tell me about a time when...").
+- Keep it realistic for a campus placement or fresher interview.
+- Conversational tone, like a real interviewer.
 
 Return ONLY the interview question.
 """
@@ -189,9 +234,15 @@ def _get_focus_targets(resume_data: dict, focus: str, limit: int) -> list:
         edus = resume_data.get("educations", resume_data.get("education", []))
         targets = [e.get("degree", "") for e in edus]
 
-    elif focus in ("leadership", "metrics", "gaps"):
+    elif focus == "leadership":
+        # Resume-agnostic — pull from the fixed behavioral topic bank
+        # instead of skills/projects. Handled without RAG context in
+        # generate_questions_for_resume() below.
+        targets = list(LEADERSHIP_TOPICS)
+
+    elif focus in ("metrics", "gaps"):
         # No direct resume field maps cleanly to these — fall back to
-        # skills + project names as discussion anchors.
+        # skills + project names as discussion anchors. Still resume-grounded.
         targets = list(resume_data.get("skills", []))
         for p in resume_data.get("projects", []):
             name = p.get("project", p.get("name", ""))
@@ -226,13 +277,23 @@ def generate_questions_for_resume(
     """
     Returns a list of {question, expectedKeywords} dicts, matching the shape
     ResumeVerification.jsx expects for verification.verificationQuestions.
+
+    For focus == "leadership", questions are generated WITHOUT resume
+    context (generic behavioral questions from LEADERSHIP_TOPICS). All
+    other focus values continue to use RAG-grounded questions from the
+    resume.
     """
     generator = InMemRagQuestionGenerator(resume_data)
     targets = _get_focus_targets(resume_data, focus, num_questions)
+    is_leadership = (focus or "").lower() == "leadership"
 
     questions = []
     for target in targets:
-        q_text = generator.generate_rag_question(target, persona=persona)
+        if is_leadership:
+            q_text = generator.generate_generic_question(target, persona=persona)
+        else:
+            q_text = generator.generate_rag_question(target, persona=persona)
+
         questions.append({
             "question": q_text.strip(),
             "expectedKeywords": [target],

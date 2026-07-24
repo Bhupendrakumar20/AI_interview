@@ -13,7 +13,8 @@ export async function POST(request) {
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const response = await fetch("http://127.0.0.1:8080/generate-questions", {
+    const pythonUrl = process.env.NEXT_PUBLIC_ADAPTIVE_API_URL || "http://127.0.0.1:8080";
+    const response = await fetch(`${pythonUrl}/generate-questions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

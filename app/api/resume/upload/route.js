@@ -12,7 +12,8 @@ export async function POST(request) {
     const forwardData = new FormData();
     forwardData.append("resume", file);
 
-    const response = await fetch("http://localhost:8080/parse", {
+    const pythonUrl = process.env.NEXT_PUBLIC_ADAPTIVE_API_URL || "http://localhost:8080";
+    const response = await fetch(`${pythonUrl}/parse`, {
       method: "POST",
       body: forwardData,
     });

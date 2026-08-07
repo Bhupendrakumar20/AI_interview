@@ -56,7 +56,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
                     "num_predict": num_predict,
                 },
             },
-            timeout=60,  # generous enough for a warm local model; adjust if you see frequent timeouts
+            timeout=180,  # generous enough for a warm local model; adjust if you see frequent timeouts
         )
         response.raise_for_status()
         result = response.json().get("response")

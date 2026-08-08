@@ -198,18 +198,47 @@ const AiBuddyInterviewSession = ({
     }
   };
 
-  const buildResultsFromReport = (report) => ({
-    totalQuestions: maxQuestions,
-    answeredQuestions: report.performance_history.length,
-    avgByTopic: report.avg_by_topic,
-    topWeakAreas: report.top_weak_areas,
-    scoreProgression: report.score_progression,
-    performanceHistory: report.performance_history,
-    overallScore: Math.round(
-      (report.score_progression.reduce((a, b) => a + b, 0) / report.score_progression.length) * 10
-    ),
-    timestamp: new Date().toISOString(),
-  });
+  const buildResultsFromReport = (report) => {
+    const scoreProgression = Array.isArray(report.score_progression) ? report.score_progression : [];
+    const overallScore = scoreProgression.length > 0
+      ? Math.round(
+          (scoreProgression.reduce((a, b) => a + b, 0) / scoreProgression.length) * 10
+        )
+      : 0;
+
+    const rawTopWeakAreas = report.top_weak_areas || [];
+    const topWeakAreas = Array.isArray(rawTopWeakAreas)
+      ? rawTopWeakAreas
+          .map((item) => {
+            if (Array.isArray(item) && item.length >= 2) {
+              return { area: item[0], severity: Number(item[1]) };
+            }
+            if (item && typeof item === 'object') {
+              return {
+                area: item.area ?? item.tag ?? "Unknown area",
+                severity: Number(item.severity ?? item[1] ?? 0),
+              };
+            }
+            return { area: String(item ?? "Unknown area"), severity: 0 };
+          })
+          .filter((item) => item.area && Number.isFinite(item.severity))
+      : [];
+    
+    return {
+      totalQuestions: maxQuestions,
+      answeredQuestions: report.performance_history?.length || 0,
+      avgByTopic: report.avg_by_topic || {},
+      topWeakAreas,
+      scoreProgression: scoreProgression,
+      performanceHistory: report.performance_history || [],
+      score: overallScore,
+      overallScore: overallScore,
+      feedback: {
+        totalScore: overallScore,
+      },
+      timestamp: new Date().toISOString(),
+    };
+  };
 
   if (loading) {
     return (

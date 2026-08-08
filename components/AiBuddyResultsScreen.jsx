@@ -70,7 +70,7 @@ const AiBuddyResultsScreen = ({ results = {}, onClose, onRetry }) => {
           </div>
         </div>
 
-       {scoreProgression.length > 0 && (
+       {Array.isArray(scoreProgression) && scoreProgression.length > 0 && (
   <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
     <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
       <TrendingUp className="w-5 h-5 text-blue-400" /> Score Progression
@@ -100,24 +100,34 @@ const AiBuddyResultsScreen = ({ results = {}, onClose, onRetry }) => {
   </div>
 )}
         {/* Top weak areas */}
-        {topWeakAreas.length > 0 && (
+        {Array.isArray(topWeakAreas) && topWeakAreas.length > 0 && (
           <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-yellow-400" /> Areas to Focus On
             </h2>
             <div className="space-y-3">
-              {topWeakAreas.map(([tag, severity], idx) => (
-                <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-yellow-500 flex justify-between items-center">
-                  <span className="font-semibold text-yellow-300 capitalize">{tag}</span>
-                  <span className="text-xs text-slate-400">severity {severity.toFixed(1)}</span>
-                </div>
-              ))}
+              {topWeakAreas.map((item, idx) => {
+                const tag = Array.isArray(item)
+                  ? item[0]
+                  : item?.area ?? item?.tag ?? `Area ${idx + 1}`;
+                const severity = Array.isArray(item)
+                  ? Number(item[1])
+                  : Number(item?.severity ?? item?.score ?? 0);
+                const safeSeverity = Number.isFinite(severity) ? severity : 0;
+
+                return (
+                  <div key={idx} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-yellow-500 flex justify-between items-center">
+                    <span className="font-semibold text-yellow-300 capitalize">{tag}</span>
+                    <span className="text-xs text-slate-400">severity {safeSeverity.toFixed(1)}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Per-question breakdown */}
-{performanceHistory.length > 0 && (
+{Array.isArray(performanceHistory) && performanceHistory.length > 0 && (
   <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-12">
     <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
       <Target className="w-5 h-5 text-blue-400" /> Question-by-Question Breakdown

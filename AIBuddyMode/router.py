@@ -1,10 +1,10 @@
 # adaptive_interview/router.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from state import InterviewState
-from logic import pick_next_topic, pick_target_weak_area, apply_evaluation
-from questionGeneration import get_next_question
-from evaluator import evaluate_answer
+from AIBuddyMode.state import InterviewState
+from AIBuddyMode.logic import pick_next_topic, pick_target_weak_area, apply_evaluation
+from AIBuddyMode.questionGeneration import get_next_question
+from AIBuddyMode.evaluator import evaluate_answer
 
 router = APIRouter(prefix="/interview", tags=["adaptive-interview"])
 

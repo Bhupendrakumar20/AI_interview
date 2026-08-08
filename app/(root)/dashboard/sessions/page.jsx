@@ -1,11 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TrendingUp, Share2, Download, Eye, Play, Cpu, Code, Users, Building, BarChart3, Star, Clock, Zap } from 'lucide-react';
+import InterviewBuddyStats from '@/components/InterviewBuddyStats';
 
 export default function SessionsPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [toast, setToast] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const response = await fetch('/api/auth/current-user');
+        if (!response.ok) {
+          setCurrentUser(null);
+          return;
+        }
+        const data = await response.json();
+        setCurrentUser(data);
+      } catch (error) {
+        console.error('Unable to load current user:', error);
+        setCurrentUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    }
+
+    loadUser();
+  }, []);
 
   const sessions = [
     { id: 1, mode: 'AI Mock Interview', date: 'Today at 2 PM', score: 87, accuracy: 92, duration: '45 min', icon: Cpu },
@@ -80,6 +104,21 @@ export default function SessionsPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-8 py-8">
+        {/* Interview Buddy Stats */}
+        <div className="mb-8">
+          {authLoading ? (
+            <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-6 text-slate-300">
+              Loading Interview Buddy stats...
+            </div>
+          ) : currentUser ? (
+            <InterviewBuddyStats userId={currentUser.id} />
+          ) : (
+            <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-6 text-slate-300">
+              Sign in to view your Interview Buddy stats.
+            </div>
+          )}
+        </div>
+
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mb-8">
           {stats.map((stat, idx) => (

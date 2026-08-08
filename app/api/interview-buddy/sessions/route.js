@@ -22,7 +22,7 @@ export async function GET(request) {
 
     // Get single session if sessionId provided
     if (sessionId) {
-      const query = await db.collectionGroup("interview_buddy_sessions")
+      const query = await db.collectionGroup("interviews")
         .where(admin.firestore.FieldPath.documentId(), "==", sessionId)
         .limit(1)
         .get();
@@ -53,7 +53,7 @@ export async function GET(request) {
     }
 
     const query = await db
-      .collectionGroup("interview_buddy_sessions")
+      .collectionGroup("interviews")
       .where("participants", "array-contains", userId)
       .orderBy("createdAt", "desc")
       .get();

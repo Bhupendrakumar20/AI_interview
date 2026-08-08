@@ -238,12 +238,12 @@ const InterviewBuddy = ({ userId }) => {
   const recentSessions = (stats.recentSessions || []).map(session => {
     let dateStr = "Date unknown";
     try {
-      const date = new Date(session.createdAt);
-      if (!isNaN(date.getTime())) {
-        dateStr = date.toLocaleDateString('en-US', { 
-          month: 'short', 
+      const createdAt = typeof session.createdAt === 'string' ? new Date(session.createdAt) : session.createdAt?.toDate?.();
+      if (createdAt && !isNaN(createdAt.getTime())) {
+        dateStr = createdAt.toLocaleDateString('en-US', {
+          month: 'short',
           day: 'numeric',
-          year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+          year: createdAt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
         });
       }
     } catch (e) {
@@ -251,13 +251,16 @@ const InterviewBuddy = ({ userId }) => {
     }
 
     const score = session.score !== null && session.score !== undefined ? Math.round(session.score) : 0;
-    
+    const topicsLabel = Array.isArray(session.topics)
+      ? session.topics.join(' • ')
+      : session.topics || 'Mixed Topics';
+
     return {
       type: session.mode,
-      title: `${session.mode === 'ai' ? 'AI Buddy' : 'Human Buddy'} · ${session.topics?.[0] || 'Interview'} Round`,
-      meta: `${session.persona || session.mode} · ${session.difficulty} · ${session.duration || 0} min · ${dateStr}`,
+      title: `${session.mode === 'ai' ? 'AI Buddy' : 'Human Buddy'}`,
+      meta: `${topicsLabel} · ${session.difficulty || 'Unknown'} · ${session.duration || 0} min · ${dateStr}`,
       score: `${score}%`,
-      scoreType: score >= 80 ? "good" : "mid",
+      scoreType: score >= 80 ? "good" : score >= 50 ? "mid" : "low",
       label: "Overall Score",
     };
   });
@@ -407,9 +410,6 @@ const InterviewBuddy = ({ userId }) => {
 
         if (!response.ok) {
           const errorData = await response.text();
-          console.error("❌ Failed to save session results");
-          console.error("   Status:", response.status);
-          console.error("   Response:", errorData);
           
           // Still show results even if save fails, but warn user
           toast.warning("Session completed but results may not be saved. Try refreshing.");
@@ -1052,7 +1052,9 @@ const InterviewBuddy = ({ userId }) => {
                                     </span>
                                   </div>
                                   <div className="text-sm text-slate-400 mb-2">
-                                    {session.topic || session.topics || "Mixed Topics"}
+                                    {Array.isArray(session.topics)
+                                      ? session.topics.join(' • ')
+                                      : session.topic || session.topics || "Mixed Topics"}
                                   </div>
                                   <div className="text-xs text-slate-500">
                                     {session.date || new Date(session.createdAt).toLocaleDateString()} • {session.duration || 'N/A'} min
@@ -1109,7 +1111,11 @@ const InterviewBuddy = ({ userId }) => {
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Topic</div>
-                          <div className="text-sm font-medium">{selectedSessionForDetail.topic || selectedSessionForDetail.topics || "Mixed Topics"}</div>
+                          <div className="text-sm font-medium">
+                            {Array.isArray(selectedSessionForDetail.topics)
+                              ? selectedSessionForDetail.topics.join(' • ')
+                              : selectedSessionForDetail.topic || selectedSessionForDetail.topics || "Mixed Topics"}
+                          </div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Difficulty</div>

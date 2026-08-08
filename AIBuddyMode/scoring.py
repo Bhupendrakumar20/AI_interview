@@ -1,7 +1,7 @@
 # adaptive_interview/scoring.py
 import re
 from rapidfuzz import process, fuzz
-from taxonomy import SUBTOPIC_TAGS
+from AIBuddyMode.taxonomy import SUBTOPIC_TAGS
 
 # Common abbreviations/word-forms that character-similarity can't bridge on its own.
 # Add to this as you see more LLM output drift in practice.

@@ -15,6 +15,7 @@ class InterviewState(BaseModel):
     difficulty: float = 3.0
     max_questions: int = 6
     question_count: int = 0
+    current_question_id: str | None = None
 
     asked_questions: list[str] = []
     weak_areas: dict[str, WeakArea] = {}          

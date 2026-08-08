@@ -4,10 +4,10 @@ import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from llm_fallback import generate_with_fallback, OLLAMA_URL, MODEL_NAME
-from questionGeneration import clean_question_text, generate_question, RUBRICS
-from evaluator import extract_json, evaluate_answer, looks_truncated
-from taxonomy import SUBTOPIC_TAGS
+from AIBuddyMode.llm_fallback import generate_with_fallback, OLLAMA_URL, MODEL_NAME
+from AIBuddyMode.questionGeneration import clean_question_text, generate_question, RUBRICS
+from AIBuddyMode.evaluator import extract_json, evaluate_answer, looks_truncated
+from AIBuddyMode.taxonomy import SUBTOPIC_TAGS
 
 debug_router = APIRouter(prefix="/debug", tags=["debug"])
 

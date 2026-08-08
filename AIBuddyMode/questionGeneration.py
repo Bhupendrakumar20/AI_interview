@@ -2,7 +2,7 @@
 import re
 import httpx
 import logging
-from llm_fallback import generate_with_fallback
+from AIBuddyMode.llm_fallback import generate_with_fallback
 
 logger = logging.getLogger("adaptive_interview")
 

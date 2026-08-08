@@ -7,11 +7,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from state import InterviewState
-from logic import pick_next_topic, pick_target_weak_area, apply_evaluation
-from questionGeneration import get_next_question
-from evaluator import evaluate_answer
-from debuger import debug_router
+from AIBuddyMode.firebase_Interview_service import complete_interview, create_interview, save_answer, save_question
+from AIBuddyMode.state import InterviewState
+from AIBuddyMode.logic import pick_next_topic, pick_target_weak_area, apply_evaluation
+from AIBuddyMode.questionGeneration import get_next_question
+from AIBuddyMode.evaluator import evaluate_answer
+from AIBuddyMode.debuger import debug_router
 
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
@@ -112,23 +113,70 @@ class SessionStateResponse(BaseModel):
 
 @app.post("/interview/start", response_model=StartSessionResponse)
 async def start_session(req: StartSessionRequest):
-    cleanup_stale_sessions()  # NEW
+
+    cleanup_stale_sessions()
 
     session_id = str(uuid.uuid4())
+
     state = InterviewState(
         session_id=session_id,
         persona=req.persona,
         topic_focus=req.topic_focus,
         max_questions=req.max_questions,
     )
-    state._last_touched = time.time()  # NEW
+
+    state._last_touched = time.time()
 
     topic = pick_next_topic(state)
-    logger.info(f"[{session_id}] New session created, first topic: {topic}")  # log line lets you confirm no duplicates on reload
 
-    question = await get_next_question(topic, state.difficulty, state.persona, [], None)
+    logger.info(
+        f"[{session_id}] New session created, first topic: {topic}"
+    )
+
+    question = await get_next_question(
+        topic,
+        state.difficulty,
+        state.persona,
+        [],
+        None,
+    )
+
     state.current_topic = topic
     state.current_question = question
+
+    # --------------------------------
+    # Firestore: create interview
+    # --------------------------------
+
+    created_by = getattr(req, "created_by", None)
+
+    create_interview(
+        session_id=session_id,
+        created_by=created_by or "anonymous",
+        persona=req.persona,
+        topics=req.topic_focus,
+        difficulty=state.difficulty,
+        duration=30,
+        max_questions=req.max_questions,
+    )
+
+    # --------------------------------
+    # Firestore: save first question
+    # --------------------------------
+
+    question_id = str(uuid.uuid4())
+
+    state.current_question_id = question_id
+
+    save_question(
+        session_id=session_id,
+        question_id=question_id,
+        order=1,
+        question=question,
+        topic=topic,
+        difficulty=state.difficulty,
+    )
+
     SESSIONS[session_id] = state
 
     return StartSessionResponse(
@@ -138,46 +186,169 @@ async def start_session(req: StartSessionRequest):
         question_number=1,
     )
 
-
-@app.post("/interview/answer", response_model=SubmitAnswerResponse)
+@app.post(
+    "/interview/answer",
+    response_model=SubmitAnswerResponse
+)
 async def submit_answer(req: SubmitAnswerRequest):
-    state = SESSIONS.get(req.session_id)
-    if not state:
-        raise HTTPException(404, "Session not found — it may have ended or the server restarted")
 
-    state._last_touched = time.time()  # NEW
-    logger.info(f"[{req.session_id}] Answer received for topic={state.current_topic}")
+    state = SESSIONS.get(req.session_id)
+
+    if not state:
+        raise HTTPException(
+            404,
+            "Session not found — it may have ended or the server restarted"
+        )
+
+    state._last_touched = time.time()
+
+    logger.info(
+        f"[{req.session_id}] "
+        f"Answer received for topic={state.current_topic}"
+    )
 
     try:
+
         evaluation = evaluate_answer(
-            state.current_topic, state.current_question["description"],
-            req.answer, state.persona,
+            state.current_topic,
+            state.current_question["description"],
+            req.answer,
+            state.persona,
         )
+
     except ValueError as e:
-        logger.error(f"[{req.session_id}] Evaluator JSON parse failed: {e}")
-        raise HTTPException(502, f"Evaluation failed — model returned unparseable output: {e}")
+
+        logger.error(
+            f"[{req.session_id}] Evaluator JSON parse failed: {e}"
+        )
+
+        raise HTTPException(
+            502,
+            f"Evaluation failed — model returned "
+            f"unparseable output: {e}"
+        )
 
     except Exception as e:
-        logger.exception(f"[{req.session_id}] Unexpected error during evaluation")
-        raise HTTPException(500, f"Unexpected evaluation error: {type(e).__name__}: {e}")
 
-    apply_evaluation(state, evaluation, state.current_topic, req.answer)
-    logger.info(f"[{req.session_id}] Score={evaluation['score']} difficulty->{state.difficulty} "
-                f"locked_topic={state.locked_topic}")
+        logger.exception(
+            f"[{req.session_id}] Unexpected error during evaluation"
+        )
+
+        raise HTTPException(
+            500,
+            f"Unexpected evaluation error: "
+            f"{type(e).__name__}: {e}"
+        )
+
+    # --------------------------------
+    # Update in-memory adaptive state
+    # --------------------------------
+
+    apply_evaluation(
+        state,
+        evaluation,
+        state.current_topic,
+        req.answer,
+    )
+
+    # --------------------------------
+    # Save answer to Firestore
+    # --------------------------------
+
+    save_answer(
+        session_id=req.session_id,
+        question_id=state.current_question_id,
+        answer=req.answer,
+        score=evaluation.get("score", 0),
+        feedback=evaluation,
+    )
+
+    logger.info(
+        f"[{req.session_id}] "
+        f"Score={evaluation['score']} "
+        f"difficulty->{state.difficulty} "
+        f"locked_topic={state.locked_topic}"
+    )
+
+    # --------------------------------
+    # Interview finished
+    # --------------------------------
 
     if state.question_count >= state.max_questions:
+
         report = build_report(state)
+
+        # Calculate overall score
+        scores = [
+            e["score"]
+            for e in state.performance_history
+        ]
+
+        overall_score = (
+            round(sum(scores) / len(scores), 1)
+            if scores
+            else 0
+        )
+
+        # Save final result
+        complete_interview(
+            session_id=req.session_id,
+            score=overall_score,
+            feedback=report,
+        )
+
         del SESSIONS[req.session_id]
-        logger.info(f"[{req.session_id}] Session complete")
-        return SubmitAnswerResponse(done=True, evaluation=evaluation, report=report)
+
+        logger.info(
+            f"[{req.session_id}] Session complete"
+        )
+
+        return SubmitAnswerResponse(
+            done=True,
+            evaluation=evaluation,
+            report=report,
+        )
+
+    # --------------------------------
+    # Generate next question
+    # --------------------------------
 
     next_topic = pick_next_topic(state)
-    target_weak = pick_target_weak_area(state, next_topic)
-    next_question = await get_next_question(
-        next_topic, state.difficulty, state.persona, state.asked_questions, target_weak,
+
+    target_weak = pick_target_weak_area(
+        state,
+        next_topic,
     )
+
+    next_question = await get_next_question(
+        next_topic,
+        state.difficulty,
+        state.persona,
+        state.asked_questions,
+        target_weak,
+    )
+
     state.current_topic = next_topic
     state.current_question = next_question
+
+    # --------------------------------
+    # Create Firestore question
+    # --------------------------------
+
+    next_question_id = str(uuid.uuid4())
+
+    state.current_question_id = next_question_id
+
+    question_number = state.question_count + 1
+
+    save_question(
+        session_id=req.session_id,
+        question_id=next_question_id,
+        order=question_number,
+        question=next_question,
+        topic=next_topic,
+        difficulty=state.difficulty,
+    )
 
     return SubmitAnswerResponse(
         done=False,
@@ -186,7 +357,7 @@ async def submit_answer(req: SubmitAnswerRequest):
         difficulty=state.difficulty,
         topic_locked=state.locked_topic is not None,
         locked_topic=state.locked_topic,
-        question_number=state.question_count + 1,
+        question_number=question_number,
     )
 
 
@@ -226,10 +397,16 @@ def build_report(state: InterviewState) -> dict:
         by_topic.setdefault(entry["topic"], []).append(entry["score"])
     return {
         "avg_by_topic": {t: round(sum(s) / len(s), 1) for t, s in by_topic.items()},
-        "top_weak_areas": sorted(
-            [(k, v.severity) for k, v in state.weak_areas.items()],
-            key=lambda x: -x[1],
-        )[:5],
+        "top_weak_areas": [
+            {
+                "area": k,
+                "severity": float(v.severity),
+            }
+            for k, v in sorted(
+                state.weak_areas.items(),
+                key=lambda item: -item[1].severity,
+            )[:5]
+        ],
         "score_progression": [e["score"] for e in state.performance_history],
         "performance_history": state.performance_history,
     }

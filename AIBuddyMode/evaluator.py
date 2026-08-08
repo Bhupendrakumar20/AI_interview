@@ -2,10 +2,10 @@
 import json
 import re
 import logging
-from llm_fallback import generate_with_fallback
-from questionGeneration import RUBRICS
-from taxonomy import SUBTOPIC_TAGS, WEAK_THRESHOLD
-from scoring import normalize_tag
+from AIBuddyMode.llm_fallback import generate_with_fallback
+from AIBuddyMode.questionGeneration import RUBRICS
+from AIBuddyMode.taxonomy import SUBTOPIC_TAGS, WEAK_THRESHOLD
+from AIBuddyMode.scoring import normalize_tag
 
 logger = logging.getLogger("adaptive_interview")
 

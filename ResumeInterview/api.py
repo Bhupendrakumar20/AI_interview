@@ -171,7 +171,7 @@ class GenerateQuestionsRequest(BaseModel):
     parsedResume: Dict[str, Any]
     focusArea: str = "Projects"
     persona: str = "hiring-manager"
-    numQuestions: int = 5
+    numQuestions: int = 1
 
 
 class OptimizeResumeRequest(BaseModel):

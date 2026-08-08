@@ -12,7 +12,7 @@ export async function POST(request) {
     const forwardData = new FormData();
     forwardData.append("resume", file);
 
-    const pythonUrl = process.env.NEXT_PUBLIC_ADAPTIVE_API_URL || "http://localhost:8080";
+    const pythonUrl = process.env.NEXT_PUBLIC_ADAPTIVE_API_URL || "http://127.0.0.1:8080";
     const response = await fetch(`${pythonUrl}/parse`, {
       method: "POST",
       body: forwardData,

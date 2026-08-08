@@ -33,7 +33,7 @@ export async function POST(request) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, source: "ollama" });
   } catch (error) {
     clearTimeout(timeoutId);
     console.warn("Python generate-questions failed or timed out. Falling back to Gemini Cloud API...", error.message);
@@ -69,6 +69,7 @@ Format the response exactly as a JSON array of objects:
       return NextResponse.json({
         success: true,
         verificationQuestions,
+        source: "gemini"
       });
     } catch (fallbackError) {
       console.error("Gemini fallback also failed:", fallbackError.message);
@@ -79,8 +80,29 @@ Format the response exactly as a JSON array of objects:
             question: "Can you walk me through the architecture and main challenges of your most recent project?",
             claim: "General experience",
             expectedKeywords: ["architecture", "challenges"]
+          },
+          {
+            question: "How did you handle state management, optimization, or performance bottlenecks in your codebase?",
+            claim: "Technical optimization",
+            expectedKeywords: ["state", "performance", "optimization", "bottleneck"]
+          },
+          {
+            question: "Could you describe your testing strategy and how you ensured code quality throughout development?",
+            claim: "Quality assurance",
+            expectedKeywords: ["testing", "unit", "quality", "coverage"]
+          },
+          {
+            question: "What databases or APIs did you integrate with, and how did you design the data flow?",
+            claim: "Data integration",
+            expectedKeywords: ["database", "api", "integration", "flow", "sql", "nosql"]
+          },
+          {
+            question: "Can you explain how you handled security, authentication, or user authorization in your app?",
+            claim: "Security and Auth",
+            expectedKeywords: ["security", "auth", "jwt", "login", "encryption"]
           }
-        ]
+        ],
+        source: "static"
       });
     }
   }

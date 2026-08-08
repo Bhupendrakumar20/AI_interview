@@ -157,13 +157,24 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
         };
 
         rec.onerror = (e) => {
-          console.error("Speech recognition error:", e);
+          console.error("Speech recognition error:", e.error, e.message);
+          if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+            setIsRecording(false);
+            toast.error("Microphone permission denied or not available. Please allow access in browser settings.");
+          } else if (e.error === "network") {
+            setIsRecording(false);
+            toast.error("Network error during speech recognition. Please check your connection.");
+          }
         };
 
         rec.onend = () => {
+          // Only attempt restart if it was not stopped due to a fatal error
           if (isRecording) {
-            // Keep active if it stopped unexpectedly
-            try { rec.start(); } catch (err) {}
+            try {
+              rec.start();
+            } catch (err) {
+              console.error("Failed to restart speech recognition:", err);
+            }
           }
         };
 

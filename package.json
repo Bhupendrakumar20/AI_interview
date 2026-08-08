@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack -p 4001",
+    "dev": "next dev --turbo -p 4001",
     "dev:all": "concurrently \"npm run dev\" \"npm run piston:start\" \"npm run socket:start\" \"npm run python:start\"",
     "socket:start": "node server/buddy-socket-server.js",
     "seed-db": "node scripts/seedDatabase.js",

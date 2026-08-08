@@ -127,7 +127,6 @@ const InternshipCard = ({ internship }) => {
               )}>
                 {applicationStatus.text}
               </span>
-              <span>• {internship.applicants || 0} applicants</span>
             </div>
           </div>
 

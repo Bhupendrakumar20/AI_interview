@@ -4,8 +4,15 @@ import re
 import httpx
 import requests
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "gemma3:4b"  # or "gemma3:7b" if you have the larger model available
+import os
+
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+if "localhost" in OLLAMA_URL:
+    OLLAMA_URL = OLLAMA_URL.replace("localhost", "127.0.0.1")
+if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
+    OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+
+MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
 
 RUBRICS = {
     "dsa": "correctness, time complexity, space complexity, edge case handling",

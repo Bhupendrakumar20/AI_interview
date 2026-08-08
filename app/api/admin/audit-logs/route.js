@@ -59,7 +59,7 @@ export async function GET(request) {
     const limit = Math.min(parseInt(url.searchParams.get("limit")) || 50, 500);
     const offset = parseInt(url.searchParams.get("offset")) || 0;
 
-    let query = db.collection("audit_logs");
+    let query = db.collection("system").doc("audit_logs").collection("logs");
 
     // ✅ Build query based on parameters
     if (view === "critical") {
@@ -102,9 +102,10 @@ export async function GET(request) {
     // Order and paginate
     query = query.orderBy("timestamp", "desc").limit(limit + 1).offset(offset);
 
-    // Get total count
     const countSnapshot = await db
-      .collection("audit_logs")
+      .collection("system")
+      .doc("audit_logs")
+      .collection("logs")
       .where(
         ...(userId ? ["userId", "==", userId] : []),
         ...(eventType ? ["eventType", "==", eventType] : []),
@@ -133,7 +134,7 @@ export async function GET(request) {
     }
 
     // Get summary statistics
-    const summarySnapshot = await db.collection("audit_logs").get();
+    const summarySnapshot = await db.collection("system").doc("audit_logs").collection("logs").get();
 
     const summary = {
       total: summarySnapshot.size,

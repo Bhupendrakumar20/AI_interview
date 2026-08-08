@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@/lib/ai-provider";
+import { getCurrentUser } from "@/lib/actions/auth.action";
+import { db } from "@/firebase/admin";
 
 export async function POST(request) {
   const body = await request.json();
@@ -14,6 +16,8 @@ export async function POST(request) {
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  let resultPayload = null;
 
   try {
     const pythonUrl = process.env.NEXT_PUBLIC_ADAPTIVE_API_URL || "http://127.0.0.1:8080";
@@ -30,8 +34,7 @@ export async function POST(request) {
       throw new Error(`FastAPI server error: ${response.status}`);
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    resultPayload = await response.json();
   } catch (error) {
     clearTimeout(timeoutId);
     console.warn("Python ats-score failed or timed out. Falling back to Gemini Cloud API...", error.message);
@@ -73,14 +76,14 @@ Provide scores (out of 100) and details in the following JSON format:
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       const atsResult = JSON.parse(jsonMatch ? jsonMatch[0] : text);
 
-      return NextResponse.json({
+      resultPayload = {
         success: true,
         atsResult,
         trustScore: atsResult.final_score,
-      });
+      };
     } catch (fallbackError) {
       console.error("Gemini fallback failed:", fallbackError.message);
-      return NextResponse.json({
+      resultPayload = {
         success: true,
         atsResult: {
           final_score: 75,
@@ -99,7 +102,25 @@ Provide scores (out of 100) and details in the following JSON format:
           formatting_details: []
         },
         trustScore: 75
-      });
+      };
     }
   }
+
+  // Save to Firestore if user is authenticated
+  try {
+    const currentUser = await getCurrentUser();
+    if (currentUser && resultPayload) {
+      await db.collection("users").doc(currentUser.uid).collection("resumes").add({
+        parsedResume,
+        jobDescription,
+        atsResult: resultPayload.atsResult,
+        createdAt: new Date(),
+      });
+      console.log(`📝 Saved uploaded resume and ATS details for user: ${currentUser.uid}`);
+    }
+  } catch (dbErr) {
+    console.error("Failed to save resume details to Firestore:", dbErr.message);
+  }
+
+  return NextResponse.json(resultPayload);
 }

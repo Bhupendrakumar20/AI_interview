@@ -4,16 +4,15 @@ import { z } from "zod";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
-import { auth } from "@/firebase/client";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { sendPasswordResetEmail } from "firebase/auth";
 
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import FormField from "./FormField";
+import { sendPasswordResetEmailCustom } from "@/lib/actions/auth.action";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -36,14 +35,18 @@ const ForgotPasswordForm = () => {
     try {
       setIsLoading(true);
 
-      // Send password reset email using Firebase
-      await sendPasswordResetEmail(auth, data.email);
+      const result = await sendPasswordResetEmailCustom(data.email);
+
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
 
       setSentEmail(data.email);
       setEmailSent(true);
       
       toast.success(
-        `✅ Password reset link sent to ${data.email}. Check your inbox!`
+        `Password reset link sent to ${data.email}. Check your inbox!`
       );
 
       // Redirect to sign-in after 5 seconds
@@ -52,17 +55,7 @@ const ForgotPasswordForm = () => {
       }, 5000);
     } catch (error) {
       console.error("Password reset error:", error);
-
-      // Handle different Firebase error codes
-      if (error.code === "auth/user-not-found") {
-        toast.error("❌ No account found with this email address");
-      } else if (error.code === "auth/invalid-email") {
-        toast.error("❌ Invalid email address");
-      } else if (error.code === "auth/too-many-requests") {
-        toast.error("❌ Too many reset requests. Please try again later");
-      } else {
-        toast.error(`❌ Error: ${error.message}`);
-      }
+      toast.error(`Error: ${error.message || error}`);
     } finally {
       setIsLoading(false);
     }
@@ -70,8 +63,8 @@ const ForgotPasswordForm = () => {
 
   if (emailSent) {
     return (
-      <div className="card-border lg:min-w-[566px]">
-        <div className="flex flex-col gap-6 card py-14 px-10">
+      <div className="card-border w-full">
+        <div className="flex flex-col gap-6 card py-10 px-6 sm:px-10">
           <div className="flex flex-col gap-3 justify-center items-center">
             <Image
               src="/logo_icon.png"
@@ -89,7 +82,7 @@ const ForgotPasswordForm = () => {
           <div className="text-center space-y-4">
             <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
               <h3 className="text-lg font-semibold text-green-400 mb-2">
-                ✅ Reset Link Sent!
+                Reset Link Sent!
               </h3>
               <p className="text-sm text-light-200 mb-3">
                 We've sent a password reset link to:
@@ -119,8 +112,8 @@ const ForgotPasswordForm = () => {
   }
 
   return (
-    <div className="card-border lg:min-w-[566px]">
-      <div className="flex flex-col gap-6 card py-14 px-10">
+    <div className="card-border w-full">
+      <div className="flex flex-col gap-6 card py-10 px-6 sm:px-10">
         <div className="flex flex-col gap-3 justify-center items-center">
           <Image
             src="/logo_icon.png"

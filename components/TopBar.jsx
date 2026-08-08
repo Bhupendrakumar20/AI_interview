@@ -5,12 +5,10 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Bell, User, LogOut, Settings } from "lucide-react";
-import { logout } from "@/lib/actions/auth.action";
-import { db } from "@/firebase/client";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { logout, getPendingApprovalsCount } from "@/lib/actions/auth.action";
 import ThemeToggle from "@/components/ThemeToggle";
 
-export default function TopBar({ user }) {
+export default function TopBar({ user, onToggleMobileSidebar }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -23,31 +21,13 @@ export default function TopBar({ user }) {
    */
   const fetchPendingApprovalsFromFirestore = async () => {
     if (!user?.uid) {
-      console.log('[TopBar] No user UID available');
+      // console.log('[TopBar] No user UID available');
       return;
     }
 
     try {
-      console.log(`[TopBar] Fetching pending approvals for user: ${user.uid}`);
-      
-      // Query all DSA rooms where user is the owner
-      const roomsRef = collection(db, 'dsa_rooms');
-      const q = query(roomsRef, where('owner', '==', user.uid));
-      const roomsSnapshot = await getDocs(q);
-
-      console.log(`[TopBar] Found ${roomsSnapshot.docs.length} rooms owned by user`);
-
-      let totalPendingCount = 0;
-
-      // Check each room for pending requests
-      for (const roomDoc of roomsSnapshot.docs) {
-        const roomData = roomDoc.data();
-        const pendingRequests = roomData.pendingRequests || [];
-        console.log(`[TopBar] Room ${roomDoc.id}: ${pendingRequests.length} pending requests`);
-        totalPendingCount += pendingRequests.length;
-      }
-
-      console.log(`[TopBar] Total pending count: ${totalPendingCount}`);
+      // console.log(`[TopBar] Fetching pending approvals for user: ${user.uid}`);
+      const totalPendingCount = await getPendingApprovalsCount(user.uid);
 
       if (totalPendingCount > 0) {
         setPendingApprovalsCount(totalPendingCount);
@@ -57,7 +37,7 @@ export default function TopBar({ user }) {
         localStorage.removeItem('dsaPendingCount');
       }
 
-      console.log(`✅ [TopBar] Updated pending approvals count: ${totalPendingCount}`);
+      // console.log(`✅ [TopBar] Updated pending approvals count: ${totalPendingCount}`);
     } catch (error) {
       console.error('[TopBar] Error fetching pending approvals:', error);
       // Fall back to localStorage if Firestore fails
@@ -107,7 +87,7 @@ export default function TopBar({ user }) {
       await logout();
       toast.success("Logged out successfully");
       setTimeout(() => {
-        router.push("/sign-in");
+        window.location.href = "/";
       }, 500);
     } catch (error) {
       toast.error("Failed to logout");
@@ -121,9 +101,20 @@ export default function TopBar({ user }) {
 
   return (
     <nav className="sticky top-0 z-50 bg-card border-b border-border backdrop-blur-md">
-      <div className="flex items-center justify-between px-6 py-3 h-16">
-        {/* Left Section */}
-        <div className="flex-1" />
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 h-16">
+        {/* Left Section - Hamburger Menu Button on Mobile */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleMobileSidebar}
+            type="button"
+            className="md:hidden p-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 hover:text-primary transition-all cursor-pointer"
+            aria-label="Toggle Sidebar"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
 
         {/* Right Section - Actions */}
         <div className="flex items-center gap-4">

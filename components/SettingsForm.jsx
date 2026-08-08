@@ -62,7 +62,7 @@ export default function SettingsForm({ user }) {
         return;
       }
 
-      toast.success("✅ Settings saved successfully!");
+      toast.success("Settings saved successfully!");
     } catch (error) {
       toast.error("❌ Something went wrong while saving!");
     } finally {
@@ -101,7 +101,7 @@ export default function SettingsForm({ user }) {
         return;
       }
 
-      toast.success("✅ Password changed successfully!");
+      toast.success("Password changed successfully!");
       setShowPasswordForm(false);
       setCurrentPassword("");
       setNewPassword("");
@@ -144,7 +144,7 @@ export default function SettingsForm({ user }) {
         return;
       }
 
-      toast.success("✅ Verification link sent to your new email!");
+      toast.success("Verification link sent to your new email!");
       toast.message("📧 Please check " + newEmail + " and click the verification link");
       setShowEmailForm(false);
       setNewEmail("");
@@ -184,7 +184,7 @@ export default function SettingsForm({ user }) {
 
       await logout();
 
-      toast.success("✅ Logged out successfully!");
+      toast.success("Logged out successfully!");
       
       // Redirect to sign-in page
       setTimeout(() => {
@@ -212,7 +212,7 @@ export default function SettingsForm({ user }) {
         return;
       }
 
-      toast.success("✅ Interview history cleared!");
+      toast.success("Interview history cleared!");
     } catch (error) {
       toast.error("❌ Something went wrong while clearing history!");
     } finally {
@@ -240,7 +240,7 @@ export default function SettingsForm({ user }) {
         return;
       }
 
-      toast.success("✅ Account deleted successfully!");
+      toast.success("Account deleted successfully!");
       
       // Redirect after deletion
       setTimeout(() => {

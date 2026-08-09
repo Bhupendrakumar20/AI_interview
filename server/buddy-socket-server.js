@@ -307,6 +307,12 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Listen for admin content updates and broadcast to all clients
+  socket.on("admin-content-update", ({ contentType }) => {
+    console.log(`📢 Admin content update broadcasted for: ${contentType}`);
+    io.emit("content-updated", { contentType });
+  });
+
   // Handle manual disconnect or connection loss
   socket.on("disconnect", () => {
     if (currentRoom && rooms[currentRoom]) {

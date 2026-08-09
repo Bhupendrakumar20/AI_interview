@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 import JobCard from "@/components/JobCard";
 import { fetchJobs } from "@/lib/actions/jobs.action";
 
@@ -40,6 +41,27 @@ export default function JobsPage() {
     }
 
     loadJobs();
+
+    // Socket Real-time Sync
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const socketUrl = isLocal ? 'http://localhost:4002' : (process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002');
+    
+    console.log(`🔌 Jobs page connecting to socket server: ${socketUrl}`);
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+
+    socket.on("content-updated", ({ contentType }) => {
+      if (contentType === "jobs") {
+        console.log("🔄 Real-time jobs update triggered!");
+        loadJobs();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   return (

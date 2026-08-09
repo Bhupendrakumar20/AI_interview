@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import { BookOpen, ChevronDown, ExternalLink, Check, Award, X, Loader2, Sparkles, BrainCircuit, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -49,8 +50,27 @@ export default function CoursesPage() {
     }
 
     loadData();
+
+    // Socket Real-time Sync
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const socketUrl = isLocal ? 'http://localhost:4002' : (process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002');
+    
+    console.log(`🔌 Courses page connecting to socket server: ${socketUrl}`);
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+
+    socket.on("content-updated", ({ contentType }) => {
+      if (contentType === "courses") {
+        console.log("🔄 Real-time courses update triggered!");
+        loadData();
+      }
+    });
+
     return () => {
       isMounted = false;
+      socket.disconnect();
     };
   }, []);
 

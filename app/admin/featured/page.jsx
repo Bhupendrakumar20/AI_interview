@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { io } from "socket.io-client";
 import { getFeaturedItems, addFeaturedItem, deleteFeaturedItem } from "@/lib/actions/featured.action";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,28 @@ export default function ManageFeatured() {
   const [statsInput, setStatsInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const socketUrl = isLocal ? 'http://localhost:4002' : (process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002');
+    
+    console.log(`🔌 Admin featured page connecting to socket server: ${socketUrl}`);
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('✅ Admin featured connected to socket server');
+    });
+    
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     loadItems();
   }, []);
@@ -42,6 +65,12 @@ export default function ManageFeatured() {
     const res = await deleteFeaturedItem(id);
     if (res.success) {
       toast.success("Featured card deleted successfully");
+      
+      // Emit socket update event
+      if (socketRef.current) {
+        socketRef.current.emit("admin-content-update", { contentType: "featured" });
+      }
+
       loadItems();
     } else {
       toast.error(res.error || "Failed to delete card");
@@ -78,6 +107,12 @@ export default function ManageFeatured() {
 
     if (res.success) {
       toast.success("New featured card added successfully!");
+      
+      // Emit socket update event
+      if (socketRef.current) {
+        socketRef.current.emit("admin-content-update", { contentType: "featured" });
+      }
+
       // Reset form
       setTitle("");
       setCompany("");

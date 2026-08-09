@@ -1,11 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { io } from "socket.io-client";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 
 export default function ResponsiveLayoutWrapper({ user, children }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const socketUrl = isLocal ? 'http://localhost:4002' : (process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002');
+    
+    console.log(`🔌 Global layout connecting to socket server: ${socketUrl}`);
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+
+    socket.on("content-updated", ({ contentType }) => {
+      if (contentType === "featured") {
+        console.log("🔄 Featured items updated, refreshing page...");
+        router.refresh();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [router]);
 
   return (
     <div className="flex min-h-screen w-full relative">

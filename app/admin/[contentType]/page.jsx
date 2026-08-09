@@ -1,8 +1,9 @@
 // app/admin/[contentType]/page.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { io } from "socket.io-client";
 import { getDynamicContent, saveDynamicContent, deleteContent } from "@/lib/actions/admin.action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,28 @@ export default function DynamicAdminContentPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [formData, setFormData] = useState({});
+
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const socketUrl = isLocal ? 'http://localhost:4002' : (process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002');
+    
+    console.log(`🔌 Admin connecting to socket server: ${socketUrl}`);
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('✅ Admin connected to socket server');
+    });
+    
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   // Dynamic configurations based on the requested page content type
   const config = {
@@ -222,6 +245,12 @@ export default function DynamicAdminContentPage() {
       const result = await saveDynamicContent(contentType, selectedItem?.id, formData);
       if (result.success) {
         toast.success(`Record ${selectedItem ? "updated" : "created"} successfully`);
+        
+        // Emit update event via socket
+        if (socketRef.current) {
+          socketRef.current.emit("admin-content-update", { contentType });
+        }
+
         setShowCreateDialog(false);
         setSelectedItem(null);
         setFormData({});
@@ -240,6 +269,12 @@ export default function DynamicAdminContentPage() {
       const result = await deleteContent(contentType, selectedItem.id);
       if (result.success) {
         toast.success("Record deleted successfully");
+
+        // Emit update event via socket
+        if (socketRef.current) {
+          socketRef.current.emit("admin-content-update", { contentType });
+        }
+
         setShowDeleteDialog(false);
         setSelectedItem(null);
         loadData();

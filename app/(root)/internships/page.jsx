@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { io } from "socket.io-client";
 import InternshipCard from "@/components/InternshipCard";
 import FilterBar from "@/components/FilterBar";
 import ApplicationModal from "@/components/ApplicationModal";
@@ -166,6 +167,30 @@ export default function InternshipsPage() {
   // Load data when filters change
   useEffect(() => {
     loadInternships();
+  }, [loadInternships]);
+
+  // Socket Real-time Sync
+  useEffect(() => {
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const socketUrl = isLocal ? 'http://localhost:4002' : (process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002');
+    
+    console.log(`🔌 Internships page connecting to socket server: ${socketUrl}`);
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+
+    socket.on("content-updated", ({ contentType }) => {
+      if (contentType === "internships") {
+        console.log("🔄 Real-time internships update triggered!");
+        loadInternships();
+        getInternshipCounts().then(setCounts).catch(console.error);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [loadInternships]);
 
   // Update URL with filters

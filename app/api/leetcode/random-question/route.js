@@ -1,5 +1,18 @@
 import { db } from "@/firebase/admin";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -21,7 +34,7 @@ export async function GET(request) {
     if (questionsSnapshot.empty) {
       return Response.json(
         { success: false, error: `No questions found in database for difficulty: ${difficulty}` },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
 
@@ -30,13 +43,33 @@ export async function GET(request) {
       docs.push({ id: doc.id, ...doc.data() });
     });
 
-    // Shuffle the matching list and take 'count' elements
-    for (let i = docs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [docs[i], docs[j]] = [docs[j], docs[i]];
+    // Only keep questions that have configured test cases in dsa_test_cases
+    const validDocs = [];
+    await Promise.all(docs.map(async (doc) => {
+      const tcSnapshot = await db
+        .collection("dsa_test_cases")
+        .where("questionId", "==", doc.id)
+        .limit(1)
+        .get();
+      if (!tcSnapshot.empty) {
+        validDocs.push(doc);
+      }
+    }));
+
+    if (validDocs.length === 0) {
+      return Response.json(
+        { success: false, error: `No questions with test cases found for difficulty: ${difficulty}` },
+        { status: 404, headers: CORS_HEADERS }
+      );
     }
 
-    const selectedDocs = docs.slice(0, Math.min(count, docs.length));
+    // Shuffle the matching list and take 'count' elements
+    for (let i = validDocs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [validDocs[i], validDocs[j]] = [validDocs[j], validDocs[i]];
+    }
+
+    const selectedDocs = validDocs.slice(0, Math.min(count, validDocs.length));
 
     // Fetch associated test cases for each selected question
     const formattedQuestions = await Promise.all(selectedDocs.map(async (selectedQuestion) => {
@@ -84,18 +117,18 @@ export async function GET(request) {
         success: true,
         question: formattedQuestions[0],
         questions: formattedQuestions
-      });
+      }, { headers: CORS_HEADERS });
     }
 
     return Response.json({
       success: true,
       questions: formattedQuestions
-    });
+    }, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("[Random Question API Error]:", error);
     return Response.json(
       { success: false, error: "Failed to fetch random questions", message: error.message },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }

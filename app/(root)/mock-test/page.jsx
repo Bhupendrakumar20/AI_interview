@@ -206,7 +206,16 @@ export default function MockTestPage() {
             {TEST_TYPES.map((type) => (
               <div
                 key={type.id}
-                onClick={() => setSelectedTestType(type)}
+                onClick={() => {
+                  setSelectedTestType(type);
+                  const typeMapping = {
+                    "technical": "Technical",
+                    "behavioral": "Behavioral",
+                    "system-design": "System Design",
+                    "coding": "Coding"
+                  };
+                  handleFilterChange("type", typeMapping[type.id] || "Technical");
+                }}
                 className={`group cursor-pointer rounded-xl border-2 transition-all p-5 relative overflow-hidden ${
                   selectedTestType.id === type.id
                     ? "border-primary bg-secondary/50 shadow-md"

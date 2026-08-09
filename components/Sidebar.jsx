@@ -30,7 +30,7 @@ const Icon = ({ name, className = "w-5 h-5" }) => {
   return icons[name] || icons.default;
 };
 
-const Sidebar = ({ user }) => {
+const Sidebar = ({ user, onCloseMobile }) => {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -73,7 +73,7 @@ const Sidebar = ({ user }) => {
     )}>
       <div className="flex flex-col h-full">
         {/* Logo */}
-        <div className="p-4 border-b border-border bg-background/50">
+        <div className="p-4 border-b border-border bg-background/50 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
             <Image src="/logo_icon.png" alt="logo" width={32} height={32} className="object-contain" />
             {!collapsed && (
@@ -83,6 +83,18 @@ const Sidebar = ({ user }) => {
               </div>
             )}
           </Link>
+          {onCloseMobile && (
+            <button
+              onClick={onCloseMobile}
+              type="button"
+              className="md:hidden p-1.5 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 hover:text-primary transition-all cursor-pointer"
+              aria-label="Close Sidebar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* User Profile */}
@@ -111,6 +123,7 @@ const Sidebar = ({ user }) => {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onCloseMobile}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg relative transition-all group overflow-hidden",
                     "transition-[transform,background-color] duration-200 ease-out",
@@ -152,6 +165,7 @@ const Sidebar = ({ user }) => {
                     <Link
                       key={item.href}
                       href={item.href}
+                      onClick={onCloseMobile}
                       className={cn(
                         "flex items-center gap-2 px-4 py-2 text-sm rounded-lg relative transition-all duration-200 group",
                         isActive

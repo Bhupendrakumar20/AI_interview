@@ -87,7 +87,7 @@ async function createAdminUser() {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
-    await db.collection('user_settings').doc(adminUser.uid).set(adminSettings, { merge: true });
+    await db.collection('users').doc(adminUser.uid).collection('settings').doc('general').set(adminSettings, { merge: true });
     console.log('✅ Created admin settings');
 
     // Create admin activity log
@@ -101,7 +101,7 @@ async function createAdminUser() {
       userAgent: 'Seed Script'
     };
 
-    await db.collection('admin_logs').doc(adminLog.id).set(adminLog);
+    await db.collection('system').doc('admin_logs').collection('logs').doc(adminLog.id).set(adminLog);
     console.log('✅ Created admin activity log');
 
     console.log('\n🎉 ADMIN USER CREATED SUCCESSFULLY!');

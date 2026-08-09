@@ -185,7 +185,8 @@ export default function BuddyInvitePage() {
       iceServersRef.current = iceData.iceServers;
 
       // 2. Connect to the mesh signaling server
-      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || "http://localhost:4002";
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const socketUrl = isLocal ? 'http://localhost:4002' : (process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002');
       console.log(`🔌 Connecting to signaling server at: ${socketUrl}`);
       const socket = io(socketUrl, {
         transports: ["websocket", "polling"],

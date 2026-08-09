@@ -50,6 +50,7 @@ export default function DSALiveRoomPage() {
   const isHostParam = searchParams.get('host') === 'true';
 
   const [socket, setSocket] = useState(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [roomState, setRoomState] = useState({
     status: 'lobby',
     participants: [],
@@ -132,7 +133,8 @@ export default function DSALiveRoomPage() {
 
   // Connect to Sockets
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002';
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const socketUrl = isLocal ? 'http://localhost:4002' : (process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:4002');
     console.log(`🔌 Connecting to DSA Room socket server: ${socketUrl}`);
     
     const socketIo = io(socketUrl, {
@@ -261,6 +263,13 @@ export default function DSALiveRoomPage() {
 
     toast.info("Running your solution against test cases...");
 
+    console.log(`🚀 [DSA Room] Executing code submission:`, {
+      language,
+      questionId: activeQuestion?.titleSlug || activeQuestion?.id,
+      codeLength: activeCode.length,
+      userId: auth.currentUser?.uid || currentParticipant?.userId || 'usr_guest',
+    });
+
     try {
       const res = await fetch('/api/code-executor/execute', {
         method: 'POST',
@@ -284,6 +293,14 @@ export default function DSALiveRoomPage() {
       const allPassed = data.allPassed || false;
       const passedCount = data.passed || 0;
       const totalCases = data.totalTests || 0;
+
+      console.log(`✅ [DSA Room] Execution completed successfully:`, {
+        allPassed,
+        passedCases: passedCount,
+        totalCases: totalCases,
+        executionMode: data.mode,
+        runtimes: data.results?.map(r => `${r.passed ? 'PASS' : 'FAIL'} (${r.executionTime}ms)`).join(', '),
+      });
 
       setSubmitStatus(allPassed ? 'passed' : 'failed');
       setTestResults({
@@ -310,6 +327,7 @@ export default function DSALiveRoomPage() {
       });
 
     } catch (err) {
+      console.error(`❌ [DSA Room] Code execution failed:`, err);
       toast.error(err.message || "Error running solution.");
     } finally {
       setSubmitting(false);
@@ -317,7 +335,7 @@ export default function DSALiveRoomPage() {
   };
 
   const handleLeaveRoom = () => {
-    router.push('/dsa-room');
+    setShowLeaveConfirm(true);
   };
 
   const currentParticipant = roomState.participants.find(p => p.socketId === socket?.id);
@@ -685,6 +703,43 @@ export default function DSALiveRoomPage() {
         </div>
 
       </div>
+
+      {/* Leave Room Confirmation Modal */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl animate-scaleUp">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-full">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Leave DSA Room?</h3>
+                <p className="text-slate-400 text-sm mt-1.5 leading-relaxed">
+                  Are you sure you want to exit the room? Your current code progress in this session will be lost.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-lg transition text-sm cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLeaveConfirm(false);
+                  router.push('/dsa-room');
+                }}
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white font-semibold rounded-lg transition text-sm shadow-lg shadow-red-500/20 cursor-pointer"
+              >
+                Leave Room
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="max-w-7xl mx-auto w-full text-center text-xs text-slate-700 py-4 border-t border-slate-900">

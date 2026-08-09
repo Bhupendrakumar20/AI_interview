@@ -96,7 +96,7 @@ export default function HomeClient({ latestInterviews = [], userInterviews = [],
     { code: "def twoSum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):", output: "Evaluating indices..." },
     { code: "def twoSum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):\n        diff = target - num", output: "Checking lookup table..." },
     { code: "def twoSum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):\n        diff = target - num\n        if diff in seen:\n            return [seen[diff], i]", output: "All checks completed..." },
-    { code: "def twoSum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):\n        diff = target - num\n        if diff in seen:\n            return [seen[diff], i]\n        seen[num] = i", output: "✅ Success: All Test Cases Passed (0ms)" }
+    { code: "def twoSum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):\n        diff = target - num\n        if diff in seen:\n            return [seen[diff], i]\n        seen[num] = i", output: "Success: All Test Cases Passed (0ms)" }
   ];
 
   // Simulator chat steps
@@ -238,7 +238,7 @@ export default function HomeClient({ latestInterviews = [], userInterviews = [],
               </pre>
               <div className="border-t border-slate-900 pt-3 flex items-center justify-between text-slate-400">
                 <span>Output:</span>
-                <span className={codeSteps[typingStep].output.includes("✅") ? "text-emerald-400 font-bold" : "text-amber-400 font-medium"}>
+                <span className={codeSteps[typingStep].output.includes("Success") ? "text-emerald-400 font-bold" : "text-amber-400 font-medium"}>
                   {codeSteps[typingStep].output}
                 </span>
               </div>

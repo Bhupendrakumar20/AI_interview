@@ -1,7 +1,7 @@
 // app/api/auth/admin-verify/route.js
-import { auth } from '@/firebase/admin';
+import { verifyToken } from '@/lib/security/auth-utils';
 
-// ✅ Explicitly use Node.js runtime (required for Firebase Admin SDK)
+// ✅ Explicitly use Node.js runtime
 export const runtime = 'nodejs';
 
 export async function POST(request) {
@@ -16,10 +16,17 @@ export async function POST(request) {
     }
 
     // Verify token
-    const decodedToken = await auth.verifyIdToken(idToken);
+    const decodedToken = verifyToken(idToken);
+
+    if (!decodedToken) {
+      return new Response(JSON.stringify({ error: 'Invalid or expired token', isAdmin: false }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // Check if user has admin claims
-    const isAdmin = decodedToken.admin === true || decodedToken.super_admin === true;
+    const isAdmin = decodedToken.admin === true || decodedToken.role === 'admin' || decodedToken.role === 'super_admin';
 
     return new Response(
       JSON.stringify({

@@ -80,7 +80,7 @@ export default function UpdateProfileForm({ user }) {
         return;
       }
 
-      toast.success("✅ Profile updated successfully!");
+      toast.success("Profile updated successfully!");
     } catch (error) {
       toast.error("❌ Server error. Please try again.");
     } finally {
@@ -96,7 +96,7 @@ export default function UpdateProfileForm({ user }) {
     setGithub(user?.github ?? "");
     setLinkedin(user?.linkedin ?? "");
     setPortfolio(user?.portfolio ?? "");
-    toast.success("✅ Reset to saved profile!");
+    toast.success("Reset to saved profile!");
   };
 
   // ✅ Logout
@@ -108,7 +108,7 @@ export default function UpdateProfileForm({ user }) {
 
     try {
       await signOut(); // ✅ clears session cookie
-      toast.success("✅ Logged out successfully!");
+      toast.success("Logged out successfully!");
       window.location.href = "/sign-in";
     } catch (err) {
       toast.error("❌ Logout failed!");
@@ -126,7 +126,7 @@ export default function UpdateProfileForm({ user }) {
       if (typeof navigator !== "undefined" && navigator.clipboard) {
         try {
           await navigator.clipboard.writeText(userIdText);
-          toast.success("✅ User ID copied!");
+          toast.success("User ID copied!");
           return;
         } catch (clipboardError) {
           console.error("Clipboard API failed:", clipboardError);
@@ -146,7 +146,7 @@ export default function UpdateProfileForm({ user }) {
       document.body.removeChild(textarea);
       
       if (successful) {
-        toast.success("✅ User ID copied!");
+        toast.success("User ID copied!");
       } else {
         toast.error("❌ Failed to copy user ID");
       }
@@ -188,7 +188,7 @@ export default function UpdateProfileForm({ user }) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => toast.info("✅ You are logged in!")}
+            onClick={() => toast.info("You are logged in!")}
           >
             Check Profile
           </Button>

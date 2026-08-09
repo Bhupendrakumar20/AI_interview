@@ -37,7 +37,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
                     "top_p": top_p
                 }
             },
-            timeout=15 # reasonably short timeout for local ollama
+            timeout=180 # reasonably short timeout for local ollama
         )
         response.raise_for_status()
         result = response.json().get("response")

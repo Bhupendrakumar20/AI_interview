@@ -9,6 +9,8 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+import { Suspense } from "react";
+
 const VerifyEmailPage = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -214,4 +216,10 @@ const VerifyEmailPage = () => {
   );
 };
 
-export default VerifyEmailPage;
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="text-foreground p-8 text-center">Loading verification context...</div>}>
+      <VerifyEmailPage />
+    </Suspense>
+  );
+}

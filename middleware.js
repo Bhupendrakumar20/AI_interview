@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { adminMiddleware } from './middleware/admin';
 
-export async function proxy(request) {
+export async function middleware(request) {
   const path = request.nextUrl.pathname;
   
   // Protect admin routes

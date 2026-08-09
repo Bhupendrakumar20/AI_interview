@@ -55,7 +55,7 @@ export async function GET(request) {
     const offset = parseInt(url.searchParams.get("offset")) || 0;
 
     // Build query
-    let query = db.collection("proctoring_reviews").orderBy("createdAt", "desc");
+    let query = db.collection("system").doc("proctoring_reviews").collection("reviews").orderBy("createdAt", "desc");
 
     if (status) {
       query = query.where("status", "==", status);
@@ -88,7 +88,7 @@ export async function GET(request) {
     }
 
     // ✅ Get summary statistics
-    const summarySnapshot = await db.collection("proctoring_reviews").get();
+    const summarySnapshot = await db.collection("system").doc("proctoring_reviews").collection("reviews").get();
 
     const summary = {
       total: summarySnapshot.size,
@@ -183,7 +183,7 @@ export async function PUT(request) {
     }
 
     // Update review
-    const reviewRef = db.collection("proctoring_reviews").doc(reviewId);
+    const reviewRef = db.collection("system").doc("proctoring_reviews").collection("reviews").doc(reviewId);
     const reviewDoc = await reviewRef.get();
 
     if (!reviewDoc.exists) {

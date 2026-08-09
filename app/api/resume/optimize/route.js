@@ -111,6 +111,7 @@ export async function POST(request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "bypass-tunnel-reminder": "true",
       },
       signal: controller.signal,
       body: JSON.stringify({

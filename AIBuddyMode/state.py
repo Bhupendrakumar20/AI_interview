@@ -15,14 +15,15 @@ class InterviewState(BaseModel):
     difficulty: float = 3.0
     max_questions: int = 6
     question_count: int = 0
+    current_question_id: str | None = None
 
     asked_questions: list[str] = []
-    weak_areas: dict[str, WeakArea] = {}          # {"recursion": WeakArea(...)}
+    weak_areas: dict[str, WeakArea] = {}          
     topic_performance: dict[str, list[float]] = {}
     performance_history: list[dict] = []
 
-    locked_topic: Optional[str] = None            # set when a topic is remediation-locked
-    lock_recovery_streak: int = 0                 # consecutive good scores in locked topic
+    locked_topic: Optional[str] = None            
+    lock_recovery_streak: int = 0                 
 
     current_topic: Optional[str] = None
     current_question: Optional[dict] = None

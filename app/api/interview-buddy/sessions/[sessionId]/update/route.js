@@ -215,7 +215,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const doc = await db.collection("interview_buddy_sessions").doc(sessionId).get();
+    const doc = await db.collection("interviews").doc(sessionId).get();
 
     if (!doc.exists) {
       return NextResponse.json(

@@ -14,6 +14,7 @@ export default function ResumeRoundSection() {
   // Loading & Flow states
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAtsProcessing, setIsAtsProcessing] = useState(false);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
   const [currentStep, setCurrentStep] = useState("setup"); // setup -> interviewing -> report
   
   // Data states
@@ -27,6 +28,7 @@ export default function ResumeRoundSection() {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [answers, setAnswers] = useState([]);
+  const [targetQuestionCount, setTargetQuestionCount] = useState(0);
 
   const fileInputRef = useRef(null);
 
@@ -155,6 +157,53 @@ export default function ResumeRoundSection() {
     }
   };
 
+  const generateQuestionsSequentially = async (parsedData) => {
+    const totalQuestions = 5;
+    setTargetQuestionCount(totalQuestions);
+    setQuestions([]);
+    setCurrentQuestionIdx(0);
+    setCurrentAnswer("");
+    setAnswers([]);
+    setIsGeneratingQuestions(true);
+
+    for (let index = 0; index < totalQuestions; index++) {
+      const questionsRes = await fetch("/api/resume/generate-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parsedResume: parsedData,
+          focusArea: selectedFocus,
+          persona: selectedPersona,
+          numQuestions: 1,
+        }),
+      });
+
+      if (!questionsRes.ok) {
+        throw new Error("Failed to generate questions.");
+      }
+
+      const questData = await questionsRes.json();
+      const generatedQuestions = questData.verificationQuestions || [];
+      const nextQuestion = generatedQuestions[0] || {
+        question: "Can you walk me through how you implemented this work in your project?",
+        expectedKeywords: [selectedFocus],
+      };
+
+      setQuestions((prevQuestions) => {
+        const updatedQuestions = [...prevQuestions, nextQuestion];
+        if (prevQuestions.length === 0) {
+          setCurrentStep("interviewing");
+          setCurrentQuestionIdx(0);
+          setCurrentAnswer("");
+          setAnswers([]);
+        }
+        return updatedQuestions;
+      });
+    }
+
+    setIsGeneratingQuestions(false);
+  };
+
   const startResumeRound = async () => {
     if (!file) {
       alert("Please upload a resume first.");
@@ -181,66 +230,62 @@ export default function ResumeRoundSection() {
       const parsedData = parseData.parsedResume;
       setParsedResume(parsedData);
 
-      // Step 2: Parallel fetch for ATS Score and Question Generation
-      const [atsRes, questionsRes] = await Promise.all([
-        fetch("/api/resume/ats-score", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ parsedResume: parsedData, jobDescription }),
-        }),
-        fetch("/api/resume/generate-questions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            parsedResume: parsedData,
-            focusArea: selectedFocus,
-            persona: selectedPersona,
-            numQuestions: 5,
-          }),
-        }),
-      ]);
+      const atsPromise = fetch("/api/resume/ats-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parsedResume: parsedData, jobDescription }),
+      }).then(async (atsRes) => {
+        if (!atsRes.ok) throw new Error("Failed to calculate ATS score.");
+        const atsData = await atsRes.json();
+        setAtsResult(atsData.atsResult);
+        return atsData;
+      });
 
-      if (!atsRes.ok) throw new Error("Failed to calculate ATS score.");
-      if (!questionsRes.ok) throw new Error("Failed to generate questions.");
+      const questionsPromise = generateQuestionsSequentially(parsedData);
 
-      const atsData = await atsRes.json();
-      const questData = await questionsRes.json();
-
-      setAtsResult(atsData.atsResult);
-      setQuestions(questData.verificationQuestions || []);
-
-      // Step 3: Fetch Feedback and Optimized Resume
-      const [feedbackRes, optimizeRes] = await Promise.all([
-        fetch("/api/resume/feedback", {
+      const feedbackPromise = atsPromise.then(async (atsData) => {
+        return fetch("/api/resume/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ atsResult: atsData.atsResult, jobDescription }),
-        }),
-        fetch("/api/resume/optimize", {
+        }).catch(() => null);
+      });
+
+      const optimizePromise = atsPromise.then(async (atsData) => {
+        return fetch("/api/resume/optimize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ parsedResume: parsedData, atsResult: atsData.atsResult }),
-        }),
+        }).catch(() => null);
+      });
+
+      const [atsData, feedbackRes, optimizeRes] = await Promise.all([
+        atsPromise,
+        questionsPromise.then(() => null),
+        Promise.resolve(null),
       ]);
 
-      if (feedbackRes.ok) {
-        const feedbackData = await feedbackRes.json();
+      const feedbackResponse = await feedbackPromise;
+      const optimizeResponse = await optimizePromise;
+
+      if (feedbackResponse?.ok) {
+        const feedbackData = await feedbackResponse.json();
         setFeedback(feedbackData.feedback);
       }
-      if (optimizeRes.ok) {
-        const optimizeData = await optimizeRes.json();
+      if (optimizeResponse?.ok) {
+        const optimizeData = await optimizeResponse.json();
         setOptimizedResume(optimizeData.optimizedResume);
       }
 
-      // Transition to interviewing
-      setCurrentQuestionIdx(0);
-      setAnswers([]);
-      setCurrentStep("interviewing");
+      if (atsData?.atsResult) {
+        setAtsResult(atsData.atsResult);
+      }
     } catch (err) {
       console.error(err);
       alert(err.message || "An error occurred during resume processing.");
     } finally {
       setIsProcessing(false);
+      setIsGeneratingQuestions(false);
     }
   };
 
@@ -251,6 +296,11 @@ export default function ResumeRoundSection() {
     }
 
     const currentQuestion = questions[currentQuestionIdx];
+    if (!currentQuestion) {
+      alert("The next question is still being generated. Please wait a moment.");
+      return;
+    }
+
     const newAnswers = [
       ...answers,
       {
@@ -263,6 +313,8 @@ export default function ResumeRoundSection() {
 
     if (currentQuestionIdx < questions.length - 1) {
       setCurrentQuestionIdx(currentQuestionIdx + 1);
+    } else if (isGeneratingQuestions && currentQuestionIdx < targetQuestionCount - 1) {
+      return;
     } else {
       setCurrentStep("report");
     }
@@ -278,6 +330,7 @@ export default function ResumeRoundSection() {
     setOptimizedResume(null);
     setIsAtsProcessing(false);
     setIsProcessing(false);
+    setIsGeneratingQuestions(false);
     setCurrentStep("setup");
   };
 
@@ -286,6 +339,12 @@ export default function ResumeRoundSection() {
     if (score >= 60) return "text-amber-500 border-amber-500/20 bg-amber-500/10";
     return "text-rose-500 border-rose-500/20 bg-rose-500/10";
   };
+
+  const progressPercent = targetQuestionCount > 0
+    ? Math.min(100, ((questions.length || 1) / targetQuestionCount) * 100)
+    : 0;
+  const isWaitingForNextQuestion = isGeneratingQuestions && currentQuestionIdx >= questions.length - 1 && currentQuestionIdx < targetQuestionCount - 1;
+  const currentQuestion = questions[currentQuestionIdx];
 
   return (
     <section className="resume-section animate-fadeIn">
@@ -480,12 +539,12 @@ export default function ResumeRoundSection() {
           {/* Header Progress */}
           <div className="flex justify-between items-center text-sm text-slate-500 mb-6">
             <span>
-              Question {currentQuestionIdx + 1} of {questions.length}
+              Question {Math.min(currentQuestionIdx + 1, questions.length || 1)} of {targetQuestionCount || questions.length || 1}
             </span>
             <div className="w-48 bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
               <div 
                 className="bg-cyan-500 h-full transition-all duration-300"
-                style={{ width: `${((currentQuestionIdx + 1) / questions.length) * 100}%` }}
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
           </div>
@@ -498,14 +557,14 @@ export default function ResumeRoundSection() {
                 Claim Verification ({selectedFocus})
               </span>
               <p className="text-lg font-semibold text-slate-800 dark:text-slate-100 mt-1">
-                {typeof questions[currentQuestionIdx] === "string" 
-                  ? questions[currentQuestionIdx] 
-                  : questions[currentQuestionIdx]?.question}
+                {typeof currentQuestion === "string"
+                  ? currentQuestion
+                  : currentQuestion?.question || "Generating the next question..."}
               </p>
-              {questions[currentQuestionIdx]?.expectedKeywords && (
+              {currentQuestion?.expectedKeywords && (
                 <div className="mt-3 flex flex-wrap gap-1.5 items-center">
                   <span className="text-xs text-slate-400 mr-1">Recommended topics:</span>
-                  {questions[currentQuestionIdx].expectedKeywords.map((kw, i) => (
+                  {currentQuestion.expectedKeywords.map((kw, i) => (
                     <span key={i} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-500">
                       {kw}
                     </span>
@@ -528,9 +587,15 @@ export default function ResumeRoundSection() {
             />
             <button
               onClick={handleAnswerSubmit}
-              className="mt-2 w-full py-3.5 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition"
+              disabled={isWaitingForNextQuestion}
+              className="mt-2 w-full py-3.5 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {currentQuestionIdx < questions.length - 1 ? (
+              {isWaitingForNextQuestion ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating next question...
+                </>
+              ) : currentQuestionIdx < questions.length - 1 ? (
                 <>
                   Next Question
                   <ArrowRight className="w-4 h-4" />

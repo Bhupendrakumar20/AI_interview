@@ -125,9 +125,9 @@ from dotenv import load_dotenv
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 env_local_path = os.path.join(root_dir, ".env.local")
 if os.path.exists(env_local_path):
-    load_dotenv(env_local_path)
+    load_dotenv(env_local_path, override=True)
 else:
-    load_dotenv()
+    load_dotenv(override=True)
 import shutil
 import tempfile
 from typing import Any, Dict, Optional
@@ -171,7 +171,7 @@ class GenerateQuestionsRequest(BaseModel):
     parsedResume: Dict[str, Any]
     focusArea: str = "Projects"
     persona: str = "hiring-manager"
-    numQuestions: int = 5
+    numQuestions: int = 1
 
 
 class OptimizeResumeRequest(BaseModel):

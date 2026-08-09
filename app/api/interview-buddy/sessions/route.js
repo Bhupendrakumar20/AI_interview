@@ -22,14 +22,19 @@ export async function GET(request) {
 
     // Get single session if sessionId provided
     if (sessionId) {
-      const doc = await db.collection("interview_buddy_sessions").doc(sessionId).get();
+      const query = await db.collectionGroup("interviews")
+        .where(admin.firestore.FieldPath.documentId(), "==", sessionId)
+        .limit(1)
+        .get();
 
-      if (!doc.exists) {
+      if (query.empty) {
         return NextResponse.json(
           { error: "Session not found" },
           { status: 404 }
         );
       }
+
+      const doc = query.docs[0];
 
       const sessionData = doc.data();
 
@@ -47,9 +52,8 @@ export async function GET(request) {
       });
     }
 
-    // Get all user's sessions
     const query = await db
-      .collection("interview_buddy_sessions")
+      .collectionGroup("interviews")
       .where("participants", "array-contains", userId)
       .orderBy("createdAt", "desc")
       .get();

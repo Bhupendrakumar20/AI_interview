@@ -20,6 +20,22 @@ import {
 // ──────────────────────────────────────────────
 // GET — health + runtime info
 // ──────────────────────────────────────────────
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
+
+// ──────────────────────────────────────────────
+// GET — health + runtime info
+// ──────────────────────────────────────────────
 export async function GET() {
   const connectivity = await testPistonConnectivity();
   const runtimes = connectivity.ok ? (connectivity.runtimes ?? []) : [];
@@ -34,21 +50,19 @@ export async function GET() {
     note: connectivity.ok
       ? '✅ Piston Docker container is running'
       : '❌ Piston is offline — run: docker compose up -d',
-  });
+  }, { headers: CORS_HEADERS });
 }
 
 import { db } from "@/firebase/admin";
 import { recordDSASubmission } from "@/lib/security/dsa-score-validation";
 
 // ──────────────────────────────────────────────
-// POST — execute code
-// ──────────────────────────────────────────────
 export async function POST(req) {
   let body;
   try {
     body = await req.json();
   } catch {
-    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400, headers: CORS_HEADERS });
   }
 
   const {
@@ -62,7 +76,7 @@ export async function POST(req) {
 
   // ── Validation ──────────────────────────────
   if (!sourceCode || typeof sourceCode !== 'string' || !sourceCode.trim()) {
-    return Response.json({ error: 'sourceCode is required and must be a non-empty string' }, { status: 400 });
+    return Response.json({ error: 'sourceCode is required and must be a non-empty string' }, { status: 400, headers: CORS_HEADERS });
   }
   if (!language || typeof language !== 'string') {
     return Response.json(
@@ -70,7 +84,7 @@ export async function POST(req) {
         error: 'language is required',
         supportedLanguages: Object.keys(PISTON_LANGUAGE_MAP),
       },
-      { status: 400 }
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
@@ -82,34 +96,34 @@ export async function POST(req) {
         supportedLanguages: Object.keys(PISTON_LANGUAGE_MAP),
         resolvedAs: pistonLang,
       },
-      { status: 400 }
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
   try {
-    const modifiedSourceCode = injectAutoDriver(sourceCode, language);
+    let resolvedId = questionId;
+    if (questionId && !questionId.startsWith('lc_')) {
+      // If it's a slug, look it up in dsa_questions to get the real ID (e.g. lc_206)
+      const questionDoc = await db.collection("dsa_questions")
+        .where("titleSlug", "==", questionId)
+        .limit(1)
+        .get();
+      if (!questionDoc.empty) {
+        resolvedId = questionDoc.docs[0].id;
+      } else {
+        // Try checking by document ID directly in case the doc ID itself is the slug
+        const docDirect = await db.collection("dsa_questions").doc(questionId).get();
+        if (docDirect.exists) {
+          resolvedId = docDirect.id;
+        }
+      }
+    }
+
+    const modifiedSourceCode = injectAutoDriver(sourceCode, language, resolvedId);
     let testCases = [];
 
     // Phase 1 & 2: Database Registry Lookup
-    if (questionId) {
-      let resolvedId = questionId;
-      if (!questionId.startsWith('lc_')) {
-        // If it's a slug, look it up in dsa_questions to get the real ID (e.g. lc_206)
-        const questionDoc = await db.collection("dsa_questions")
-          .where("titleSlug", "==", questionId)
-          .limit(1)
-          .get();
-        if (!questionDoc.empty) {
-          resolvedId = questionDoc.docs[0].id;
-        } else {
-          // Try checking by document ID directly in case the doc ID itself is the slug
-          const docDirect = await db.collection("dsa_questions").doc(questionId).get();
-          if (docDirect.exists) {
-            resolvedId = docDirect.id;
-          }
-        }
-      }
-
+    if (resolvedId) {
       const snapshot = await db
         .collection("dsa_test_cases")
         .where("questionId", "==", resolvedId)
@@ -134,19 +148,36 @@ export async function POST(req) {
 
     // Phase 3: Evaluation Loop with Phase 4 Safeguards
     const results = [];
-    let allPassed = true;
+    let allPassed = testCases.length > 0;
     let passedCount = 0;
     const MAX_STDOUT_BYTES = 512 * 1024; // 512 KB limit
+
+    if (testCases.length === 0) {
+      results.push({
+        passed: false,
+        executionTime: 0,
+        exitCode: 1,
+        error: "System Error: No test cases configured/found for this question.",
+        testInput: "N/A",
+        output: "N/A",
+        expectedOutput: "N/A"
+      });
+    }
 
     for (let i = 0; i < testCases.length; i++) {
       const tc = testCases[i];
       const startMs = Date.now();
 
+      // Determine format flag
+      const expected = (tc.expectedOutput || '').trim();
+      const formatFlag = expected.startsWith('[') ? 'array' : 'scalar';
+      const modifiedStdin = (tc.stdin || '').trim() + '\n' + formatFlag;
+
       // Piston Call
       const result = await executeCode({
         sourceCode: modifiedSourceCode,
         language,
-        stdin: tc.stdin || '',
+        stdin: modifiedStdin,
       });
 
       const executionTime = Date.now() - startMs;
@@ -160,7 +191,6 @@ export async function POST(req) {
 
       const hasRuntimeError = result.exitCode !== 0;
       const actual = output.trim();
-      const expected = (tc.expectedOutput || '').trim();
       const normalize = (str) => str.replace(/\s+/g, '');
       const passed = !hasRuntimeError && (actual === expected || normalize(actual) === normalize(expected));
 
@@ -273,7 +303,7 @@ export async function POST(req) {
       failed: testCases.length - passedCount,
       allPassed,
       results,
-    });
+    }, { headers: CORS_HEADERS });
 
   } catch (err) {
     console.error('[/api/code-executor/execute] Unhandled error:', err);
@@ -283,7 +313,7 @@ export async function POST(req) {
         details:
           process.env.NODE_ENV === 'development' ? err.stack : undefined,
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }
@@ -292,7 +322,7 @@ export async function POST(req) {
  * Automatically inject standard input parsing and execution driver
  * for standard LeetCode-style function signatures (Choice 1 & 2 integration)
  */
-function injectAutoDriver(sourceCode, language) {
+function injectAutoDriver(sourceCode, language, questionId) {
   const lang = language.toLowerCase();
   
   if (lang === 'javascript' || lang === 'js') {
@@ -410,7 +440,8 @@ function injectAutoDriver(sourceCode, language) {
         "try {",
         "  const lines = fs.readFileSync(0, 'utf-8').replace(/\\r/g, '').trim().split('\\n');",
         "  if (lines.length > 0 && lines[0] !== '') {",
-        "    const parsedArgs = lines.map(line => {",
+        "    const format_flag = lines[lines.length - 1];",
+        "    const parsedArgs = lines.slice(0, lines.length - 1).map(line => {",
         "      try {",
         "        return JSON.parse(line);",
         "      } catch (e) {",
@@ -440,16 +471,16 @@ function injectAutoDriver(sourceCode, language) {
         "",
         "      if (result !== null && typeof result === 'object') {",
         "        if ('next' in result) {",
-        "          result = linkedListToArray(result);",
+        "          result = format_flag === 'scalar' ? result.val : linkedListToArray(result);",
         "        } else if ('left' in result || 'right' in result) {",
-        "          result = treeToArray(result);",
+        "          result = format_flag === 'scalar' ? result.val : treeToArray(result);",
         "        }",
         "      }",
         "",
         "      console.log(JSON.stringify(result));",
         "    }",
         "  }",
-        "} catch (e) {}"
+        "} catch (e) { console.error(e); }"
       ];
       
       return driverParts.join("\n");
@@ -532,7 +563,14 @@ function injectAutoDriver(sourceCode, language) {
       "            result.append(None)",
       "    while result and result[-1] is None:",
       "        result.pop()",
-      "    return result"
+      "    return result",
+      "",
+      "def findNodeInTree(root, val):",
+      "    if not root: return None",
+      "    if root.val == val: return root",
+      "    left = findNodeInTree(root.left, val)",
+      "    if left: return left",
+      "    return findNodeInTree(root.right, val)"
     ].join("\n");
 
     if (classMethod) {
@@ -545,8 +583,9 @@ function injectAutoDriver(sourceCode, language) {
         "try:",
         "    lines = sys.stdin.read().replace('\\r', '').strip().split('\\n')",
         "    if lines and lines[0]:",
+        "        format_flag = lines[-1]",
         "        parsed = []",
-        "        for line in lines:",
+        "        for line in lines[:-1]:",
         "            try:",
         "                parsed.append(json.loads(line))",
         "            except:",
@@ -560,8 +599,8 @@ function injectAutoDriver(sourceCode, language) {
         "        ",
         "        converted = []",
         "        for idx, arg in enumerate(parsed):",
+        "            param_name = params[idx].lower() if idx < len(params) else \"\"",
         "            if isinstance(arg, list):",
-        "                param_name = params[idx].lower() if idx < len(params) else \"\"",
         "                if param_name in [\"head\", \"list\", \"node\"] or param_name.startswith(\"list\") or param_name.startswith(\"l\"): ",
         "                    converted.append(arrayToLinkedList(arg))",
         "                elif param_name == \"root\" or \"tree\" in param_name:",
@@ -569,19 +608,22 @@ function injectAutoDriver(sourceCode, language) {
         "                else:",
         "                    converted.append(arg)",
         "            else:",
-        "                converted.append(arg)",
+        "                if param_name in [\"p\", \"q\"] and len(converted) > 0 and hasattr(converted[0], 'val'):",
+        "                    converted.append(findNodeInTree(converted[0], arg))",
+        "                else:",
+        "                    converted.append(arg)",
         "        ",
         "        res = method(*converted)",
         "        ",
         "        if res is not None:",
         "            if hasattr(res, 'next'):",
-        "                res = linkedListToArray(res)",
+        "                res = res.val if format_flag == 'scalar' else linkedListToArray(res)",
         "            elif hasattr(res, 'left') or hasattr(res, 'right'):",
-        "                res = treeToArray(res)",
+        "                res = res.val if format_flag == 'scalar' else treeToArray(res)",
         "        ",
         "        print(json.dumps(res))",
         "except Exception as e:",
-        "    pass"
+        "    import traceback; traceback.print_exc()"
       ].join("\n");
       
       return driverCode;
@@ -602,8 +644,9 @@ function injectAutoDriver(sourceCode, language) {
           "try:",
           "    lines = sys.stdin.read().replace('\\r', '').strip().split('\\n')",
           "    if lines and lines[0]:",
+          "        format_flag = lines[-1]",
           "        parsed = []",
-          "        for line in lines:",
+          "        for line in lines[:-1]:",
           "            try:",
           "                parsed.append(json.loads(line))",
           "            except:",
@@ -631,13 +674,13 @@ function injectAutoDriver(sourceCode, language) {
           "        ",
           "        if res is not None:",
           "            if hasattr(res, 'next'):",
-          "                res = linkedListToArray(res)",
+          "                res = res.val if format_flag == 'scalar' else linkedListToArray(res)",
           "            elif hasattr(res, 'left') or hasattr(res, 'right'):",
-          "                res = treeToArray(res)",
+          "                res = res.val if format_flag == 'scalar' else treeToArray(res)",
           "        ",
           "        print(json.dumps(res))",
           "except Exception as e:",
-          "    pass"
+          "    import traceback; traceback.print_exc()"
         ].join("\n");
         
         return driverCode;
@@ -693,7 +736,12 @@ function injectAutoDriver(sourceCode, language) {
         parserLines.push(`    if (${valVar}.front() == '"' && ${valVar}.back() == '"') ${valVar} = ${valVar}.substr(1, ${valVar}.size() - 2);`);
         callArgs.push(valVar);
       } else if (type === 'TreeNode*') {
-        parserLines.push(`    TreeNode* ${valVar} = arrayToTree(${lineVar});`);
+        if (idx === 0) {
+          parserLines.push(`    TreeNode* ${valVar} = arrayToTree(${lineVar});`);
+        } else {
+          parserLines.push(`    TreeNode* temp_${valVar} = arrayToTree(${lineVar});`);
+          parserLines.push(`    TreeNode* ${valVar} = findNodeInTree(val_0, temp_${valVar} ? temp_${valVar}->val : -1);`);
+        }
         callArgs.push(valVar);
       } else if (type === 'ListNode*') {
         parserLines.push(`    ListNode* ${valVar} = arrayToLinkedList(${lineVar});`);
@@ -717,14 +765,29 @@ function injectAutoDriver(sourceCode, language) {
       }
     });
     
+    parserLines.push(`    std::string format_flag;`);
+    parserLines.push(`    if (!std::getline(std::cin, format_flag)) format_flag = "array";`);
+
     let outputCode = '';
     const cleanRetType = returnType.replace(/&/g, '').trim();
     if (cleanRetType === 'void') {
       outputCode = `    sol.${methodName}(${callArgs.join(', ')});`;
     } else if (cleanRetType === 'TreeNode*') {
-      outputCode = `    TreeNode* res = sol.${methodName}(${callArgs.join(', ')});\n    printTree(res);`;
+      outputCode = `    TreeNode* res = sol.${methodName}(${callArgs.join(', ')});\n` +
+                   `    if (format_flag == "scalar") {\n` +
+                   `        if (res) std::cout << res->val << std::endl;\n` +
+                   `        else std::cout << "null" << std::endl;\n` +
+                   `    } else {\n` +
+                   `        printTree(res);\n` +
+                   `    }`;
     } else if (cleanRetType === 'ListNode*') {
-      outputCode = `    ListNode* res = sol.${methodName}(${callArgs.join(', ')});\n    printLinkedList(res);`;
+      outputCode = `    ListNode* res = sol.${methodName}(${callArgs.join(', ')});\n` +
+                   `    if (format_flag == "scalar") {\n` +
+                   `        if (res) std::cout << res->val << std::endl;\n` +
+                   `        else std::cout << "null" << std::endl;\n` +
+                   `    } else {\n` +
+                   `        printLinkedList(res);\n` +
+                   `    }`;
     } else if (cleanRetType.includes('vector<int>') || cleanRetType.includes('std::vector<int>')) {
       outputCode = `    std::vector<int> res = sol.${methodName}(${callArgs.join(', ')});\n    std::cout << "[";\n    for (size_t i = 0; i < res.size(); ++i) {\n        if (i > 0) std::cout << ",";\n        std::cout << res[i];\n    }\n    std::cout << "]" << std::endl;`;
     } else if (cleanRetType === 'bool') {
@@ -803,6 +866,14 @@ function injectAutoDriver(sourceCode, language) {
       `        }`,
       `    }`,
       `    return root;`,
+      `}`,
+      ``,
+      `inline TreeNode* findNodeInTree(TreeNode* root, int val) {`,
+      `    if (!root) return nullptr;`,
+      `    if (root->val == val) return root;`,
+      `    TreeNode* left = findNodeInTree(root->left, val);`,
+      `    if (left) return left;`,
+      `    return findNodeInTree(root->right, val);`,
       `}`,
       ``,
       `inline void printTree(TreeNode* root) {`,

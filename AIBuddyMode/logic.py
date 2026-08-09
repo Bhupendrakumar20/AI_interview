@@ -1,7 +1,7 @@
 # adaptive_interview/logic.py
 import random
-from state import InterviewState, WeakArea
-from taxonomy import LOCK_THRESHOLD
+from AIBuddyMode.state import InterviewState, WeakArea
+from AIBuddyMode.taxonomy import LOCK_THRESHOLD
 
 def update_difficulty(current: float, score: float, k: float = 0.4) -> float:
     expected = 6.5

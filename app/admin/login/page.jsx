@@ -3,12 +3,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Shield, Mail, Lock, AlertCircle } from "lucide-react";
+import { signIn } from "@/lib/actions/auth.action";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -23,30 +22,21 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-
-      const idToken = await userCredential.user.getIdToken();
-      
-      // Verify admin status
-      const response = await fetch('/api/auth/admin-verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ idToken }),
+      const result = await signIn({
+        email: formData.email,
+        password: formData.password,
       });
 
-      const result = await response.json();
+      if (!result.success) {
+        toast.error(result.message || "Login failed");
+        return;
+      }
 
       if (result.isAdmin) {
         toast.success("Admin login successful!");
+        router.refresh();
         router.push('/admin');
       } else {
-        await auth.signOut();
         toast.error("Access denied. Admin privileges required.");
       }
     } catch (error) {

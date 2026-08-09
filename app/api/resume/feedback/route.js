@@ -90,6 +90,7 @@ export async function POST(request) {
 
     const pythonUrl =
       process.env.NEXT_PUBLIC_RESUME_API_URL ||
+      process.env.NEXT_PUBLIC_RESUME_API_URL_2 ||
       "http://127.0.0.1:8000";
 
     const controller = new AbortController();

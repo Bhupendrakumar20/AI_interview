@@ -4,7 +4,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { io } from "socket.io-client";
-import { getDynamicContent, saveDynamicContent, deleteContent } from "@/lib/actions/admin.action";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { getDynamicContent, saveDynamicContent, deleteContent, getDetailedAnalytics } from "@/lib/actions/admin.action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +86,31 @@ export default function DynamicAdminContentPage() {
       socket.disconnect();
     };
   }, []);
+
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+
+  useEffect(() => {
+    if (contentType === "analytics") {
+      async function loadAnalytics() {
+        try {
+          setAnalyticsLoading(true);
+          const res = await getDetailedAnalytics();
+          if (res.success) {
+            setAnalyticsData(res);
+          } else {
+            toast.error("Failed to load analytics data");
+          }
+        } catch (err) {
+          console.error(err);
+          toast.error("An error occurred loading analytics");
+        } finally {
+          setAnalyticsLoading(false);
+        }
+      }
+      loadAnalytics();
+    }
+  }, [contentType]);
 
   // Dynamic configurations based on the requested page content type
   const config = {
@@ -309,6 +335,26 @@ export default function DynamicAdminContentPage() {
   // Render analytics dashboards or system controllers if not standard CRUD
   if (!activeConfig) {
     if (contentType === "analytics") {
+      if (analyticsLoading) {
+        return (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
+          </div>
+        );
+      }
+
+      const prepChartData = (growthMap) => {
+        if (!growthMap) return [];
+        return Object.entries(growthMap)
+          .map(([date, count]) => ({ date, count }))
+          .sort((a, b) => new Date(a.date) - new Date(b.date))
+          .slice(-10); // Show last 10 days
+      };
+
+      const userGrowthData = prepChartData(analyticsData?.userGrowth);
+      const interviewTrafficData = prepChartData(analyticsData?.interviewTraffic);
+      const applicationsData = prepChartData(analyticsData?.applicationsCount);
+
       return (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
@@ -320,18 +366,114 @@ export default function DynamicAdminContentPage() {
               <p className="text-sm text-slate-500">Real-time usage metrics and system logs</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-white/50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800/80 backdrop-blur-sm shadow-sm">
-              <CardHeader><CardTitle className="text-sm font-semibold">User Growth</CardTitle></CardHeader>
-              <CardContent><div className="h-[200px] flex items-center justify-center text-slate-500">Chart Loading...</div></CardContent>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* User Growth Card */}
+            <Card className="bg-white/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 backdrop-blur-sm shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold">User Growth</CardTitle>
+                  <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
+                    {analyticsData?.totalUsers || 0}
+                  </p>
+                  <p className="text-xs text-slate-400">Total Registered Users</p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[200px] w-full mt-4">
+                  {userGrowthData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={userGrowthData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorUser" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={9} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }} labelClassName="text-slate-400 text-xs" />
+                        <Area type="monotone" dataKey="count" name="New Users" stroke="#06b6d4" strokeWidth={2} fillOpacity={1} fill="url(#colorUser)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">No user registration data yet</div>
+                  )}
+                </div>
+              </CardContent>
             </Card>
-            <Card className="bg-white/50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800/80 backdrop-blur-sm shadow-sm">
-              <CardHeader><CardTitle className="text-sm font-semibold">Interview Buddy Traffic</CardTitle></CardHeader>
-              <CardContent><div className="h-[200px] flex items-center justify-center text-slate-500">Chart Loading...</div></CardContent>
+
+            {/* Interview Buddy Traffic Card */}
+            <Card className="bg-white/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 backdrop-blur-sm shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold">Mock Interviews</CardTitle>
+                  <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
+                    {analyticsData?.totalInterviews || 0}
+                  </p>
+                  <p className="text-xs text-slate-400">Total Practice Sessions</p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[200px] w-full mt-4">
+                  {interviewTrafficData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={interviewTrafficData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorInterview" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={9} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }} labelClassName="text-slate-400 text-xs" />
+                        <Area type="monotone" dataKey="count" name="Interviews" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorInterview)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">No mock interview data yet</div>
+                  )}
+                </div>
+              </CardContent>
             </Card>
-            <Card className="bg-white/50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800/80 backdrop-blur-sm shadow-sm">
-              <CardHeader><CardTitle className="text-sm font-semibold">ATS Resume uploads</CardTitle></CardHeader>
-              <CardContent><div className="h-[200px] flex items-center justify-center text-slate-500">Chart Loading...</div></CardContent>
+
+            {/* Applications & Resumes Card */}
+            <Card className="bg-white/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 backdrop-blur-sm shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold">User Applications</CardTitle>
+                  <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
+                    {analyticsData?.totalApplications || 0}
+                  </p>
+                  <p className="text-xs text-slate-400">Total Internships/Jobs Applied</p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[200px] w-full mt-4">
+                  {applicationsData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={applicationsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorApps" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={9} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }} labelClassName="text-slate-400 text-xs" />
+                        <Area type="monotone" dataKey="count" name="Applications" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorApps)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">No application data yet</div>
+                  )}
+                </div>
+              </CardContent>
             </Card>
           </div>
         </div>

@@ -21,6 +21,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { logout } from "@/lib/actions/auth.action";
 
 // ✅ Date formatting helper (optional if you need later)
 const formatDate = (dateString) => {
@@ -200,37 +201,14 @@ const AdminSidebar = ({ user }) => {
             </ul>
           </nav>
 
-          {/* ✅ Quick Stats */}
-          {!collapsed && (
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800/80">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 dark:text-slate-400">Users</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{stats.totalUsers}</span>
-                </div>
 
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 dark:text-slate-400">Active</span>
-                  <span className="font-semibold text-emerald-500">
-                    {stats.activeUsers}
-                  </span>
-                </div>
-
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 dark:text-slate-400">Pending</span>
-                  <span className="font-semibold text-amber-500">
-                    {stats.pendingApprovals}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ✅ Logout Button */}
           <div className="p-4 border-t border-slate-200 dark:border-slate-800/80">
             <button
-              onClick={() => {
-                window.location.href = "/api/auth/logout";
+              onClick={async () => {
+                await logout();
+                window.location.href = "/";
               }}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors font-semibold"
             >

@@ -25,27 +25,47 @@ export default function InternshipsPage() {
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [selectedInternship, setSelectedInternship] = useState(null);
   
-  const [filters, setFilters] = useState({
-    search: "",
-    location: "all",
-    type: "all",
-    sort: "deadline",
+  const [filters, setFilters] = useState(() => {
+    return {
+      search: searchParams.get("search") || "",
+      location: searchParams.get("location") || "all",
+      type: searchParams.get("type") || "all",
+      sort: searchParams.get("sort") || "deadline",
+    };
   });
 
-  // Initialize filters from URL params
+  // Sync filters with URL params on back/forward navigation
   useEffect(() => {
     const type = searchParams.get("type") || "all";
     const search = searchParams.get("search") || "";
     const location = searchParams.get("location") || "all";
     const sort = searchParams.get("sort") || "deadline";
 
-    setFilters({
-      search,
-      location,
-      type,
-      sort,
+    setFilters((prev) => {
+      if (
+        prev.type === type &&
+        prev.search === search &&
+        prev.location === location &&
+        prev.sort === sort
+      ) {
+        return prev; // No change, skip update
+      }
+      return { search, location, type, sort };
     });
   }, [searchParams]);
+
+  // Load counts once on mount
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const countsData = await getInternshipCounts();
+        setCounts(countsData);
+      } catch (error) {
+        console.error("Error loading counts:", error);
+      }
+    };
+    loadCounts();
+  }, []);
 
   // Load user
   useEffect(() => {
@@ -134,12 +154,6 @@ export default function InternshipsPage() {
       }
 
       setInternships(sortedData);
-
-      // Load filter options if not loaded
-      if (Object.keys(counts).length === 0) {
-        const countsData = await getInternshipCounts();
-        setCounts(countsData);
-      }
     } catch (error) {
       console.error("Error loading internships:", error);
       toast.error("Failed to load internships");
@@ -147,7 +161,7 @@ export default function InternshipsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, counts]);
+  }, [filters]);
 
   // Load data when filters change
   useEffect(() => {

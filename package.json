@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbo -p 4001",
-    "dev:all": "concurrently \"npm run dev\" \"npm run piston:start\" \"npm run socket:start\" \"npm run python:start\"",
+    "dev:all": "concurrently \"npm run dev\" \"npm run piston:start\" \"npm run socket:start\" \"npm run python:start\" \"npm run adaptive:start\"",
     "socket:start": "node server/buddy-socket-server.js",
     "seed-db": "node scripts/seedDatabase.js",
 
@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "next lint",
     "piston:start": "node server/piston-local-server.js",
-    "python:start": ".venv\\Scripts\\python -m uvicorn ResumeInterview.api:app --reload --port 8080",
+    "python:start": ".venv\\Scripts\\python -m uvicorn ResumeInterview.api:app --reload --port 8000",
+    "adaptive:start": ".venv\\Scripts\\python -m uvicorn AIBuddyMode.api:app --reload --port 8001",
     "piston:status": "node -e \"fetch('http://localhost:2000/api/v2/piston/runtimes').then(r=>r.json()).then(d=>console.log('Runtimes:',d.map(r=>r.language+' '+r.version).join(', '))).catch(e=>console.log('Piston offline:',e.message))\""
   },
   "dependencies": {

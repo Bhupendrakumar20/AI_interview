@@ -100,6 +100,9 @@ const ResetPasswordForm = () => {
           <p className="text-sm text-light-300">
             Please enter your new secure password below
           </p>
+          <p className="text-xs text-primary-100 font-semibold mt-1">
+            Note: Password must be at least 6 characters long.
+          </p>
         </div>
 
         <Form {...form}>

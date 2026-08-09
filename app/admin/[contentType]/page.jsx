@@ -157,19 +157,28 @@ export default function DynamicAdminContentPage() {
     },
     courses: {
       title: "Courses Catalogue",
-      subtitle: "Manage learning paths and tutorial lessons",
-      headers: ["Course Title", "Price", "Duration", "Instructor"],
+      subtitle: "Manage learning paths and curriculum resources",
+      headers: ["Badge", "Course Title", "Subtitle", "Resources Count"],
       fields: [
-        { name: "title", label: "Course Title", type: "text", placeholder: "React Native Masterclass" },
-        { name: "price", label: "Course Price", type: "text", placeholder: "$49" },
-        { name: "duration", label: "Duration", type: "text", placeholder: "12 Hours" },
-        { name: "instructor", label: "Instructor", type: "text", placeholder: "John Doe" }
+        { name: "badge", label: "Badge (e.g. DSA)", type: "text", placeholder: "DSA" },
+        { name: "title", label: "Course Title", type: "text", placeholder: "Data Structures and Algorithms" },
+        { name: "subtitle", label: "Subtitle", type: "text", placeholder: "Pattern recognition and practice..." },
+        { name: "color", label: "Color (e.g. cyan, violet)", type: "text", placeholder: "cyan" }
       ],
-      renderRow: (item) => [
+      renderRow: (item, router) => [
+        <span key="badge" className="px-2 py-0.5 bg-primary-200/20 text-primary-100 text-xs font-semibold rounded-full border border-primary-200/40 inline-block">{item.badge || "N/A"}</span>,
         <span key="title" className="font-semibold text-slate-800 dark:text-slate-100">{item.title || "Untitled Course"}</span>,
-        <span key="price" className="text-xs text-emerald-500 font-semibold">{item.price || "Free"}</span>,
-        <span key="duration" className="text-xs text-slate-400">{item.duration || "Self-Paced"}</span>,
-        <span key="instructor" className="text-xs text-slate-400">{item.instructor || "PrepWise Academy"}</span>
+        <span key="subtitle" className="text-xs text-slate-400 max-w-[200px] truncate block">{item.subtitle || "N/A"}</span>,
+        <button
+          key="resources"
+          onClick={(e) => {
+            e.stopPropagation();
+            router.push(`/admin/courses/${item.id}/resources`);
+          }}
+          className="text-xs font-bold text-emerald-500 hover:underline hover:text-emerald-400 cursor-pointer text-left"
+        >
+          {item.resources?.length || 0} Resources
+        </button>
       ]
     }
   };
@@ -411,13 +420,13 @@ export default function DynamicAdminContentPage() {
               No records found.
             </div>
           ) : (
-            data.map((item) => (
+            data.map((item, idx) => (
               <div 
-                key={item.id} 
+                key={`${item.id || idx}-${idx}`} 
                 className="grid gap-4 p-4 items-center hover:bg-slate-100/50 dark:hover:bg-slate-905/30 transition-colors"
                 style={{ gridTemplateColumns: `repeat(${activeConfig.headers.length}, 1fr) 80px` }}
               >
-                {activeConfig.renderRow(item).map((element, idx) => (
+                {activeConfig.renderRow(item, router).map((element, idx) => (
                   <div key={idx} className="truncate">{element}</div>
                 ))}
                 <div className="text-right flex justify-end gap-1.5">

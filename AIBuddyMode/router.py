@@ -1,4 +1,6 @@
 # adaptive_interview/router.py
+import json
+import redis
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from state import InterviewState
@@ -8,8 +10,43 @@ from evaluator import evaluate_answer
 
 router = APIRouter(prefix="/interview", tags=["adaptive-interview"])
 
-# In-memory store — swap for Redis/DB in production
-SESSIONS: dict[str, InterviewState] = {}
+# Initialize Redis client (decode_responses=True returns string instead of bytes)
+redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
+# Helper function to get state from Redis
+def get_session_state(session_id: str) -> InterviewState | None:
+    try:
+        data = redis_client.get(f"adaptive:session:{session_id}")
+        if not data:
+            return None
+        # Support Pydantic v2 and fallback to Pydantic v1
+        if hasattr(InterviewState, 'model_validate_json'):
+            return InterviewState.model_validate_json(data)
+        else:
+            return InterviewState.parse_raw(data)
+    except Exception as err:
+        print(f"Error parsing session state: {err}")
+        return None
+
+# Helper function to save state to Redis
+def save_session_state(session_id: str, state: InterviewState):
+    try:
+        # Support Pydantic v2 and fallback to Pydantic v1
+        if hasattr(state, 'model_dump_json'):
+            data = state.model_dump_json()
+        else:
+            data = state.json()
+        redis_client.set(f"adaptive:session:{session_id}", data, ex=7200) # 2 hours expiry
+    except Exception as err:
+        print(f"Error saving session state: {err}")
+
+# Helper function to delete state from Redis
+def delete_session_state(session_id: str):
+    try:
+        redis_client.delete(f"adaptive:session:{session_id}")
+    except Exception as err:
+        print(f"Error deleting session state: {err}")
+
 
 class StartSessionRequest(BaseModel):
     session_id: str
@@ -29,18 +66,19 @@ async def start_session(req: StartSessionRequest):
         topic_focus=req.topic_focus,
         max_questions=req.max_questions,
     )
-    topic = pick_next_topic(state.topic_focus, state.topic_performance)
+    # Fix original bug: passing state instead of focus list
+    topic = pick_next_topic(state)
     question = await get_next_question(topic, state.difficulty, state.persona, [], None)
     state.current_topic = topic
     state.current_question = question
-    SESSIONS[req.session_id] = state
+    
+    save_session_state(req.session_id, state)
     return {"question": question, "difficulty": state.difficulty, "question_number": 1}
-
 
 
 @router.post("/answer")
 async def submit_answer(req: SubmitAnswerRequest):
-    state = SESSIONS.get(req.session_id)
+    state = get_session_state(req.session_id)
     if not state:
         raise HTTPException(404, "Session not found")
 
@@ -51,7 +89,7 @@ async def submit_answer(req: SubmitAnswerRequest):
 
     if state.question_count >= state.max_questions:
         report = build_report(state)
-        del SESSIONS[req.session_id]
+        delete_session_state(req.session_id)
         return {"done": True, "evaluation": evaluation, "report": report}
 
     next_topic = pick_next_topic(state)   # returns locked_topic if set
@@ -61,6 +99,8 @@ async def submit_answer(req: SubmitAnswerRequest):
     )
     state.current_topic = next_topic
     state.current_question = next_question
+
+    save_session_state(req.session_id, state)
 
     return {
         "done": False,
@@ -76,9 +116,17 @@ def build_report(state: InterviewState) -> dict:
     by_topic = {}
     for entry in state.performance_history:
         by_topic.setdefault(entry["topic"], []).append(entry["score"])
+    
+    # Extract string values from WeakArea if it is a dictionary/model
+    weak_areas_sorted = {}
+    for topic_tag, w_area in state.weak_areas.items():
+        # Handle dict or WeakArea object
+        severity = w_area.severity if hasattr(w_area, 'severity') else w_area.get('severity', 0.0)
+        weak_areas_sorted[topic_tag] = severity
+
     return {
         "avg_by_topic": {t: sum(s) / len(s) for t, s in by_topic.items()},
-        "top_weak_areas": sorted(state.weak_areas.items(), key=lambda x: -x[1])[:5],
+        "top_weak_areas": sorted(weak_areas_sorted.items(), key=lambda x: -x[1])[:5],
         "score_progression": [e["score"] for e in state.performance_history],
         "performance_history": state.performance_history,
     }

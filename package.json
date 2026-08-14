@@ -14,7 +14,9 @@
     "piston:start": "node server/piston-local-server.js",
     "python:start": ".venv\\Scripts\\python -m uvicorn ResumeInterview.api:app --reload --port 8000",
     "adaptive:start": ".venv\\Scripts\\python -m uvicorn AIBuddyMode.api:app --reload --port 8001",
-    "piston:status": "node -e \"fetch('http://localhost:2000/api/v2/piston/runtimes').then(r=>r.json()).then(d=>console.log('Runtimes:',d.map(r=>r.language+' '+r.version).join(', '))).catch(e=>console.log('Piston offline:',e.message))\""
+    "piston:status": "node -e \"fetch('http://localhost:2000/api/v2/piston/runtimes').then(r=>r.json()).then(d=>console.log('Runtimes:',d.map(r=>r.language+' '+r.version).join(', '))).catch(e=>console.log('Piston offline:',e.message))\"",
+    "redis:start": "docker start prepwise-redis || docker run -d --name prepwise-redis -p 6379:6379 redis:alpine",
+    "redis:cli": "docker exec -it prepwise-redis redis-cli"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.43",

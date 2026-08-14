@@ -6,6 +6,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import uuid
 import time
 import logging
+import json
+import redis
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -42,22 +44,42 @@ app.add_middleware(
 
 app.include_router(debug_router)
 
-SESSIONS: dict[str, InterviewState] = {}
-SESSION_TIMEOUT_SECONDS = 3600  # NEW — 1 hour of inactivity
+# Initialize Redis client (decode_responses=True returns string instead of bytes)
+redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
+# Helper function to get state from Redis
+def get_session_state(session_id: str) -> InterviewState | None:
+    try:
+        data = redis_client.get(f"adaptive:session:{session_id}")
+        if not data:
+            return None
+        # Support Pydantic v2 and fallback to Pydantic v1
+        if hasattr(InterviewState, 'model_validate_json'):
+            return InterviewState.model_validate_json(data)
+        else:
+            return InterviewState.parse_raw(data)
+    except Exception as err:
+        logger.error(f"Error parsing session state from Redis: {err}")
+        return None
 
-def cleanup_stale_sessions():
-    """NEW — removes sessions untouched for over an hour. Guards against
-    orphaned sessions from dev-mode double-mounts, abandoned tabs, or
-    crashed clients piling up in memory indefinitely."""
-    now = time.time()
-    stale_ids = [
-        sid for sid, state in SESSIONS.items()
-        if now - getattr(state, "_last_touched", now) > SESSION_TIMEOUT_SECONDS
-    ]
-    for sid in stale_ids:
-        logger.info(f"Cleaning up stale session: {sid}")
-        del SESSIONS[sid]
+# Helper function to save state to Redis
+def save_session_state(session_id: str, state: InterviewState):
+    try:
+        # Support Pydantic v2 and fallback to Pydantic v1
+        if hasattr(state, 'model_dump_json'):
+            data = state.model_dump_json()
+        else:
+            data = state.json()
+        redis_client.set(f"adaptive:session:{session_id}", data, ex=7200) # 2 hours expiry
+    except Exception as err:
+        logger.error(f"Error saving session state to Redis: {err}")
+
+# Helper function to delete state from Redis
+def delete_session_state(session_id: str):
+    try:
+        redis_client.delete(f"adaptive:session:{session_id}")
+    except Exception as err:
+        logger.error(f"Error deleting session state from Redis: {err}")
 
 
 @app.exception_handler(Exception)
@@ -115,8 +137,6 @@ class SessionStateResponse(BaseModel):
 
 @app.post("/interview/start", response_model=StartSessionResponse)
 async def start_session(req: StartSessionRequest):
-    cleanup_stale_sessions()  # NEW
-
     session_id = str(uuid.uuid4())
     state = InterviewState(
         session_id=session_id,
@@ -124,15 +144,16 @@ async def start_session(req: StartSessionRequest):
         topic_focus=req.topic_focus,
         max_questions=req.max_questions,
     )
-    state._last_touched = time.time()  # NEW
+    state._last_touched = time.time()
 
     topic = pick_next_topic(state)
-    logger.info(f"[{session_id}] New session created, first topic: {topic}")  # log line lets you confirm no duplicates on reload
+    logger.info(f"[{session_id}] New session created, first topic: {topic}")
 
     question = await get_next_question(topic, state.difficulty, state.persona, [], None)
     state.current_topic = topic
     state.current_question = question
-    SESSIONS[session_id] = state
+    
+    save_session_state(session_id, state)
 
     return StartSessionResponse(
         session_id=session_id,
@@ -144,11 +165,11 @@ async def start_session(req: StartSessionRequest):
 
 @app.post("/interview/answer", response_model=SubmitAnswerResponse)
 async def submit_answer(req: SubmitAnswerRequest):
-    state = SESSIONS.get(req.session_id)
+    state = get_session_state(req.session_id)
     if not state:
         raise HTTPException(404, "Session not found — it may have ended or the server restarted")
 
-    state._last_touched = time.time()  # NEW
+    state._last_touched = time.time()
     logger.info(f"[{req.session_id}] Answer received for topic={state.current_topic}")
 
     try:
@@ -159,7 +180,6 @@ async def submit_answer(req: SubmitAnswerRequest):
     except ValueError as e:
         logger.error(f"[{req.session_id}] Evaluator JSON parse failed: {e}")
         raise HTTPException(502, f"Evaluation failed — model returned unparseable output: {e}")
-
     except Exception as e:
         logger.exception(f"[{req.session_id}] Unexpected error during evaluation")
         raise HTTPException(500, f"Unexpected evaluation error: {type(e).__name__}: {e}")
@@ -170,7 +190,7 @@ async def submit_answer(req: SubmitAnswerRequest):
 
     if state.question_count >= state.max_questions:
         report = build_report(state)
-        del SESSIONS[req.session_id]
+        delete_session_state(req.session_id)
         logger.info(f"[{req.session_id}] Session complete")
         return SubmitAnswerResponse(done=True, evaluation=evaluation, report=report)
 
@@ -181,6 +201,8 @@ async def submit_answer(req: SubmitAnswerRequest):
     )
     state.current_topic = next_topic
     state.current_question = next_question
+
+    save_session_state(req.session_id, state)
 
     return SubmitAnswerResponse(
         done=False,
@@ -194,8 +216,8 @@ async def submit_answer(req: SubmitAnswerRequest):
 
 
 @app.get("/interview/session/{session_id}", response_model=SessionStateResponse)
-def get_session_state(session_id: str):
-    state = SESSIONS.get(session_id)
+def get_session_state_endpoint(session_id: str):
+    state = get_session_state(session_id)
     if not state:
         raise HTTPException(404, "Session not found")
     return SessionStateResponse(
@@ -205,16 +227,18 @@ def get_session_state(session_id: str):
         question_count=state.question_count,
         max_questions=state.max_questions,
         locked_topic=state.locked_topic,
-        weak_areas={k: v.dict() for k, v in state.weak_areas.items()},
+        weak_areas={k: v.dict() if hasattr(v, 'dict') else v for k, v in state.weak_areas.items()},
         topic_performance=state.topic_performance,
     )
 
 
 @app.delete("/interview/session/{session_id}")
 def end_session_early(session_id: str):
-    if session_id not in SESSIONS:
+    state = get_session_state(session_id)
+    if not state:
         raise HTTPException(404, "Session not found")
-    state = SESSIONS.pop(session_id)
+    
+    delete_session_state(session_id)
     return {"ended": True, "report": build_report(state)}
 
 
@@ -227,10 +251,16 @@ def build_report(state: InterviewState) -> dict:
     by_topic = {}
     for entry in state.performance_history:
         by_topic.setdefault(entry["topic"], []).append(entry["score"])
+    
+    weak_areas_sorted = {}
+    for topic_tag, w_area in state.weak_areas.items():
+        severity = w_area.severity if hasattr(w_area, 'severity') else w_area.get('severity', 0.0)
+        weak_areas_sorted[topic_tag] = severity
+
     return {
         "avg_by_topic": {t: round(sum(s) / len(s), 1) for t, s in by_topic.items()},
         "top_weak_areas": sorted(
-            [(k, v.severity) for k, v in state.weak_areas.items()],
+            weak_areas_sorted.items(),
             key=lambda x: -x[1],
         )[:5],
         "score_progression": [e["score"] for e in state.performance_history],

@@ -323,8 +323,8 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
 
         if (result?.success && result.feedbackId) {
           console.log(`✅ [Interview] Feedback saved with ID: ${result.feedbackId}`);
-          toast.success("Interview finished! Generating feedback...");
-          router.push(`/interview/${interview.id}/feedback`);
+          toast.success("Interview finished! Check your feedback card.");
+          router.push(`/interview`);
         } else {
           console.error("❌ [Interview] Feedback generation failed:", result);
           console.error("Error:", result?.error);
@@ -415,6 +415,14 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                 </Button>
 
                 <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/20"
+                    onClick={handleFinish}
+                    disabled={isSubmitting}
+                  >
+                    Exit & Save
+                  </Button>
                   <Button
                     type="button"
                     className="btn-secondary"

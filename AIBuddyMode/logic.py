@@ -50,7 +50,7 @@ def apply_evaluation(state: InterviewState, evaluation: dict, topic: str, answer
             )
 
     state.topic_performance.setdefault(topic, []).append(evaluation["score"])
-    state.asked_questions.append(state.current_question["description"])
+    state.asked_questions.append(state.current_question.get("title", state.current_question.get("description", "")))
     state.performance_history.append({
         "topic": topic,
         "question": state.current_question["description"],

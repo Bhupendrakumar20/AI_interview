@@ -44,6 +44,13 @@ services:
       - ollama_data:/root/.ollama
     restart: unless-stopped
 
+  redis:
+    image: redis:alpine
+    container_name: prepwise-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
 volumes:
   piston_packages:
     driver: local

@@ -18,6 +18,13 @@ export default async function RootLayout({ children }) {
     }
   }
 
+  // Bypass ResponsiveLayoutWrapper for dynamic full-screen buddy sessions (e.g. /interview/buddy/[inviteCode])
+  const isBuddySession = pathname.startsWith("/interview/buddy/") && pathname !== "/interview/buddy";
+
+  if (isBuddySession) {
+    return <>{children}</>;
+  }
+
   return (
     <ResponsiveLayoutWrapper user={user}>
       {children}

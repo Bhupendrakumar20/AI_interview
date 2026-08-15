@@ -12,6 +12,7 @@ import {
   MicOff,
   Lightbulb,
   CheckCircle,
+  CheckCircle2,
   AlertTriangle,
   Award,
   BookOpen,
@@ -32,7 +33,8 @@ import {
   ChevronRight,
   TrendingUp,
   User,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 import {
   Radar,
@@ -43,6 +45,7 @@ import {
   ResponsiveContainer
 } from "recharts";
 import { getAiNudge, evaluateMockTest, runCodeAction } from "@/lib/actions/mock-test-ai.action";
+import { getQuestionAnswer, getQuestionTips } from "@/lib/actions/mock-test.action";
 
 const INITIAL_CODE_TEMPLATES = {
   javascript: `// Write your JavaScript solution here\nfunction solve(input) {\n  console.log("Hello PrepWise JS");\n  return true;\n}\n\nsolve();`,
@@ -83,6 +86,15 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
   const [nudges, setNudges] = useState([]);
   const [loadingNudge, setLoadingNudge] = useState(false);
 
+  // Expected Answer / Tips — keyed by question index so results persist
+  // when navigating between questions and each question fetches independently.
+  const [answersByIndex, setAnswersByIndex] = useState({}); // { [index]: string }
+  const [tipsByIndex, setTipsByIndex] = useState({}); // { [index]: string[] }
+  const [loadingAnswer, setLoadingAnswer] = useState(false);
+  const [loadingTips, setLoadingTips] = useState(false);
+  const [answerError, setAnswerError] = useState(false);
+  const [tipsError, setTipsError] = useState(false);
+
   // Final evaluation feedback
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [evaluation, setEvaluation] = useState(null);
@@ -101,6 +113,9 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
     expectedAnswer: "Rubric...",
     tips: []
   };
+
+  const currentAnswer = answersByIndex[currentQuestionIndex];
+  const currentTips = tipsByIndex[currentQuestionIndex];
 
   // Sync templates on language selection change
   useEffect(() => {
@@ -448,6 +463,61 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
   };
 
   // ----------------------------------------------------
+  // Expected Answer / Tips — fetched on demand per question
+  // ----------------------------------------------------
+  const handleShowExpectedAnswer = async () => {
+    if (answersByIndex[currentQuestionIndex] || loadingAnswer) return;
+    setLoadingAnswer(true);
+    setAnswerError(false);
+    try {
+      const res = await getQuestionAnswer({
+        question: currentQuestion.question,
+        company: filters.company,
+        role: filters.role,
+        difficulty: filters.difficulty,
+      });
+      if (res.success) {
+        setAnswersByIndex((prev) => ({ ...prev, [currentQuestionIndex]: res.answer }));
+      } else {
+        setAnswerError(true);
+        toast.error("Failed to generate expected answer.");
+      }
+    } catch (err) {
+      console.error(err);
+      setAnswerError(true);
+      toast.error("AI Assistant connection error.");
+    } finally {
+      setLoadingAnswer(false);
+    }
+  };
+
+  const handleShowTips = async () => {
+    if (tipsByIndex[currentQuestionIndex] || loadingTips) return;
+    setLoadingTips(true);
+    setTipsError(false);
+    try {
+      const res = await getQuestionTips({
+        question: currentQuestion.question,
+        company: filters.company,
+        role: filters.role,
+        difficulty: filters.difficulty,
+      });
+      if (res.success) {
+        setTipsByIndex((prev) => ({ ...prev, [currentQuestionIndex]: res.tips }));
+      } else {
+        setTipsError(true);
+        toast.error("Failed to generate tips.");
+      }
+    } catch (err) {
+      console.error(err);
+      setTipsError(true);
+      toast.error("AI Assistant connection error.");
+    } finally {
+      setLoadingTips(false);
+    }
+  };
+
+  // ----------------------------------------------------
   // Structured AI Diagnostics Evaluation Submission
   // ----------------------------------------------------
   const handleSubmitTest = async () => {
@@ -619,19 +689,78 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
               {currentQuestion.question || currentQuestion.title}
             </h3>
 
-            {currentQuestion.tips && currentQuestion.tips.length > 0 && (
-              <div className="mt-2 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+            {/* Expected Answer / Tips buttons — fetch from AI only on click */}
+            <div className="flex flex-wrap gap-2 mt-1">
+              <Button
+                size="xs"
+                onClick={handleShowExpectedAnswer}
+                disabled={loadingAnswer}
+                className="h-7 px-2.5 text-xs flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white"
+              >
+                {loadingAnswer ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={12} />
+                )}
+                Expected Answer
+              </Button>
+              <Button
+                size="xs"
+                onClick={handleShowTips}
+                disabled={loadingTips}
+                className="h-7 px-2.5 text-xs flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200"
+              >
+                {loadingTips ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Lightbulb size={12} className="text-amber-500" />
+                )}
+                Tips
+              </Button>
+            </div>
+
+            {/* Expected Answer result panel */}
+            {(loadingAnswer || currentAnswer || answerError) && (
+              <div className="mt-1 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <h4 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 mb-1.5">
+                  <CheckCircle2 size={14} className="text-blue-500" /> Expected Answer
+                </h4>
+                {loadingAnswer && (
+                  <p className="text-xs text-slate-500 italic">Generating answer…</p>
+                )}
+                {answerError && !loadingAnswer && (
+                  <p className="text-xs text-rose-400">Couldn't generate an answer. Try again.</p>
+                )}
+                {currentAnswer && (
+                  <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-line">
+                    {currentAnswer}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Tips result panel */}
+            {(loadingTips || currentTips || tipsError) && (
+              <div className="mt-1 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
                 <h4 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 mb-1.5">
                   <Lightbulb size={14} className="text-amber-500" /> Key Considerations
                 </h4>
-                <ul className="text-xs text-slate-400 space-y-1 pl-1">
-                  {currentQuestion.tips.map((tip, idx) => (
-                    <li key={idx} className="flex items-start gap-1">
-                      <span>•</span>
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
+                {loadingTips && (
+                  <p className="text-xs text-slate-500 italic">Generating tips…</p>
+                )}
+                {tipsError && !loadingTips && (
+                  <p className="text-xs text-rose-400">Couldn't generate tips. Try again.</p>
+                )}
+                {currentTips && currentTips.length > 0 && (
+                  <ul className="text-xs text-slate-400 space-y-1 pl-1">
+                    {currentTips.map((tip, idx) => (
+                      <li key={idx} className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
           </div>
@@ -1093,4 +1222,3 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
     </div>
   );
 }
-

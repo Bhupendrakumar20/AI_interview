@@ -1,13 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  getMockTestQuestions,
-} from "@/lib/actions/mock-test.action";
-import { getPositionsForCompany, getCompanyById } from "@/lib/companies-data";
+import { getPositionsForCompany } from "@/lib/companies-data";
 import QuestionCard from "@/components/QuestionCard";
 import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
@@ -16,7 +13,6 @@ const DIFFICULTY_LEVELS = ["Easy", "Medium", "Hard"];
 
 export default function PracticePage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const companyName = searchParams.get("company") || "Google";
 
   const [selectedPosition, setSelectedPosition] = useState("");
@@ -24,49 +20,80 @@ export default function PracticePage() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
-  const [expandedQuestion, setExpandedQuestion] = useState(null);
 
   const companyId = companyName.toLowerCase().replace(/[^a-z0-9]/g, "-");
   const positions = getPositionsForCompany(companyId);
 
-  const handleLoadQuestions = useCallback(async () => {
-    if (!selectedPosition) {
-      toast.error("Please select a position");
-      return;
-    }
+  const requestIdRef = useRef(0);
+const abortControllerRef = useRef(null);
 
-    setLoading(true);
-    try {
-      const result = await getMockTestQuestions({
+const handleLoadQuestions = useCallback(async () => {
+  if (!selectedPosition) {
+    toast.error("Please select a position");
+    return;
+  }
+
+  if (abortControllerRef.current) abortControllerRef.current.abort();
+  const controller = new AbortController();
+  abortControllerRef.current = controller;
+  const myRequestId = ++requestIdRef.current;
+
+  setLoading(true);
+  setQuestions([]);
+  try {
+    const res = await fetch("/api/mock-test/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         company: companyName,
         role: selectedPosition,
         difficulty: selectedDifficulty,
         questionType: "Technical",
         count: 5,
-      });
+      }),
+      signal: controller.signal,
+    });
 
-      if (result.success) {
-        setQuestions(result.questions || []);
-        setQuestionsLoaded(true);
-        toast.success(
-          `Loaded ${result.totalQuestions || 0} questions for ${selectedPosition} at ${companyName}`
-        );
-      } else {
-        toast.error(result.error || "Failed to load questions");
-        setQuestions([]);
+    if (!res.ok || !res.body) throw new Error("Failed to start question stream");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let firstReceived = false;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (myRequestId !== requestIdRef.current) { reader.cancel(); return; }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const parsed = JSON.parse(line);
+        if (parsed.error) throw new Error(parsed.error);
+        if (myRequestId === requestIdRef.current) {
+          setQuestions(parsed.questions);
+          setQuestionsLoaded(true);
+          if (!firstReceived) { setLoading(false); firstReceived = true; }
+        }
       }
-    } catch (error) {
-      console.error("Error loading questions:", error);
-      toast.error("Failed to load practice questions");
-      setQuestions([]);
-    } finally {
-      setLoading(false);
     }
-  }, [selectedPosition, selectedDifficulty, companyName]);
 
-  const handleQuestionClick = (index) => {
-    setExpandedQuestion(expandedQuestion === index ? null : index);
-  };
+    if (myRequestId === requestIdRef.current) {
+      toast.success(`Loaded questions for ${selectedPosition} at ${companyName}`);
+    }
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    console.error("Error loading questions:", error);
+    toast.error("Failed to load practice questions");
+    if (myRequestId === requestIdRef.current) setQuestions([]);
+  } finally {
+    if (myRequestId === requestIdRef.current) setLoading(false);
+  }
+}, [selectedPosition, selectedDifficulty, companyName]);
 
   return (
     <div className="space-y-8">
@@ -159,7 +186,9 @@ export default function PracticePage() {
       {questionsLoaded && questions.length > 0 && (
         <section className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Practice Questions</h2>
+            <h2 className="text-2xl font-bold">
+              Practice Questions ({questions.length}/5)
+            </h2>
             <Button
               onClick={() => {
                 setQuestionsLoaded(false);
@@ -173,62 +202,25 @@ export default function PracticePage() {
 
           <div className="space-y-4">
             {questions.map((question, index) => (
-              <div key={index} className="card-border">
-                <div
-                  onClick={() => handleQuestionClick(index)}
-                  className="card p-4 cursor-pointer hover:bg-light-300 transition-colors"
-                >
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-light-900 text-lg">
-                        Question {index + 1}
-                      </h3>
-                      {expandedQuestion !== index && (
-                        <p className="text-light-100 text-sm mt-2 line-clamp-2">
-                          {question.question || question.title}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {expandedQuestion === index && (
-                    <div className="mt-4 space-y-3">
-                      <div>
-                        <p className="text-light-900 font-semibold">Question:</p>
-                        <p className="text-light-100 mt-2">
-                          {question.question || question.title}
-                        </p>
-                      </div>
-
-                      {question.hint && (
-                        <div>
-                          <p className="text-light-900 font-semibold">Hint:</p>
-                          <p className="text-light-100 mt-2">{question.hint}</p>
-                        </div>
-                      )}
-
-                      {question.example && (
-                        <div>
-                          <p className="text-light-900 font-semibold">Example:</p>
-                          <pre className="bg-light-300 p-3 rounded mt-2 text-sm text-light-100 overflow-x-auto">
-                            {question.example}
-                          </pre>
-                        </div>
-                      )}
-
-                      <Button className="w-full bg-primary-200 hover:bg-primary-100 text-white mt-4">
-                        Practice this Question
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <QuestionCard
+                key={index}
+                question={question}
+                index={index}
+                company={companyName}
+                role={selectedPosition}
+              />
             ))}
+            {loading && questions.length < 5 && (
+              <div className="flex items-center gap-2 text-sm text-light-100 py-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-200"></div>
+                Generating question {questions.length + 1} of 5…
+              </div>
+            )}
           </div>
         </section>
       )}
 
-      {questionsLoaded && questions.length === 0 && (
+      {questionsLoaded && questions.length === 0 && !loading && (
         <div className="card-border text-center py-12">
           <div className="card p-8">
             <p className="text-light-100 mb-4">

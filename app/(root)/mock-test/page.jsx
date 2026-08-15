@@ -1,23 +1,17 @@
-// Mock Test Page - PrepWise
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  getMockTestQuestions,
-  getAvailableFilters,
-} from "@/lib/actions/mock-test.action";
-import {
   MOCK_TEST_COMPANIES,
   DIFFICULTY_LEVELS,
-  QUESTION_TYPES,
 } from "@/lib/mock-test-constants";
 import QuestionCard from "@/components/QuestionCard";
 import MockTestWorkspace from "@/components/MockTestWorkspace";
 import { toast } from "sonner";
-import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Lightbulb, Star } from "lucide-react";
+import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Star } from "lucide-react";
 
 const TEST_TYPES = [
   { id: "technical", name: "Technical Round", icon: Laptop, desc: "Core technical concepts", color: "from-purple-500 to-indigo-600" },
@@ -49,47 +43,105 @@ export default function MockTestPage() {
 
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [expandedQuestion, setExpandedQuestion] = useState(null);
   const [searchRole, setSearchRole] = useState(filters.role);
   const [selectedTestType, setSelectedTestType] = useState(TEST_TYPES[0]);
-  const [testHistory, setTestHistory] = useState([]);
   const [isTestActive, setIsTestActive] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState(null);
 
-  // Load questions on filter change
-  useEffect(() => {
-    loadQuestions();
-  }, [filters]);
+  // Tracks the "current" request so stale/overlapping responses can be ignored
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef(null);
+  const debounceTimerRef = useRef(null);
 
-  const loadQuestions = useCallback(async () => {
+  const loadQuestions = useCallback(async (activeFilters) => {
+    // Cancel any in-flight request before starting a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const myRequestId = ++requestIdRef.current;
+
     setLoading(true);
+    setQuestions([]);
     try {
-      console.log("Loading questions with filters:", filters);
-
-      const result = await getMockTestQuestions({
-        company: filters.company,
-        role: filters.role,
-        difficulty: filters.difficulty,
-        questionType: filters.type,
-        count: filters.count,
+      const res = await fetch("/api/mock-test/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: activeFilters.company,
+          role: activeFilters.role,
+          difficulty: activeFilters.difficulty,
+          questionType: activeFilters.type,
+          count: activeFilters.count,
+        }),
+        signal: controller.signal,
       });
 
-      if (result.success) {
-        setQuestions(result.questions || []);
-        toast.success(
-          `Loaded ${result.totalQuestions || 0} questions for ${filters.company}`
-        );
-      } else {
-        toast.error(result.error || "Failed to load questions");
-        setQuestions([]);
+      if (!res.ok || !res.body) {
+        throw new Error("Failed to start question stream");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let firstReceived = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        // If a newer request has started, stop applying this one's results
+        if (myRequestId !== requestIdRef.current) {
+          reader.cancel();
+          return;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const parsed = JSON.parse(line);
+
+          if (parsed.error) {
+            throw new Error(parsed.error);
+          }
+
+          // Only apply if this is still the latest request
+          if (myRequestId === requestIdRef.current) {
+            setQuestions(parsed.questions);
+            if (!firstReceived) {
+              setLoading(false);
+              firstReceived = true;
+            }
+          }
+        }
+      }
+
+      if (myRequestId === requestIdRef.current) {
+        toast.success(`Loaded questions for ${activeFilters.company}`);
       }
     } catch (error) {
+      if (error.name === "AbortError") return; // expected when superseded — not a real error
       console.error("Error loading questions:", error);
       toast.error("Failed to load mock test questions");
-      setQuestions([]);
+      if (myRequestId === requestIdRef.current) setQuestions([]);
     } finally {
-      setLoading(false);
+      if (myRequestId === requestIdRef.current) setLoading(false);
     }
+  }, []);
+
+  // Debounced trigger: fires ~500ms after filters stop changing
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      loadQuestions(filters);
+    }, 500);
+
+    return () => clearTimeout(debounceTimerRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const handleFilterChange = (key, value) => {
@@ -108,10 +160,6 @@ export default function MockTestPage() {
     handleFilterChange("role", value);
   };
 
-  const handleQuestionClick = (index) => {
-    setExpandedQuestion(expandedQuestion === index ? null : index);
-  };
-
   const handleStartTest = () => {
     if (questions.length === 0) {
       toast.error("No questions loaded");
@@ -122,9 +170,9 @@ export default function MockTestPage() {
 
   const getDifficultyBadge = (diff) => {
     const badges = {
-      "Easy": "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
-      "Medium": "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30",
-      "Hard": "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30",
+      Easy: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+      Medium: "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30",
+      Hard: "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30",
     };
     return badges[diff] || badges["Medium"];
   };
@@ -145,28 +193,27 @@ export default function MockTestPage() {
       <section className="relative pt-12 pb-8 px-8 border-b border-border">
         <div className="max-w-7xl mx-auto">
           <div className="relative backdrop-blur-sm rounded-2xl border border-border bg-card p-8 overflow-hidden shadow-sm">
-            {/* Decorative orbs */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full filter blur-3xl -z-10 opacity-30" />
             <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-500/5 rounded-full filter blur-3xl -z-10 opacity-20" />
- 
+
             <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5 mb-4">
                   <Target size={14} className="text-primary animate-pulse" />
                   <span className="text-xs font-bold text-primary uppercase tracking-widest">Practice Mode</span>
                 </div>
- 
+
                 <h1 className="text-4xl md:text-5xl font-bold mb-3">
                   Mock Interview Tests
                   <span className="text-primary ml-2">For PrepWise</span>
                 </h1>
- 
+
                 <p className="text-muted-foreground text-base max-w-md mb-6 leading-relaxed">
                   Master technical interviews with company-specific questions and real-time feedback
                 </p>
- 
+
                 <div className="flex flex-wrap gap-4">
-                  <Button 
+                  <Button
                     onClick={handleStartTest}
                     className="btn-primary flex items-center gap-2 px-6 py-2.5"
                   >
@@ -177,8 +224,7 @@ export default function MockTestPage() {
                   </Button>
                 </div>
               </div>
- 
-              {/* Stats */}
+
               <div className="flex gap-8">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary">{MOCK_TEST_COMPANIES.length}</div>
@@ -194,14 +240,14 @@ export default function MockTestPage() {
           </div>
         </div>
       </section>
- 
+
       {/* MAIN CONTENT */}
       <section className="max-w-7xl mx-auto px-8 py-12">
         {/* TEST TYPE SELECTION */}
         <div className="mb-12">
           <h2 className="text-2xl font-bold mb-1 tracking-tight text-foreground" style={{ letterSpacing: "-0.02em" }}>Select Test Type</h2>
           <p className="text-muted-foreground text-sm mb-6">Choose the type of interview round you want to practice</p>
- 
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {TEST_TYPES.map((type) => (
               <div
@@ -209,10 +255,10 @@ export default function MockTestPage() {
                 onClick={() => {
                   setSelectedTestType(type);
                   const typeMapping = {
-                    "technical": "Technical",
-                    "behavioral": "Behavioral",
+                    technical: "Technical",
+                    behavioral: "Behavioral",
                     "system-design": "System Design",
-                    "coding": "Coding"
+                    coding: "Coding",
                   };
                   handleFilterChange("type", typeMapping[type.id] || "Technical");
                 }}
@@ -238,10 +284,9 @@ export default function MockTestPage() {
             ))}
           </div>
         </div>
- 
+
         {/* CONFIG PANEL */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-          {/* Configuration Card */}
           <div className="lg:col-span-2">
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="px-6 py-4 border-b border-border flex items-center gap-3">
@@ -251,10 +296,9 @@ export default function MockTestPage() {
                   <p className="text-xs text-muted-foreground">Customize your mock test settings</p>
                 </div>
               </div>
- 
+
               <div className="p-6 space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Company */}
                   <div>
                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
                       Company
@@ -271,8 +315,7 @@ export default function MockTestPage() {
                       ))}
                     </select>
                   </div>
- 
-                  {/* Role */}
+
                   <div>
                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
                       Role
@@ -285,8 +328,7 @@ export default function MockTestPage() {
                       className="bg-secondary border-border text-foreground placeholder:text-muted-foreground/50 text-sm h-10"
                     />
                   </div>
- 
-                  {/* Difficulty */}
+
                   <div>
                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
                       Difficulty
@@ -311,8 +353,7 @@ export default function MockTestPage() {
                       ))}
                     </div>
                   </div>
- 
-                  {/* Question Count */}
+
                   <div>
                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
                       Questions
@@ -328,7 +369,7 @@ export default function MockTestPage() {
                     <div className="text-right text-xs text-muted-foreground mt-1">{filters.count} questions</div>
                   </div>
                 </div>
- 
+
                 <button
                   onClick={handleStartTest}
                   className="w-full btn-primary flex items-center justify-center gap-2 py-3 px-4 mt-4"
@@ -338,8 +379,7 @@ export default function MockTestPage() {
               </div>
             </div>
           </div>
- 
-          {/* Preview Card */}
+
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="px-6 py-4 border-b border-border flex items-center gap-3">
               <Eye size={20} className="text-primary" />
@@ -348,7 +388,7 @@ export default function MockTestPage() {
                 <p className="text-xs text-muted-foreground">Summary</p>
               </div>
             </div>
- 
+
             <div className="p-6 space-y-4">
               <div className="bg-secondary/40 border border-border/50 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-border/40">
@@ -370,16 +410,16 @@ export default function MockTestPage() {
                   <span className="font-bold text-primary">{filters.count}</span>
                 </div>
               </div>
- 
+
               <div className="bg-secondary/40 border border-border/50 rounded-lg p-3 space-y-2">
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">✓ Questions loaded</p>
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">✓ Timer enabled</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">✓ Questions stream in live</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">✓ Answer & tips on demand</p>
                 <p className="text-xs text-muted-foreground flex items-center gap-1.5">✓ You can review</p>
               </div>
             </div>
           </div>
         </div>
- 
+
         {/* CURATED PACKS */}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-6">
@@ -391,7 +431,7 @@ export default function MockTestPage() {
               View All
             </Button>
           </div>
- 
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {CURATED_PACKS.map((pack) => (
               <div key={pack.id} className="rounded-lg border border-border bg-card p-4 hover:border-primary/50 transition-all cursor-pointer group shadow-sm">
@@ -401,7 +441,7 @@ export default function MockTestPage() {
                     <p className="text-xs text-muted-foreground mt-0.5">{pack.questions} questions</p>
                   </div>
                   <span className={`text-xs font-bold px-2 py-1 rounded border ${
-                    pack.level === "Easy" 
+                    pack.level === "Easy"
                       ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                       : pack.level === "Medium"
                       ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30"
@@ -423,22 +463,22 @@ export default function MockTestPage() {
             ))}
           </div>
         </div>
- 
+
         {/* QUESTIONS LIST */}
         <div className="mb-12">
           <h2 className="text-2xl font-bold mb-1 tracking-tight text-foreground" style={{ letterSpacing: "-0.02em" }}>Practice Questions</h2>
           <p className="text-muted-foreground text-sm mb-6">
-            {questions.length} questions for {filters.company} - {filters.role} ({filters.difficulty})
+            {questions.length} of {filters.count} questions for {filters.company} - {filters.role} ({filters.difficulty})
           </p>
- 
-          {loading ? (
+
+          {loading && questions.length === 0 ? (
             <div className="flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
             </div>
           ) : questions.length === 0 ? (
             <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
               <p className="text-muted-foreground mb-4">No questions loaded yet</p>
-              <Button 
+              <Button
                 onClick={handleStartTest}
                 className="btn-primary"
               >
@@ -448,46 +488,20 @@ export default function MockTestPage() {
           ) : (
             <div className="space-y-4">
               {questions.slice(0, 5).map((q, index) => (
-                <div
+                <QuestionCard
                   key={index}
-                  className="rounded-lg border border-border bg-card p-5 hover:border-primary/50 transition-all cursor-pointer shadow-sm"
-                  onClick={() => handleQuestionClick(index)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-sm font-bold text-primary">Q{index + 1}</span>
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${getDifficultyBadge(q.difficulty)}`}>
-                          {q.difficulty || "Medium"}
-                        </span>
-                      </div>
-                      <p className="text-foreground font-medium">{q.question}</p>
-                    </div>
-                    <span className="text-primary text-sm font-semibold ml-4">
-                      {expandedQuestion === index ? "Hide" : "Show"}
-                    </span>
-                  </div>
- 
-                  {expandedQuestion === index && (
-                    <div className="mt-4 pt-4 border-t border-border">
-                      <p className="text-muted-foreground text-sm mb-3"><strong>Expected Answer:</strong></p>
-                      <p className="text-foreground text-sm leading-relaxed">{q.expectedAnswer}</p>
-                      {q.tips && q.tips.length > 0 && (
-                        <div className="mt-4">
-                          <p className="font-bold text-foreground text-sm mb-2 flex items-center gap-1.5">
-                            <Lightbulb size={16} className="text-amber-500" /> Tips:
-                          </p>
-                          <ul className="space-y-1 pl-1">
-                            {q.tips.map((tip, i) => (
-                              <li key={i} className="text-muted-foreground text-sm">• {tip}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                  question={q}
+                  index={index}
+                  company={filters.company}
+                  role={filters.role}
+                />
               ))}
+              {questions.length < filters.count && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  Generating question {questions.length + 1} of {filters.count}…
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -1,122 +1,132 @@
-// components/QuestionCard.jsx
-import { Button } from "@/components/ui/button";
+"use client";
 
-const QuestionCard = ({
-  question,
-  index,
-  isExpanded,
-  onToggle,
-  company,
-}) => {
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty?.toLowerCase()) {
-      case "easy":
-        return "bg-green-500/20 text-green-300 border-green-500/30";
-      case "medium":
-        return "bg-yellow-500/20 text-yellow-300 border-yellow-500/30";
-      case "hard":
-        return "bg-red-500/20 text-red-300 border-red-500/30";
-      default:
-        return "bg-primary-200/20 text-primary-200 border-primary-200/30";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { getQuestionAnswer, getQuestionTips } from "@/lib/actions/mock-test.action";
+import { Loader2, CheckCircle2, Lightbulb } from "lucide-react";
+
+const getDifficultyBadge = (diff) => {
+  const badges = {
+    Easy: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+    Medium: "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30",
+    Hard: "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30",
+  };
+  return badges[diff] || badges["Medium"];
+};
+
+export default function QuestionCard({ question, index, company, role }) {
+  const [answer, setAnswer] = useState(null);
+  const [tips, setTips] = useState(null);
+  const [loadingAnswer, setLoadingAnswer] = useState(false);
+  const [loadingTips, setLoadingTips] = useState(false);
+  const [answerError, setAnswerError] = useState(false);
+  const [tipsError, setTipsError] = useState(false);
+
+  const handleShowAnswer = async () => {
+    if (answer || loadingAnswer) return;
+    setLoadingAnswer(true);
+    setAnswerError(false);
+    try {
+      const res = await getQuestionAnswer({
+        question: question.question,
+        company,
+        role,
+        difficulty: question.difficulty,
+      });
+      if (res.success) {
+        setAnswer(res.answer);
+      } else {
+        setAnswerError(true);
+      }
+    } catch {
+      setAnswerError(true);
+    } finally {
+      setLoadingAnswer(false);
+    }
+  };
+
+  const handleShowTips = async () => {
+    if (tips || loadingTips) return;
+    setLoadingTips(true);
+    setTipsError(false);
+    try {
+      const res = await getQuestionTips({
+        question: question.question,
+        company,
+        role,
+        difficulty: question.difficulty,
+      });
+      if (res.success) {
+        setTips(res.tips);
+      } else {
+        setTipsError(true);
+      }
+    } catch {
+      setTipsError(true);
+    } finally {
+      setLoadingTips(false);
     }
   };
 
   return (
-    <div className="card-border">
-      <div className="card p-5">
-        {/* Question Header */}
-        <div
-          className="cursor-pointer"
-          onClick={onToggle}
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-sm font-semibold text-primary-200">
-                  Question {index + 1}
-                </span>
-                <span
-                  className={`text-xs px-3 py-1 rounded-full border ${getDifficultyColor(
-                    question.difficulty
-                  )}`}
-                >
-                  {question.difficulty || "Medium"}
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-light-200 hover:text-primary-200 transition">
-                {question.question}
-              </h3>
-            </div>
-            <button className="text-primary-200 text-xl ml-4">
-              {isExpanded ? "−" : "+"}
-            </button>
-          </div>
-        </div>
-
-        {/* Expanded Content */}
-        {isExpanded && (
-          <div className="border-t border-dark-300 pt-6 mt-4 space-y-6">
-            {/* Expected Answer */}
-            <div>
-              <h4 className="text-sm font-bold text-light-100 mb-3 uppercase tracking-wider">
-                Expected Answer / Approach
-              </h4>
-              <div className="bg-dark-300/50 border border-dark-400 rounded p-4 text-light-200 text-sm leading-relaxed whitespace-pre-wrap">
-                {question.expectedAnswer}
-              </div>
-            </div>
-
-            {/* Tips */}
-            {question.tips && Array.isArray(question.tips) && question.tips.length > 0 && (
-              <div>
-                <h4 className="text-sm font-bold text-light-100 mb-3 uppercase tracking-wider">
-                  Tips for Success
-                </h4>
-                <ul className="space-y-2">
-                  {question.tips.map((tip, tipIndex) => (
-                    <li key={tipIndex} className="flex gap-3 text-sm text-light-200">
-                      <span className="text-primary-200 font-bold flex-shrink-0">
-                        {tipIndex + 1}.
-                      </span>
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Company Context */}
-            <div className="bg-primary-200/10 border border-primary-200/30 rounded p-4">
-              <p className="text-sm text-light-200">
-                <span className="font-semibold text-primary-200">
-                  {company} Context:
-                </span>{" "}
-                This question tests skills commonly evaluated at {company}.
-                Focus on clarity, technical depth, and real-world application.
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-4 border-t border-dark-300">
-              <Button className="btn-primary flex-1">
-                Practice This Question
-              </Button>
-              <Button className="btn-secondary">
-                Save for Later
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Collapsed State - Preview */}
-        {!isExpanded && (
-          <div className="text-sm text-light-100/60 mt-2">
-            Click to view expected answer and tips
-          </div>
-        )}
+    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="flex items-center gap-3 mb-2">
+        <span className="text-sm font-bold text-primary">Q{index + 1}</span>
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${getDifficultyBadge(question.difficulty)}`}>
+          {question.difficulty || "Medium"}
+        </span>
       </div>
+
+      <p className="text-foreground font-medium mb-4">{question.question}</p>
+
+      <div className="flex flex-wrap gap-3">
+        <Button
+          size="sm"
+          onClick={handleShowAnswer}
+          disabled={loadingAnswer}
+          className="flex items-center gap-2 bg-primary-200 hover:bg-primary-100 text-white"
+        >
+          {loadingAnswer ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+          Expected Answer
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleShowTips}
+          disabled={loadingTips}
+          className="flex items-center gap-2 bg-light-400 hover:bg-light-300 text-light-900"
+        >
+          {loadingTips ? <Loader2 size={14} className="animate-spin" /> : <Lightbulb size={14} />}
+          Tips
+        </Button>
+      </div>
+
+      {(loadingAnswer || answer || answerError) && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <p className="text-sm font-semibold text-foreground mb-1">Expected Answer</p>
+          {loadingAnswer && <p className="text-sm text-muted-foreground">Generating answer…</p>}
+          {answerError && <p className="text-sm text-rose-500">Couldn't generate an answer. Try again.</p>}
+          {answer && (
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{answer}</p>
+          )}
+        </div>
+      )}
+
+      {(loadingTips || tips || tipsError) && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <p className="text-sm font-semibold text-foreground mb-1 flex items-center gap-1.5">
+            <Lightbulb size={14} className="text-amber-500" /> Tips
+          </p>
+          {loadingTips && <p className="text-sm text-muted-foreground">Generating tips…</p>}
+          {tipsError && <p className="text-sm text-rose-500">Couldn't generate tips. Try again.</p>}
+          {tips && (
+            <ul className="space-y-1">
+              {tips.map((t, i) => (
+                <li key={i} className="text-sm text-muted-foreground">• {t}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
-};
-
-export default QuestionCard;
+}

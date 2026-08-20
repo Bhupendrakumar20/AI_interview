@@ -15,6 +15,7 @@ from typing import Optional, List
 
 import spacy
 from sentence_transformers import SentenceTransformer
+from langchain.embeddings import HuggingFaceEmbeddings
 
 
 # ─────────────────────────────────────────────────────────────
@@ -32,12 +33,20 @@ def get_nlp() -> spacy.Language:
     return _nlp
 
 
-def get_embedder() -> SentenceTransformer:
+def get_embedder() -> HuggingFaceEmbeddings:
     global _embedder
+
     if _embedder is None:
-        print("\n⏳ Loading AI Model...")
-        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
-        print("✅ AI Model Loaded Successfully\n")
+        print("\n⏳ Loading Hugging Face embedding model...")
+
+        _embedder = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True}
+        )
+
+        print("✅ Hugging Face embedding model loaded\n")
+
     return _embedder
 
 

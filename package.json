@@ -12,6 +12,8 @@
     "lint": "next lint",
     "piston:start": "node server/piston-local-server.js",
     "python:start": ".venv\\Scripts\\python -m uvicorn ResumeInterview.api:app --reload --port 8080",
+    "python:lightweight": ".venv\\Scripts\\python -m uvicorn ResumeInterview.lightweight_api.api:app --reload --port 8080",
+    "python:ml": ".venv\\Scripts\\python -m uvicorn ResumeInterview.ml_api.api:app --reload --port 8081",
     "piston:status": "node -e \"fetch('http://localhost:2000/api/v2/piston/runtimes').then(r=>r.json()).then(d=>console.log('Runtimes:',d.map(r=>r.language+' '+r.version).join(', '))).catch(e=>console.log('Piston offline:',e.message))\""
   },
   "dependencies": {

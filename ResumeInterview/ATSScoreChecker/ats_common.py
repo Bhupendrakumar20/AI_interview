@@ -13,31 +13,30 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional, List
 
-import spacy
-from sentence_transformers import SentenceTransformer
-from langchain.embeddings import HuggingFaceEmbeddings
-
 
 # ─────────────────────────────────────────────────────────────
 # MODEL LOADING
 # ─────────────────────────────────────────────────────────────
 
-_nlp: Optional[spacy.Language] = None
-_embedder: Optional[SentenceTransformer] = None
+_nlp = None
+_embedder = None
 
 
-def get_nlp() -> spacy.Language:
+def get_nlp():
     global _nlp
     if _nlp is None:
+        import spacy
         _nlp = spacy.load("en_core_web_sm")
     return _nlp
 
 
-def get_embedder() -> HuggingFaceEmbeddings:
+def get_embedder():
     global _embedder
 
     if _embedder is None:
         print("\n⏳ Loading Hugging Face embedding model...")
+
+        from langchain_huggingface import HuggingFaceEmbeddings
 
         _embedder = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2",

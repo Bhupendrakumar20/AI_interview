@@ -22,6 +22,7 @@ import re
 import hashlib
 import logging
 import requests
+from functools import lru_cache
 from dotenv import load_dotenv
 from langchain_community.document_loaders import CSVLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -43,7 +44,10 @@ def log(msg, level="info"):
     getattr(logger, level)(msg)
 
 
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+@lru_cache(maxsize=1)
+def get_embeddings():
+    """Load the embedding model only when resume optimization is requested."""
+    return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 RESUME_SCHEMA_EXAMPLE = {
     "name": "Full Name",
@@ -255,14 +259,14 @@ def should_rebuild_index(csv_path, hash_file=HASH_FILE):
 
 def create_vectorstore(docs):
     log("[Vectorstore] Building FAISS index...")
-    db = FAISS.from_documents(docs, embeddings)
+    db = FAISS.from_documents(docs, get_embeddings())
     db.save_local("faiss_index")
     return db
 
 
 def load_vectorstore():
     log("[Vectorstore] Loading existing FAISS index...")
-    return FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+    return FAISS.load_local("faiss_index", get_embeddings(), allow_dangerous_deserialization=True)
 
 
 def build_targeted_query(resume_json):
@@ -390,7 +394,11 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CSV_PATH = os.path.join(BASE_DIR, "final_jobs.csv")
-def generate_optimized_resume(parsed_resume: dict, csv_path: str = CSV_PATH) -> dict:
+def generate_optimized_resume(
+    parsed_resume: dict,
+    ats_result: dict | None = None,
+    csv_path: str = CSV_PATH,
+) -> dict:
     """
     Takes a parsed resume dict (from ResumeParser.parse_resume) and returns
     a job-market-optimized version, using FAISS + Ollama.

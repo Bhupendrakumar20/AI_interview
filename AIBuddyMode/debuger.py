@@ -23,6 +23,17 @@ class RawPromptRequest(BaseModel):
     temperature: float = 0.3
 
 
+@debug_router.get("/ollama-config")
+def get_ollama_config():
+    """Reports the loaded Ollama target without making a model request."""
+    return {
+        "source": OLLAMA_SOURCE,
+        "url": OLLAMA_URL,
+        "model": MODEL_NAME,
+        "authentication_configured": OLLAMA_AUTH is not None,
+    }
+
+
 @debug_router.get("/ollama-health")
 def check_ollama_health():
     """Confirms Ollama specifically is reachable — this checks ONLY the local

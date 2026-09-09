@@ -43,12 +43,13 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
     formatting between models.
     """
     # 1. Try Ollama
-    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
-    if not ollama_url.endswith("/api/generate") and not ollama_url.endswith("/api/chat"):
-        ollama_url = f"{ollama_url.rstrip('/')}/api/generate"
-    model_name = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+    ollama_url = OLLAMA_URL
+    model_name = MODEL_NAME
 
-    logger.info(f"[LLM Fallback] Attempting Ollama with model {model_name}...")
+    logger.info(
+        f"[LLM Fallback] Attempting Ollama ({OLLAMA_SOURCE}) at {ollama_url} "
+        f"with model {model_name}..."
+    )
     start = time.time()
     try:
         response = requests.post(
@@ -71,7 +72,12 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
         elapsed = round(time.time() - start, 1)
         if result and result.strip():
             logger.info(f"[LLM Fallback] Ollama responded in {elapsed}s")
-            return {"text": result, "source": "ollama"}
+            return {
+                "text": result,
+                "source": "ollama",
+                "ollama_source": OLLAMA_SOURCE,
+                "ollama_url": ollama_url,
+            }
         raise Exception("Ollama returned empty response.")
     except Exception as e:
         logger.warning(f"[LLM Fallback] Ollama failed after {round(time.time() - start, 1)}s: {e}. Trying cloud fallbacks...")

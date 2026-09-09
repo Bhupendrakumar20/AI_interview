@@ -1,5 +1,6 @@
 import os
 import requests
+from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv
 
 # Load .env.local from the grandparent directory (project root)
@@ -11,6 +12,17 @@ if os.path.exists(env_local_path):
 else:
     load_dotenv()
 
+OLLAMA_URL = os.environ.get(
+    "OLLAMA_URL", "https://audible-nanny-slacks.ngrok-free.dev/api/generate"
+).strip()
+if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
+    OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+OLLAMA_USERNAME = os.environ.get("OLLAMA_USERNAME", "").strip()
+OLLAMA_PASSWORD = os.environ.get("OLLAMA_PASSWORD", "")
+OLLAMA_AUTH = HTTPBasicAuth(OLLAMA_USERNAME, OLLAMA_PASSWORD) if OLLAMA_USERNAME else None
+
+
 def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float = 0.9) -> str:
     """
     Tries to generate text using the following fallback chain:
@@ -19,12 +31,10 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
     3. Groq API (cloud, via GROQ_API_KEY)
     """
     # 1. Try Ollama
-    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
-    if not ollama_url.endswith("/api/generate") and not ollama_url.endswith("/api/chat"):
-        ollama_url = f"{ollama_url.rstrip('/')}/api/generate"
-    model_name = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+    ollama_url = OLLAMA_URL
+    model_name = OLLAMA_MODEL
 
-    print(f"[LLM Fallback] Attempting Ollama with model {model_name}...")
+    print(f"[LLM Fallback] Attempting Ollama at {ollama_url} with model {model_name}...")
     try:
         response = requests.post(
             ollama_url,
@@ -37,7 +47,8 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
                     "top_p": top_p
                 }
             },
-            timeout=180 # reasonably short timeout for local ollama
+            auth=OLLAMA_AUTH,
+            timeout=180 # reasonably short timeout for Ollama
         )
         response.raise_for_status()
         result = response.json().get("response")

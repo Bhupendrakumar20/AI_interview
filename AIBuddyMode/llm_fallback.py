@@ -2,7 +2,9 @@
 import os
 import time
 import logging
+from urllib.parse import urlparse
 import requests
+from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,10 +16,15 @@ else:
     load_dotenv()
 
 # llm_fallback.py — add near the top, after load_dotenv calls
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
 if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
     OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
 MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+OLLAMA_USERNAME = os.environ.get("OLLAMA_USERNAME", "").strip()
+OLLAMA_PASSWORD = os.environ.get("OLLAMA_PASSWORD", "")
+OLLAMA_AUTH = HTTPBasicAuth(OLLAMA_USERNAME, OLLAMA_PASSWORD) if OLLAMA_USERNAME else None
+OLLAMA_HOST = urlparse(OLLAMA_URL).hostname or ""
+OLLAMA_SOURCE = "localhost" if OLLAMA_HOST in {"localhost", "127.0.0.1", "::1"} else "remote"
 
 logger = logging.getLogger("llm_fallback")
 
@@ -36,7 +43,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
     formatting between models.
     """
     # 1. Try Ollama
-    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
     if not ollama_url.endswith("/api/generate") and not ollama_url.endswith("/api/chat"):
         ollama_url = f"{ollama_url.rstrip('/')}/api/generate"
     model_name = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
@@ -56,6 +63,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
                     "num_predict": num_predict,
                 },
             },
+            auth=OLLAMA_AUTH,
             timeout=360,  # generous enough for a warm local model; adjust if you see frequent timeouts
         )
         response.raise_for_status()

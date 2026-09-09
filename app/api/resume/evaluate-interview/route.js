@@ -33,8 +33,13 @@ export async function POST(request) {
     }
 
     // Try local Ollama model first if available
-    const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+    const OLLAMA_URL = (process.env.OLLAMA_URL || "https://audible-nanny-slacks.ngrok-free.dev").trim();
     const MODEL_NAME = process.env.OLLAMA_MODEL || "gemma3:4b";
+    const OLLAMA_USERNAME = (process.env.OLLAMA_USERNAME || "").trim();
+    const OLLAMA_PASSWORD = process.env.OLLAMA_PASSWORD || "";
+    const authHeader = OLLAMA_USERNAME
+      ? `Basic ${Buffer.from(`${OLLAMA_USERNAME}:${OLLAMA_PASSWORD}`).toString("base64")}`
+      : undefined;
     
     let evaluationData = null;
 
@@ -64,7 +69,10 @@ export async function POST(request) {
 
       const response = await fetch(`${OLLAMA_URL.replace(/\/$/, "")}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
         body: JSON.stringify({
           model: MODEL_NAME,
           messages: [{ role: "user", content: prompt }],

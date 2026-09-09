@@ -16,7 +16,9 @@ else:
     load_dotenv()
 
 # llm_fallback.py — add near the top, after load_dotenv calls
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
+OLLAMA_URL = os.environ.get(
+    "OLLAMA_URL", "https://audible-nanny-slacks.ngrok-free.dev/api/generate"
+).strip()
 if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
     OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
 MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")

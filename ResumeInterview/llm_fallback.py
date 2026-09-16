@@ -12,11 +12,14 @@ if os.path.exists(env_local_path):
 else:
     load_dotenv()
 
-OLLAMA_URL = os.environ.get(
-    "OLLAMA_URL", "https://audible-nanny-slacks.ngrok-free.dev/api/generate"
+OLLAMA_URL = (
+    os.environ.get("OLLAMA_URL") or
+    os.environ.get("OLLAMA_URL_2") or
+    "http://localhost:11434/api/generate"
 ).strip()
 if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
     OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
 OLLAMA_USERNAME = os.environ.get("OLLAMA_USERNAME", "").strip()
 OLLAMA_PASSWORD = os.environ.get("OLLAMA_PASSWORD", "")
@@ -26,7 +29,7 @@ OLLAMA_AUTH = HTTPBasicAuth(OLLAMA_USERNAME, OLLAMA_PASSWORD) if OLLAMA_USERNAME
 def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float = 0.9) -> str:
     """
     Tries to generate text using the following fallback chain:
-    1. Ollama (local)
+    1. Ollama (local or remote tunnel)
     2. Gemini API (cloud, via GOOGLE_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY)
     3. Groq API (cloud, via GROQ_API_KEY)
     """
@@ -60,12 +63,11 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
         print(f"[LLM Fallback] Ollama failed: {e}. Checking cloud fallbacks...")
 
     # 2. Try Gemini API
-    gemini_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY") or os.environ.get("GROQ_API_KEY")
-    # Wait, check if gemini_key looks like a Groq key (starts with gsk_). If so, we skip to Groq or let it fall through.
-    if gemini_key and not gemini_key.startswith("gsk_"):
+    gemini_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
+    if gemini_key and gemini_key.startswith("AIzaSy"):
         print("[LLM Fallback] Attempting Gemini API...")
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={gemini_key}"
             headers = {"Content-Type": "application/json"}
             payload = {
                 "contents": [

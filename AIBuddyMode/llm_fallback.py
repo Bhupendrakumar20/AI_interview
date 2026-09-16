@@ -15,12 +15,15 @@ if os.path.exists(env_local_path):
 else:
     load_dotenv()
 
-# llm_fallback.py — add near the top, after load_dotenv calls
-OLLAMA_URL = os.environ.get(
-    "OLLAMA_URL", "https://audible-nanny-slacks.ngrok-free.dev/api/generate"
+# Resolve Ollama URL: environment variable > local default
+OLLAMA_URL = (
+    os.environ.get("OLLAMA_URL") or
+    os.environ.get("OLLAMA_URL_2") or
+    "http://localhost:11434/api/generate"
 ).strip()
 if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
     OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+
 MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
 OLLAMA_USERNAME = os.environ.get("OLLAMA_USERNAME", "").strip()
 OLLAMA_PASSWORD = os.environ.get("OLLAMA_PASSWORD", "")
@@ -35,7 +38,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
                             num_predict: int = 1024) -> dict:
     """
     Fallback chain for the adaptive interview's question generation and evaluation:
-    1. Ollama (local)
+    1. Ollama (local or remote tunnel)
     2. Gemini API (cloud)
     3. Groq API (cloud)
 
@@ -86,10 +89,10 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
 
     # 2. Try Gemini API
     gemini_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
-    if gemini_key:
+    if gemini_key and gemini_key.startswith("AIzaSy"):
         logger.info("[LLM Fallback] Attempting Gemini API...")
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={gemini_key}"
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"temperature": temperature},

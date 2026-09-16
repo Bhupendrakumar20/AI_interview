@@ -114,12 +114,14 @@ export async function GET(request) {
     };
 
     // Check 5: Piston Code Execution Service
-    const pistonUrl = process.env.PISTON_API_URL || "http://localhost:2000/api/v2/piston";
+    const configuredPistonUrl = process.env.PISTON_API_URL || "http://localhost:2000/api/v2/piston";
+    let pistonUrl = configuredPistonUrl;
+    let pistonOk = false;
+    let pistonDetail = "";
+
     try {
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 3000);
-      let pistonOk = false;
-      let pistonDetail = "";
+      const tid = setTimeout(() => controller.abort(), 2000);
       try {
         const pistonRes = await fetch(`${pistonUrl}/runtimes`, {
           method: "GET",
@@ -128,12 +130,38 @@ export async function GET(request) {
         });
         pistonOk = pistonRes.ok;
         if (!pistonOk) {
-          const body = await pistonRes.text();
-          pistonDetail = body.substring(0, 200);
+          pistonDetail = `HTTP ${pistonRes.status}`;
         }
       } finally {
         clearTimeout(tid);
       }
+    } catch (e) {
+      pistonDetail = e.message;
+    }
+
+    if (!pistonOk && configuredPistonUrl.endsWith('/piston')) {
+      const strippedUrl = configuredPistonUrl.replace(/\/piston$/, '');
+      try {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 2000);
+        try {
+          const pistonRes = await fetch(`${strippedUrl}/runtimes`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+          });
+          if (pistonRes.ok) {
+            pistonOk = true;
+            pistonUrl = strippedUrl;
+            pistonDetail = "";
+          }
+        } finally {
+          clearTimeout(tid);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
       checks.services.piston = {
         status: pistonOk ? "OPERATIONAL" : "FAILED",
         url: pistonUrl,

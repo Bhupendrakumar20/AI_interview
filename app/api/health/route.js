@@ -162,22 +162,14 @@ export async function GET(request) {
         // ignore
       }
     }
-      checks.services.piston = {
-        status: pistonOk ? "OPERATIONAL" : "FAILED",
-        url: pistonUrl,
-        note: pistonOk
-          ? "Piston code execution is running"
-          : `Cannot reach Piston API. ${pistonDetail || "Is Docker running? See docker-compose.yml"}`,
-      };
-      if (!pistonOk) checks.status = "DEGRADED";
-    } catch (err) {
-      checks.services.piston = {
-        status: "OFFLINE",
-        url: pistonUrl,
-        note: `Connection failed: ${err.message}. Run: docker compose up -d`,
-      };
-      checks.status = "DEGRADED";
-    }
+    checks.services.piston = {
+      status: pistonOk ? "OPERATIONAL" : "FAILED",
+      url: pistonUrl,
+      note: pistonOk
+        ? "Piston code execution is running"
+        : `Cannot reach Piston API. ${pistonDetail || "Is Docker running? See docker-compose.yml"}`,
+    };
+    if (!pistonOk) checks.status = "DEGRADED";
 
     // Check 5: Rate Limited APIs Status
     const rateLimitedApis = [

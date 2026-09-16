@@ -19,7 +19,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
     3. Groq API (cloud, via GROQ_API_KEY)
     """
     # 1. Try Ollama
-    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
     if not ollama_url.endswith("/api/generate") and not ollama_url.endswith("/api/chat"):
         ollama_url = f"{ollama_url.rstrip('/')}/api/generate"
     model_name = os.environ.get("OLLAMA_MODEL", "gemma3:4b")

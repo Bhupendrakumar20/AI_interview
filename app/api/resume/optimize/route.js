@@ -78,6 +78,7 @@
 //   }
 // }
 import { NextResponse } from "next/server";
+import { fetchWithServiceFallback } from "@/lib/service-urls";
 
 export async function POST(request) {
   try {
@@ -97,28 +98,28 @@ export async function POST(request) {
       );
     }
 
-    const pythonUrl = process.env.NODE_ENV === "production"
-      ? (process.env.NEXT_PUBLIC_RESUME_API_URL_2 || process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000")
-      : (process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000");
-
     const controller = new AbortController();
 
     const timeout = setTimeout(() => {
       controller.abort();
     }, 240000); // 2 minutes
 
-    const response = await fetch(`${pythonUrl}/optimize-resume`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "bypass-tunnel-reminder": "true",
+    const { response } = await fetchWithServiceFallback(
+      "resume",
+      "/optimize-resume",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          parsedResume,
+          atsResult,
+        }),
       },
-      signal: controller.signal,
-      body: JSON.stringify({
-        parsedResume,
-        atsResult,
-      }),
-    });
+      request
+    );
 
     clearTimeout(timeout);
 

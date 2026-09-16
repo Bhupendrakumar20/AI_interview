@@ -3,6 +3,7 @@ import { withRateLimit } from "@/lib/rate-limiter";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { checkGeminiRateLimit } from "@/lib/security/rate-limiters";
 import { NextResponse } from "next/server";
+import { fetchWithServiceFallback } from "@/lib/service-urls";
 import { db } from "@/firebase/admin";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
@@ -62,18 +63,23 @@ export async function POST(request) {
         }
       `;
 
-      const response = await fetch(`${OLLAMA_URL.replace(/\/$/, "")}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: MODEL_NAME,
-          messages: [{ role: "user", content: prompt }],
-          stream: false,
-          format: "json",
-          options: { temperature: 0.3 }
-        }),
-        signal: controller.signal,
-      });
+      const { response } = await fetchWithServiceFallback(
+        "ollama",
+        "/api/chat",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: MODEL_NAME,
+            messages: [{ role: "user", content: prompt }],
+            stream: false,
+            format: "json",
+            options: { temperature: 0.3 }
+          }),
+          signal: controller.signal,
+        },
+        request
+      );
 
       clearTimeout(timeoutId);
 

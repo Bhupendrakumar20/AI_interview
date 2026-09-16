@@ -106,6 +106,7 @@
 
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@/lib/ai-provider";
+import { fetchWithServiceFallback } from "@/lib/service-urls";
 
 export async function POST(request) {
   const body = await request.json();
@@ -123,28 +124,28 @@ export async function POST(request) {
     );
   }
 
-  const pythonUrl = process.env.NODE_ENV === "production"
-    ? (process.env.NEXT_PUBLIC_RESUME_API_URL_2 || process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000")
-    : (process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000");
-
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
   }, 120000); // 120 seconds timeout to allow local Ollama enough time to generate and avoid cloud fallbacks
 
   try {
-    const response = await fetch(`${pythonUrl}/ats-score`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "bypass-tunnel-reminder": "true",
+    const { response } = await fetchWithServiceFallback(
+      "resume",
+      "/ats-score",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          parsedResume,
+          jobDescription,
+        }),
       },
-      signal: controller.signal,
-      body: JSON.stringify({
-        parsedResume,
-        jobDescription,
-      }),
-    });
+      request
+    );
 
     clearTimeout(timeout);
 

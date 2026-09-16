@@ -14,7 +14,7 @@ else:
     load_dotenv()
 
 # llm_fallback.py — add near the top, after load_dotenv calls
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
 if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
     OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
 MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
@@ -36,7 +36,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
     formatting between models.
     """
     # 1. Try Ollama
-    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
     if not ollama_url.endswith("/api/generate") and not ollama_url.endswith("/api/chat"):
         ollama_url = f"{ollama_url.rstrip('/')}/api/generate"
     model_name = os.environ.get("OLLAMA_MODEL", "gemma3:4b")

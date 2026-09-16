@@ -162,11 +162,36 @@ export async function GET(request) {
         // ignore
       }
     }
+
+    if (!pistonOk) {
+      const publicPistonUrl = "https://emkc.org/api/v2/piston";
+      try {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 3000);
+        try {
+          const pistonRes = await fetch(`${publicPistonUrl}/runtimes`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+          });
+          if (pistonRes.ok) {
+            pistonOk = true;
+            pistonUrl = publicPistonUrl;
+            pistonDetail = "";
+          }
+        } finally {
+          clearTimeout(tid);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
     checks.services.piston = {
       status: pistonOk ? "OPERATIONAL" : "FAILED",
       url: pistonUrl,
       note: pistonOk
-        ? "Piston code execution is running"
+        ? `Piston code execution is running (${pistonUrl.includes("emkc.org") ? "Public API" : "Docker"})`
         : `Cannot reach Piston API. ${pistonDetail || "Is Docker running? See docker-compose.yml"}`,
     };
     if (!pistonOk) checks.status = "DEGRADED";

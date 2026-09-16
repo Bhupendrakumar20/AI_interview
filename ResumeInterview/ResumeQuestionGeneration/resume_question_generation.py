@@ -31,13 +31,12 @@ PERSONA_STYLES = {
 
 
 import os
+from llm_fallback import OLLAMA_AUTH, OLLAMA_MODEL, OLLAMA_URL
 
 class InMemRagQuestionGenerator:
 
-    OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
-    if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
-        OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
-    MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+    OLLAMA_URL = OLLAMA_URL
+    MODEL_NAME = OLLAMA_MODEL
 
     def __init__(self, resume_data: dict):
         self.embedder = get_embedder()
@@ -126,7 +125,8 @@ class InMemRagQuestionGenerator:
             response = requests.post(
                 self.OLLAMA_URL,
                 json={"model": self.MODEL_NAME, "prompt": prompt, "stream": False,
-                      "options": {"temperature": 0.4, "top_p": 0.9}}
+                      "options": {"temperature": 0.4, "top_p": 0.9}},
+                auth=OLLAMA_AUTH,
             )
             response.raise_for_status()
             return response.json()["response"]

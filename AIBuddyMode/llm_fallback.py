@@ -2,7 +2,9 @@
 import os
 import time
 import logging
+from urllib.parse import urlparse
 import requests
+from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -13,11 +15,21 @@ if os.path.exists(env_local_path):
 else:
     load_dotenv()
 
-# llm_fallback.py — add near the top, after load_dotenv calls
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
+# Resolve Ollama URL: environment variable > local default
+OLLAMA_URL = (
+    os.environ.get("OLLAMA_URL") or
+    os.environ.get("OLLAMA_URL_2") or
+    "http://localhost:11434/api/generate"
+).strip()
 if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
     OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+
 MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+OLLAMA_USERNAME = os.environ.get("OLLAMA_USERNAME", "").strip()
+OLLAMA_PASSWORD = os.environ.get("OLLAMA_PASSWORD", "")
+OLLAMA_AUTH = HTTPBasicAuth(OLLAMA_USERNAME, OLLAMA_PASSWORD) if OLLAMA_USERNAME else None
+OLLAMA_HOST = urlparse(OLLAMA_URL).hostname or ""
+OLLAMA_SOURCE = "localhost" if OLLAMA_HOST in {"localhost", "127.0.0.1", "::1"} else "remote"
 
 logger = logging.getLogger("llm_fallback")
 
@@ -26,7 +38,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
                             num_predict: int = 1024) -> dict:
     """
     Fallback chain for the adaptive interview's question generation and evaluation:
-    1. Ollama (local)
+    1. Ollama (local or remote tunnel)
     2. Gemini API (cloud)
     3. Groq API (cloud)
 
@@ -36,12 +48,13 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
     formatting between models.
     """
     # 1. Try Ollama
-    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate").strip()
-    if not ollama_url.endswith("/api/generate") and not ollama_url.endswith("/api/chat"):
-        ollama_url = f"{ollama_url.rstrip('/')}/api/generate"
-    model_name = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+    ollama_url = OLLAMA_URL
+    model_name = MODEL_NAME
 
-    logger.info(f"[LLM Fallback] Attempting Ollama with model {model_name}...")
+    logger.info(
+        f"[LLM Fallback] Attempting Ollama ({OLLAMA_SOURCE}) at {ollama_url} "
+        f"with model {model_name}..."
+    )
     start = time.time()
     try:
         response = requests.post(
@@ -56,6 +69,7 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
                     "num_predict": num_predict,
                 },
             },
+            auth=OLLAMA_AUTH,
             timeout=360,  # generous enough for a warm local model; adjust if you see frequent timeouts
         )
         response.raise_for_status()
@@ -63,7 +77,12 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
         elapsed = round(time.time() - start, 1)
         if result and result.strip():
             logger.info(f"[LLM Fallback] Ollama responded in {elapsed}s")
-            return {"text": result, "source": "ollama"}
+            return {
+                "text": result,
+                "source": "ollama",
+                "ollama_source": OLLAMA_SOURCE,
+                "ollama_url": ollama_url,
+            }
         raise Exception("Ollama returned empty response.")
     except Exception as e:
         logger.warning(f"[LLM Fallback] Ollama failed after {round(time.time() - start, 1)}s: {e}. Trying cloud fallbacks...")

@@ -11,11 +11,7 @@ import os
 import json
 import requests
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
-
-if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
-    OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
-MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+from llm_fallback import OLLAMA_AUTH, OLLAMA_URL, OLLAMA_MODEL as MODEL_NAME
 
 PROMPT = """
 You are an ATS Resume Expert.
@@ -79,7 +75,8 @@ def ask_ollama(ats_json: dict, jd_text: str) -> str:
                 "prompt": prompt,
                 "stream": False,
                 "options": {"temperature": 0.3, "top_p": 0.9}
-            }
+            },
+            auth=OLLAMA_AUTH,
         )
         response.raise_for_status()
         return response.json()["response"]

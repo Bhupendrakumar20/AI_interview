@@ -1,166 +1,133 @@
-import { GoogleGenerativeAI } from "@/lib/ai-provider";
-import { withRateLimit } from "@/lib/rate-limiter";
-import { getCurrentUser } from "@/lib/actions/auth.action";
-import { checkGeminiRateLimit } from "@/lib/security/rate-limiters";
-import { NextResponse } from "next/server";
-import { fetchWithServiceFallback } from "@/lib/service-urls";
-import { db } from "@/firebase/admin";
+# llm_fallback.py
+import os
+import time
+import logging
+from urllib.parse import urlparse
+import requests
+from requests.auth import HTTPBasicAuth
+from dotenv import load_dotenv
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+env_local_path = os.path.join(parent_dir, ".env.local")
+if os.path.exists(env_local_path):
+    load_dotenv(env_local_path)
+else:
+    load_dotenv()
 
-export async function POST(request) {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
-    }
+# Resolve Ollama URL: environment variable > local default
+OLLAMA_URL = (
+    os.environ.get("OLLAMA_URL") or
+    os.environ.get("OLLAMA_URL_2") or
+    "http://localhost:11434/api/generate"
+).strip()
+if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
+    OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"
 
-    const rateLimitCheck = await checkGeminiRateLimit(currentUser.uid);
-    if (!rateLimitCheck.allowed) {
-      return NextResponse.json(
-        { 
-          error: "Gemini API rate limit exceeded. Please try again later.",
-          retryAfter: rateLimitCheck.resetIn,
-        },
-        { status: 429 }
-      );
-    }
+MODEL_NAME = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+OLLAMA_USERNAME = os.environ.get("OLLAMA_USERNAME", "").strip()
+OLLAMA_PASSWORD = os.environ.get("OLLAMA_PASSWORD", "")
+OLLAMA_AUTH = HTTPBasicAuth(OLLAMA_USERNAME, OLLAMA_PASSWORD) if OLLAMA_USERNAME else None
+OLLAMA_HOST = urlparse(OLLAMA_URL).hostname or ""
+OLLAMA_SOURCE = "localhost" if OLLAMA_HOST in {"localhost", "127.0.0.1", "::1"} else "remote"
 
-    const body = await request.json();
-    const { answers, parsedResume, focusArea } = body;
+logger = logging.getLogger("llm_fallback")
 
-    if (!answers || !Array.isArray(answers) || answers.length === 0) {
-      return NextResponse.json({ error: "Answers array is required" }, { status: 400 });
-    }
 
-    // Try local Ollama model first if available
-    const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
-    const MODEL_NAME = process.env.OLLAMA_MODEL || "gemma3:4b";
-    
-    let evaluationData = null;
+def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float = 0.9,
+                            num_predict: int = 1024) -> dict:
+    """
+    Fallback chain for the adaptive interview's question generation and evaluation:
+    1. Ollama (local or remote tunnel)
+    2. Gemini API (cloud)
+    3. Groq API (cloud)
 
-    try {
-      console.log(`🤖 Attempting Ollama query on model: ${MODEL_NAME} for resume verification...`);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
+    Returns {"text": str, "source": "ollama" | "gemini" | "groq"} instead of a bare
+    string, so callers (evaluator.py, question_gen.py) can log/surface which
+    provider actually answered — useful when debugging inconsistent JSON
+    formatting between models.
+    """
+    # 1. Try Ollama
+    ollama_url = OLLAMA_URL
+    model_name = MODEL_NAME
 
-      const prompt = `
-        You are a technical interviewer verifying a candidate's resume claims.
-        Evaluate their answers to the verification questions and determine if they actually did the projects/work claimed on their resume.
-        
-        Focus Area: ${focusArea || "General"}
-        Resume context:
-        ${JSON.stringify(parsedResume || {})}
-        
-        Interview Q&A:
-        ${answers.map((a, i) => `Question ${i+1}: ${a.question}\nAnswer ${i+1}: ${a.answer}`).join("\n\n")}
-        
-        Return a JSON response with format:
-        {
-          "trustScore": 85,
-          "verdict": "VERIFIED | PARTIALLY_VERIFIED | UNVERIFIED",
-          "feedback": "Provide detailed feedback on how well they verified their claims, their strengths, weaknesses, and whether they showed authentic technical depth."
-        }
-      `;
+    logger.info(
+        f"[LLM Fallback] Attempting Ollama ({OLLAMA_SOURCE}) at {ollama_url} "
+        f"with model {model_name}..."
+    )
+    start = time.time()
+    try:
+        response = requests.post(
+            ollama_url,
+            json={
+                "model": model_name,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "num_predict": num_predict,
+                },
+            },
+            auth=OLLAMA_AUTH,
+            timeout=360,  # generous enough for a warm local model; adjust if you see frequent timeouts
+        )
+        response.raise_for_status()
+        result = response.json().get("response")
+        elapsed = round(time.time() - start, 1)
+        if result and result.strip():
+            logger.info(f"[LLM Fallback] Ollama responded in {elapsed}s")
+            return {
+                "text": result,
+                "source": "ollama",
+                "ollama_source": OLLAMA_SOURCE,
+                "ollama_url": ollama_url,
+            }
+        raise Exception("Ollama returned empty response.")
+    except Exception as e:
+        logger.warning(f"[LLM Fallback] Ollama failed after {round(time.time() - start, 1)}s: {e}. Trying cloud fallbacks...")
 
-      const { response } = await fetchWithServiceFallback(
-        "ollama",
-        "/api/chat",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: MODEL_NAME,
-            messages: [{ role: "user", content: prompt }],
-            stream: false,
-            format: "json",
-            options: { temperature: 0.3 }
-          }),
-          signal: controller.signal,
-        },
-        request
-      );
+    # 2. Try Gemini API
+    gemini_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
+    if gemini_key and gemini_key.startswith("AIzaSy"):
+        logger.info("[LLM Fallback] Attempting Gemini API...")
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={gemini_key}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": temperature},
+            }
+            response = requests.post(url, headers={"Content-Type": "application/json"},
+                                      json=payload, timeout=20)
+            response.raise_for_status()
+            res_json = response.json()
+            result = res_json["candidates"][0]["content"]["parts"][0]["text"]
+            if result and result.strip():
+                logger.info("[LLM Fallback] Gemini API responded successfully.")
+                return {"text": result, "source": "gemini"}
+        except Exception as gemini_err:
+            logger.warning(f"[LLM Fallback] Gemini API failed: {gemini_err}")
 
-      clearTimeout(timeoutId);
+    # 3. Try Groq API
+    groq_key = os.environ.get("GROQ_API_KEY")
+    if groq_key:
+        logger.info("[LLM Fallback] Attempting Groq API...")
+        try:
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": temperature,
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response.raise_for_status()
+            res_json = response.json()
+            result = res_json["choices"][0]["message"]["content"]
+            if result and result.strip():
+                logger.info("[LLM Fallback] Groq API responded successfully.")
+                return {"text": result, "source": "groq"}
+        except Exception as groq_err:
+            logger.warning(f"[LLM Fallback] Groq API failed: {groq_err}")
 
-      if (response.ok) {
-        const data = await response.json();
-        const textContent = data.message?.content;
-        if (textContent) {
-          evaluationData = JSON.parse(textContent);
-          console.log("✅ Success evaluating with Ollama!");
-        }
-      }
-    } catch (ollamaError) {
-      console.warn("Ollama evaluation failed, falling back to Gemini:", ollamaError.message);
-    }
-
-    // Fallback to Gemini if Ollama was not successful
-    if (!evaluationData) {
-      const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error("No API key available for fallback");
-
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const prompt = `
-        You are a technical interviewer verifying a candidate's resume claims.
-        Evaluate their answers to the verification questions and determine if they actually did the projects/work claimed on their resume.
-        
-        Focus Area: ${focusArea || "General"}
-        Resume context:
-        ${JSON.stringify(parsedResume || {})}
-        
-        Interview Q&A:
-        ${answers.map((a, i) => `Question ${i+1}: ${a.question}\nAnswer ${i+1}: ${a.answer}`).join("\n\n")}
-        
-        Return a JSON response (DO NOT include markdown wrappers, return ONLY the raw JSON object):
-        {
-          "trustScore": 85,
-          "verdict": "VERIFIED",
-          "feedback": "Detailed evaluation feedback text here."
-        }
-      `;
-
-      const result = await model.generateContent(prompt);
-      const text = await result.response.text();
-      
-      try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        evaluationData = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-      } catch (parseErr) {
-        evaluationData = {
-          trustScore: 75,
-          verdict: "PARTIALLY_VERIFIED",
-          feedback: text
-        };
-      }
-    }
-
-    try {
-      await db.collection("users").doc(currentUser.uid).collection("resume_reports").add({
-        trustScore: evaluationData.trustScore,
-        verdict: evaluationData.verdict,
-        feedback: evaluationData.feedback,
-        focusArea: focusArea || "General",
-        answers,
-        createdAt: new Date(),
-      });
-      console.log("📝 Saved resume evaluation feedback to user subcollection.");
-    } catch (dbErr) {
-      console.error("Failed to save resume evaluation report:", dbErr);
-    }
-
-    return NextResponse.json({
-      success: true,
-      trustScore: evaluationData.trustScore,
-      verdict: evaluationData.verdict,
-      feedback: evaluationData.feedback
-    });
-
-  } catch (error) {
-    console.error("Error during interview evaluation:", error);
-    return NextResponse.json(
-      { error: "Failed to evaluate interview", details: error.message },
-      { status: 500 }
-    );
-  }
-}
+    raise RuntimeError("All LLM providers (Ollama, Gemini, Groq) failed to generate a response.")

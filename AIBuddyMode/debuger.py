@@ -4,7 +4,13 @@ import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from llm_fallback import generate_with_fallback, OLLAMA_URL, MODEL_NAME
+from llm_fallback import (
+    generate_with_fallback,
+    OLLAMA_URL,
+    MODEL_NAME,
+    OLLAMA_AUTH,
+    OLLAMA_SOURCE,
+)
 from questionGeneration import clean_question_text, generate_question, RUBRICS
 from evaluator import extract_json, evaluate_answer, looks_truncated
 from taxonomy import SUBTOPIC_TAGS
@@ -17,6 +23,17 @@ class RawPromptRequest(BaseModel):
     temperature: float = 0.3
 
 
+@debug_router.get("/ollama-config")
+def get_ollama_config():
+    """Reports the loaded Ollama target without making a model request."""
+    return {
+        "source": OLLAMA_SOURCE,
+        "url": OLLAMA_URL,
+        "model": MODEL_NAME,
+        "authentication_configured": OLLAMA_AUTH is not None,
+    }
+
+
 @debug_router.get("/ollama-health")
 def check_ollama_health():
     """Confirms Ollama specifically is reachable — this checks ONLY the local
@@ -24,19 +41,22 @@ def check_ollama_health():
     still work via Gemini/Groq, but this endpoint will report unreachable."""
     try:
         start = time.time()
-        resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+        tags_url = f"{OLLAMA_URL.rsplit('/api/', 1)[0]}/api/tags"
+        resp = requests.get(tags_url, auth=OLLAMA_AUTH, timeout=5)
         elapsed = round(time.time() - start, 2)
         resp.raise_for_status()
         models = [m["name"] for m in resp.json().get("models", [])]
         return {
             "reachable": True,
+            "source": OLLAMA_SOURCE,
+            "configured_url": OLLAMA_URL,
             "response_time_seconds": elapsed,
             "available_models": models,
             "configured_model": MODEL_NAME,
             "configured_model_available": MODEL_NAME in models,
         }
     except requests.exceptions.ConnectionError:
-        raise HTTPException(503, "Ollama is not running or not reachable at localhost:11434")
+        raise HTTPException(503, f"Ollama is not reachable at {tags_url}")
     except requests.exceptions.Timeout:
         raise HTTPException(504, "Ollama is running but not responding within 5s")
 
@@ -51,7 +71,8 @@ def check_fallback_chain_health():
 
     ollama_status = {"reachable": False, "error": None}
     try:
-        resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+        tags_url = f"{OLLAMA_URL.rsplit('/api/', 1)[0]}/api/tags"
+        resp = requests.get(tags_url, auth=OLLAMA_AUTH, timeout=5)
         resp.raise_for_status()
         ollama_status["reachable"] = True
         models = [m["name"] for m in resp.json().get("models", [])]
@@ -65,7 +86,11 @@ def check_fallback_chain_health():
     groq_key_set = bool(os.environ.get("GROQ_API_KEY"))
 
     return {
-        "ollama": ollama_status,
+        "ollama": {
+            **ollama_status,
+            "source": OLLAMA_SOURCE,
+            "configured_url": OLLAMA_URL,
+        },
         "gemini": {"api_key_configured": gemini_key_set},
         "groq": {"api_key_configured": groq_key_set},
         "fallback_order": ["ollama", "gemini", "groq"],

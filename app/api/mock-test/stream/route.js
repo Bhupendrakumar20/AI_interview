@@ -19,7 +19,7 @@ function getModel(modelName) {
 
 // Use the verified model ID from the curl check above, with a solid fallback
 const FALLBACK_MODELS = process.env.GROQ_API_KEY
-  ? ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
+  ? ["openai/gpt-oss-120b", "llama-3.3-70b-specdec"]
   : ["gemini-3.5-flash-lite", "gemini-1.5-flash"];
 /**
  * Strips markdown code fences and any stray text around a JSON blob.
@@ -149,15 +149,24 @@ Return ONLY a JSON object, no markdown fences, no commentary:
  * Body: { company, role, difficulty, questionType, count, userId }
  */
 export async function POST(req) {
-  const body = await req.json();
-  const {
-    company,
-    role = "Software Engineer",
-    difficulty = "Medium",
-    questionType = "Technical",
-    count = 5,
-    userId = "anonymous",
-  } = body;
+  let body = {};
+  try {
+    const text = await req.text();
+    if (text) {
+      body = JSON.parse(text);
+    }
+  } catch (err) {
+    console.warn("Failed to parse request body JSON, using query params instead", err.message);
+  }
+
+  const urlParams = new URL(req.url).searchParams;
+
+  const company = body.company || urlParams.get("company");
+  const role = body.role || urlParams.get("role") || "Software Engineer";
+  const difficulty = body.difficulty || urlParams.get("difficulty") || "Medium";
+  const questionType = body.questionType || urlParams.get("questionType") || "Technical";
+  const count = parseInt(body.count || urlParams.get("count") || "5", 10);
+  const userId = body.userId || urlParams.get("userId") || "anonymous";
 
   const cacheKey = generateCacheKey("mocktest-list", { company, role, difficulty, questionType, count });
   const cached = getCachedData(cacheKey);

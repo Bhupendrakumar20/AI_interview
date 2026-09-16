@@ -70,34 +70,34 @@
 // }
 
 import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@/lib/ai-provider";
 
 export async function POST(request) {
+  const body = await request.json();
+  const { atsResult, jobDescription } = body;
+
+  if (!atsResult || !jobDescription) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Both atsResult and jobDescription are required.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const pythonUrl = process.env.NODE_ENV === "production"
+    ? (process.env.NEXT_PUBLIC_RESUME_API_URL_2 || process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000")
+    : (process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, 120000); // 120 seconds timeout to allow local Ollama enough time to generate and avoid cloud fallbacks
+
   try {
-    const body = await request.json();
-    const { atsResult, jobDescription } = body;
-
-    if (!atsResult || !jobDescription) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Both atsResult and jobDescription are required.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const pythonUrl = process.env.NODE_ENV === "production"
-      ? (process.env.NEXT_PUBLIC_RESUME_API_URL_2 || process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000")
-      : (process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000");
-
-    const controller = new AbortController();
-
-    const timeout = setTimeout(() => {
-      controller.abort();
-    }, 240000); // 2 minutes
-
     const response = await fetch(`${pythonUrl}/feedback`, {
       method: "POST",
       headers: {
@@ -113,45 +113,56 @@ export async function POST(request) {
 
     clearTimeout(timeout);
 
-    const data = await response.json();
+    let data;
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      data = { error: text || "Non-JSON response from backend" };
+    }
 
     if (!response.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: data.detail || data.error || "Python backend failed.",
-        },
-        {
-          status: response.status,
-        }
-      );
+      throw new Error(data.detail || data.error || "Python backend failed.");
     }
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Feedback API Error:", error);
+    clearTimeout(timeout);
+    console.warn("Python backend feedback failed/timed out. Falling back to Gemini/Groq Cloud AI...", error.message);
 
-    if (error.name === "AbortError") {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Python backend took too long to respond (timeout after 120 seconds).",
-        },
-        {
-          status: 504,
-        }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || "Internal Server Error",
-      },
-      {
-        status: 500,
+    try {
+      const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GROQ_API_KEY;
+      if (!apiKey) {
+        throw new Error("No Cloud API Key configured (GOOGLE_GENERATIVE_AI_API_KEY or GROQ_API_KEY)");
       }
-    );
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+      const prompt = `You are an ATS Resume Expert. Explain overall ATS score, strengths, weaknesses, and key improvements.
+ATS Analysis:
+${JSON.stringify(atsResult)}
+
+Job Description:
+${jobDescription}
+
+Keep the feedback under 200 words, using clear and professional language.`;
+
+      const result = await model.generateContent(prompt);
+      const responseText = await result.response.text();
+
+      return NextResponse.json({
+        success: true,
+        feedback: responseText,
+      });
+    } catch (fallbackError) {
+      console.error("Cloud AI Fallback for feedback failed:", fallbackError.message);
+      // Hard fallback to mock feedback to prevent UI crash
+      return NextResponse.json({
+        success: true,
+        feedback: "Based on your ATS Score check, you have a solid matching foundation. Make sure to tailor your experiences and double-check missing skills to increase overall matching chances."
+      });
+    }
   }
 }

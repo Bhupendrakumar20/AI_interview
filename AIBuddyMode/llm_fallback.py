@@ -70,10 +70,10 @@ def generate_with_fallback(prompt: str, temperature: float = 0.3, top_p: float =
 
     # 2. Try Gemini API
     gemini_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
-    if gemini_key:
+    if gemini_key and gemini_key.startswith("AIzaSy"):
         logger.info("[LLM Fallback] Attempting Gemini API...")
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={gemini_key}"
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"temperature": temperature},

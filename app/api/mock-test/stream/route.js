@@ -171,35 +171,67 @@ export async function POST(req) {
   const cached = getCachedData(cacheKey);
 
   const encoder = new TextEncoder();
+  let streamClosed = false;
+
+  const safeEnqueue = (controller, chunk) => {
+    if (streamClosed) return;
+    try {
+      controller.enqueue(chunk);
+    } catch (error) {
+      if (error?.code !== "ERR_INVALID_STATE") {
+        throw error;
+      }
+      streamClosed = true;
+    }
+  };
+
+  const safeClose = (controller) => {
+    if (streamClosed) return;
+    streamClosed = true;
+    try {
+      controller.close();
+    } catch (error) {
+      if (error?.code !== "ERR_INVALID_STATE") {
+        throw error;
+      }
+    }
+  };
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
         if (cached) {
-          controller.enqueue(encoder.encode(JSON.stringify({ questions: cached, done: true }) + "\n"));
-          controller.close();
+          safeEnqueue(controller, encoder.encode(JSON.stringify({ questions: cached, done: true }) + "\n"));
+          safeClose(controller);
           return;
         }
 
         const questions = [];
         for (let i = 0; i < count; i++) {
+          if (streamClosed) return;
           const q = await generateOneQuestion({ company, role, difficulty, questionType, index: i }, userId);
           questions.push(q);
           const isLast = i === count - 1;
-          controller.enqueue(
+          safeEnqueue(
+            controller,
             encoder.encode(JSON.stringify({ questions: [...questions], done: isLast }) + "\n")
           );
         }
 
         setCachedData(cacheKey, questions);
-        controller.close();
+        safeClose(controller);
       } catch (error) {
         console.error("Stream error:", error);
-        controller.enqueue(
+        if (streamClosed) return;
+        safeEnqueue(
+          controller,
           encoder.encode(JSON.stringify({ error: error.message || "Generation failed", done: true }) + "\n")
         );
-        controller.close();
+        safeClose(controller);
       }
+    },
+    cancel() {
+      streamClosed = true;
     },
   });
 

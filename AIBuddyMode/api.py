@@ -7,7 +7,7 @@ import uuid
 import time
 import logging
 import json
-import redis
+from threading import Lock
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -44,42 +44,23 @@ app.add_middleware(
 
 app.include_router(debug_router)
 
-# Initialize Redis client (decode_responses=True returns string instead of bytes)
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+_SESSION_STORE: dict[str, InterviewState] = {}
+_SESSION_LOCK = Lock()
 
-# Helper function to get state from Redis
+
 def get_session_state(session_id: str) -> InterviewState | None:
-    try:
-        data = redis_client.get(f"adaptive:session:{session_id}")
-        if not data:
-            return None
-        # Support Pydantic v2 and fallback to Pydantic v1
-        if hasattr(InterviewState, 'model_validate_json'):
-            return InterviewState.model_validate_json(data)
-        else:
-            return InterviewState.parse_raw(data)
-    except Exception as err:
-        logger.error(f"Error parsing session state from Redis: {err}")
-        return None
+    with _SESSION_LOCK:
+        return _SESSION_STORE.get(session_id)
 
-# Helper function to save state to Redis
+
 def save_session_state(session_id: str, state: InterviewState):
-    try:
-        # Support Pydantic v2 and fallback to Pydantic v1
-        if hasattr(state, 'model_dump_json'):
-            data = state.model_dump_json()
-        else:
-            data = state.json()
-        redis_client.set(f"adaptive:session:{session_id}", data, ex=7200) # 2 hours expiry
-    except Exception as err:
-        logger.error(f"Error saving session state to Redis: {err}")
+    with _SESSION_LOCK:
+        _SESSION_STORE[session_id] = state
 
-# Helper function to delete state from Redis
+
 def delete_session_state(session_id: str):
-    try:
-        redis_client.delete(f"adaptive:session:{session_id}")
-    except Exception as err:
-        logger.error(f"Error deleting session state from Redis: {err}")
+    with _SESSION_LOCK:
+        _SESSION_STORE.pop(session_id, None)
 
 
 @app.exception_handler(Exception)

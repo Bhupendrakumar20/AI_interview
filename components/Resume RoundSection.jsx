@@ -15,6 +15,7 @@ export default function ResumeRoundSection() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAtsProcessing, setIsAtsProcessing] = useState(false);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [processingStage, setProcessingStage] = useState("");
   const [currentStep, setCurrentStep] = useState("setup"); // setup -> interviewing -> report
   
   // Data states
@@ -97,9 +98,9 @@ export default function ResumeRoundSection() {
     }
 
     setIsAtsProcessing(true);
+    setProcessingStage("parsing");
 
     try {
-      // Step 1: Upload and Parse Resume
       const uploadFormData = new FormData();
       uploadFormData.append("resume", file);
       
@@ -111,8 +112,8 @@ export default function ResumeRoundSection() {
       const parseData = await parseRes.json();
       const parsedData = parseData.parsedResume;
       setParsedResume(parsedData);
+      setProcessingStage("ats");
 
-      // Step 2: Fetch ATS Score
       const atsRes = await fetch("/api/resume/ats-score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,18 +123,13 @@ export default function ResumeRoundSection() {
       if (!atsRes.ok) throw new Error("Failed to calculate ATS score.");
       const atsData = await atsRes.json();
       setAtsResult(atsData.atsResult);
+      setProcessingStage("feedback");
 
-      // Step 3: Fetch Feedback and Optimized Resume in parallel
-      const [feedbackRes, optimizeRes] = await Promise.all([
+      const [feedbackRes] = await Promise.all([
         fetch("/api/resume/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ atsResult: atsData.atsResult, jobDescription }),
-        }),
-        fetch("/api/resume/optimize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ parsedResume: parsedData, atsResult: atsData.atsResult }),
         }),
       ]);
 
@@ -141,12 +137,7 @@ export default function ResumeRoundSection() {
         const feedbackData = await feedbackRes.json();
         setFeedback(feedbackData.feedback);
       }
-      if (optimizeRes.ok) {
-        const optimizeData = await optimizeRes.json();
-        setOptimizedResume(optimizeData.optimizedResume);
-      }
 
-      // Transition directly to report
       setAnswers([]);
       setCurrentStep("report");
     } catch (err) {
@@ -154,6 +145,7 @@ export default function ResumeRoundSection() {
       alert(err.message || "An error occurred during ATS score calculation.");
     } finally {
       setIsAtsProcessing(false);
+      setProcessingStage("");
     }
   };
 
@@ -215,9 +207,9 @@ export default function ResumeRoundSection() {
     }
 
     setIsProcessing(true);
+    setProcessingStage("parsing");
 
     try {
-      // Step 1: Upload and Parse Resume
       const uploadFormData = new FormData();
       uploadFormData.append("resume", file);
       
@@ -229,6 +221,7 @@ export default function ResumeRoundSection() {
       const parseData = await parseRes.json();
       const parsedData = parseData.parsedResume;
       setParsedResume(parsedData);
+      setProcessingStage("ats");
 
       const atsPromise = fetch("/api/resume/ats-score", {
         method: "POST",
@@ -238,6 +231,7 @@ export default function ResumeRoundSection() {
         if (!atsRes.ok) throw new Error("Failed to calculate ATS score.");
         const atsData = await atsRes.json();
         setAtsResult(atsData.atsResult);
+        setProcessingStage("feedback");
         return atsData;
       });
 
@@ -286,6 +280,7 @@ export default function ResumeRoundSection() {
     } finally {
       setIsProcessing(false);
       setIsGeneratingQuestions(false);
+      setProcessingStage("");
     }
   };
 
@@ -331,6 +326,7 @@ export default function ResumeRoundSection() {
     setIsAtsProcessing(false);
     setIsProcessing(false);
     setIsGeneratingQuestions(false);
+    setProcessingStage("");
     setCurrentStep("setup");
   };
 
@@ -345,6 +341,12 @@ export default function ResumeRoundSection() {
     : 0;
   const isWaitingForNextQuestion = isGeneratingQuestions && currentQuestionIdx >= questions.length - 1 && currentQuestionIdx < targetQuestionCount - 1;
   const currentQuestion = questions[currentQuestionIdx];
+
+  const processingStages = [
+    { key: "parsing", label: "Parsing resume", active: processingStage === "parsing", done: processingStage !== "" && ["parsing", "ats", "feedback"].indexOf(processingStage) >= 0 },
+    { key: "ats", label: "ATS score calculated", active: processingStage === "ats", done: ["ats", "feedback"].includes(processingStage) },
+    { key: "feedback", label: "Generating feedback", active: processingStage === "feedback", done: processingStage === "feedback" },
+  ];
 
   return (
     <section className="resume-section animate-fadeIn">
@@ -367,6 +369,41 @@ export default function ResumeRoundSection() {
       {currentStep === "setup" && (
         <div className="bg-white border border-slate-200 shadow-sm dark:bg-slate-900/80 dark:border-cyan-500/30 dark:shadow-none rounded-2xl p-8 mb-8 animate-slideUp">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {(isProcessing || isAtsProcessing) && (
+              <div className="lg:col-span-2 mb-2 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm font-semibold text-cyan-600 dark:text-cyan-400">
+                    Resume workflow
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {processingStage === "parsing" && "Parsing resume..."}
+                    {processingStage === "ats" && "ATS score calculated successfully"}
+                    {processingStage === "feedback" && "Generating feedback..."}
+                    {!processingStage && "Preparing..."}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {processingStages.map((stage) => {
+                    const isActive = stage.active;
+                    const isDone = stage.done;
+                    return (
+                      <div
+                        key={stage.key}
+                        className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                          isActive
+                            ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
+                            : isDone
+                              ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                              : "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400"
+                        }`}
+                      >
+                        {isDone ? "✓ " : isActive ? "● " : "○ "}{stage.label}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             
             {/* Upload Zone & JD */}
             <div className="flex flex-col gap-6">
@@ -502,7 +539,10 @@ export default function ResumeRoundSection() {
                   {isAtsProcessing ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Analyzing ATS Score...
+                      {processingStage === "parsing" && "Parsing resume..."}
+                      {processingStage === "ats" && "ATS score calculated successfully"}
+                      {processingStage === "feedback" && "Generating feedback..."}
+                      {!processingStage && "Analyzing ATS Score..."}
                     </>
                   ) : (
                     <>
@@ -519,7 +559,10 @@ export default function ResumeRoundSection() {
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Ollama Parsing & Analyzing...
+                      {processingStage === "parsing" && "Parsing resume..."}
+                      {processingStage === "ats" && "ATS score calculated successfully"}
+                      {processingStage === "feedback" && "Generating feedback..."}
+                      {!processingStage && "Ollama Parsing & Analyzing..."}
                     </>
                   ) : (
                     <>

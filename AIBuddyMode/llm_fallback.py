@@ -17,7 +17,8 @@ else:
 
 # llm_fallback.py — add near the top, after load_dotenv calls
 OLLAMA_URL = os.environ.get(
-    "OLLAMA_URL", "https://audible-nanny-slacks.ngrok-free.dev/api/generate"
+        "OLLAMA_URL", "https://audible-nanny-slacks.ngrok-free.dev/api/generate"
+ 
 ).strip()
 if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):
     OLLAMA_URL = f"{OLLAMA_URL.rstrip('/')}/api/generate"

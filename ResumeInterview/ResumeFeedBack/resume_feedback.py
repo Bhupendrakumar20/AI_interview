@@ -10,6 +10,7 @@ so it's replaced with a single function that takes the data directly.
 import os
 import json
 import requests
+from typing import Iterator
 
 from llm_fallback import OLLAMA_AUTH, OLLAMA_URL, OLLAMA_MODEL as MODEL_NAME
 
@@ -50,11 +51,15 @@ Answer:
 """
 
 
-def ask_ollama(ats_json: dict, jd_text: str) -> str:
-    prompt = PROMPT.format(
+def _build_prompt(ats_json: dict, jd_text: str) -> str:
+    return PROMPT.format(
         ats=json.dumps(ats_json, indent=2),
         jd=jd_text
     )
+
+
+def ask_ollama(ats_json: dict, jd_text: str) -> str:
+    prompt = _build_prompt(ats_json, jd_text)
 
     try:
         try:
@@ -80,6 +85,39 @@ def ask_ollama(ats_json: dict, jd_text: str) -> str:
         )
         response.raise_for_status()
         return response.json()["response"]
+
+
+def ask_ollama_stream(ats_json: dict, jd_text: str) -> Iterator[str]:
+    """Yield feedback fragments as Ollama generates them."""
+    prompt = _build_prompt(ats_json, jd_text)
+
+    try:
+        response = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": MODEL_NAME,
+                "prompt": prompt,
+                "stream": True,
+                "options": {"temperature": 0.3, "top_p": 0.9}
+            },
+            auth=OLLAMA_AUTH,
+            stream=True,
+            timeout=180,
+        )
+        response.raise_for_status()
+
+        for line in response.iter_lines(chunk_size=1, decode_unicode=True):
+            if not line:
+                continue
+            chunk = json.loads(line)
+            text = chunk.get("response", "")
+            if text:
+                yield text
+            if chunk.get("done"):
+                return
+    except Exception as e:
+        print(f"[Streaming Warning] Ollama streaming failed: {e}")
+        yield ask_ollama(ats_json, jd_text)
 
 
 

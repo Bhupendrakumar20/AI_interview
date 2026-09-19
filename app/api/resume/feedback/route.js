@@ -113,9 +113,8 @@ export async function POST(request) {
 
     clearTimeout(timeout);
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
       return NextResponse.json(
         {
           success: false,
@@ -127,7 +126,13 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json(data);
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        "Content-Type": response.headers.get("content-type") || "text/event-stream",
+        "Cache-Control": "no-cache",
+      },
+    });
   } catch (error) {
     console.error("Feedback API Error:", error);
 

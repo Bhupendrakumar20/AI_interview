@@ -118,6 +118,7 @@ step can be called and tested independently.
 
 import sys
 import os
+import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from dotenv import load_dotenv
@@ -134,13 +135,14 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ResumeParser.parser import parse_resume
 from ATSScoreChecker.ats_score_checker import ATSScorer
 from ResumeGeneration.generator import generate_optimized_resume
 from ResumeQuestionGeneration.resume_question_generation import generate_questions_for_resume
-from ResumeFeedBack.resume_feedback import get_ats_feedback
+from ResumeFeedBack.resume_feedback import ask_ollama_stream
 
 app = FastAPI(title="Resume Interview API")
 
@@ -303,12 +305,17 @@ async def generate_questions(payload: GenerateQuestionsRequest):
 @app.post("/feedback")
 async def feedback(payload: FeedbackRequest):
     try:
-        result = get_ats_feedback(payload.atsResult, payload.jobDescription)
+        def event_stream():
+            yield f"data: {json.dumps({'type': 'start'})}\n\n"
+            for text in ask_ollama_stream(payload.atsResult, payload.jobDescription):
+                yield f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
-        return {
-            "success": True,
-            "feedback": result,
-        }
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

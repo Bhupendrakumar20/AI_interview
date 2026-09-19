@@ -3,6 +3,15 @@
 import React, { useState, useRef } from "react";
 import { FileText, Briefcase, User, Clock, CheckCircle, Upload, Shield, AlertTriangle, ArrowRight, Loader2, Sparkles, RefreshCw, Users, Rocket, Zap } from "lucide-react";
 
+function renderFeedbackMarkdown(text) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    return <React.Fragment key={index}>{part}</React.Fragment>;
+  });
+}
+
 export default function ResumeRoundSection() {
   const [selectedFocus, setSelectedFocus] = useState("Projects");
   const [selectedPersona, setSelectedPersona] = useState("hiring-manager");
@@ -23,6 +32,7 @@ export default function ResumeRoundSection() {
   const [atsResult, setAtsResult] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [feedback, setFeedback] = useState("");
+  const [isFeedbackStreaming, setIsFeedbackStreaming] = useState(false);
   const [optimizedResume, setOptimizedResume] = useState(null);
   
   // Interviewing states
@@ -73,6 +83,40 @@ export default function ResumeRoundSection() {
 
   const triggerFileSelect = () => {
     fileInputRef.current?.click();
+  };
+
+  const streamFeedback = async (response) => {
+    if (!response.ok || !response.body) {
+      throw new Error("Failed to generate resume feedback.");
+    }
+
+    setFeedback("");
+    setIsFeedbackStreaming(true);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+
+        for (const event of events) {
+          const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
+          if (!dataLine) continue;
+          const data = JSON.parse(dataLine.slice(6));
+          if (data.type === "chunk") {
+            setFeedback((previous) => previous + data.text);
+          }
+        }
+
+        if (done) break;
+      }
+    } finally {
+      setIsFeedbackStreaming(false);
+    }
   };
 
   const handleDragOver = (e) => {
@@ -133,13 +177,10 @@ export default function ResumeRoundSection() {
         }),
       ]);
 
-      if (feedbackRes.ok) {
-        const feedbackData = await feedbackRes.json();
-        setFeedback(feedbackData.feedback);
-      }
+      setCurrentStep("report");
+      await streamFeedback(feedbackRes);
 
       setAnswers([]);
-      setCurrentStep("report");
     } catch (err) {
       console.error(err);
       alert(err.message || "An error occurred during ATS score calculation.");
@@ -212,7 +253,7 @@ export default function ResumeRoundSection() {
     try {
       const uploadFormData = new FormData();
       uploadFormData.append("resume", file);
-      
+
       const parseRes = await fetch("/api/resume/upload", {
         method: "POST",
         body: uploadFormData,
@@ -223,53 +264,20 @@ export default function ResumeRoundSection() {
       setParsedResume(parsedData);
       setProcessingStage("ats");
 
-      const atsPromise = fetch("/api/resume/ats-score", {
+      const atsData = await fetch("/api/resume/ats-score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parsedResume: parsedData, jobDescription }),
       }).then(async (atsRes) => {
         if (!atsRes.ok) throw new Error("Failed to calculate ATS score.");
-        const atsData = await atsRes.json();
-        setAtsResult(atsData.atsResult);
+        const atsJson = await atsRes.json();
+        setAtsResult(atsJson.atsResult);
         setProcessingStage("feedback");
-        return atsData;
+        return atsJson;
       });
 
-      const questionsPromise = generateQuestionsSequentially(parsedData);
-
-      const feedbackPromise = atsPromise.then(async (atsData) => {
-        return fetch("/api/resume/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ atsResult: atsData.atsResult, jobDescription }),
-        }).catch(() => null);
-      });
-
-      const optimizePromise = atsPromise.then(async (atsData) => {
-        return fetch("/api/resume/optimize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ parsedResume: parsedData, atsResult: atsData.atsResult }),
-        }).catch(() => null);
-      });
-
-      const [atsData, feedbackRes, optimizeRes] = await Promise.all([
-        atsPromise,
-        questionsPromise.then(() => null),
-        Promise.resolve(null),
-      ]);
-
-      const feedbackResponse = await feedbackPromise;
-      const optimizeResponse = await optimizePromise;
-
-      if (feedbackResponse?.ok) {
-        const feedbackData = await feedbackResponse.json();
-        setFeedback(feedbackData.feedback);
-      }
-      if (optimizeResponse?.ok) {
-        const optimizeData = await optimizeResponse.json();
-        setOptimizedResume(optimizeData.optimizedResume);
-      }
+      setCurrentStep("interviewing");
+      await generateQuestionsSequentially(parsedData);
 
       if (atsData?.atsResult) {
         setAtsResult(atsData.atsResult);
@@ -284,7 +292,41 @@ export default function ResumeRoundSection() {
     }
   };
 
-  const handleAnswerSubmit = () => {
+  const generateFinalReport = async () => {
+    if (!atsResult) return;
+
+    setCurrentStep("report");
+    setFeedback("");
+
+    try {
+      const [feedbackRes, optimizeRes] = await Promise.all([
+        fetch("/api/resume/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ atsResult, jobDescription }),
+        }),
+        fetch("/api/resume/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ parsedResume, atsResult }),
+        }).catch(() => null),
+      ]);
+
+      if (feedbackRes?.ok) {
+        await streamFeedback(feedbackRes);
+      }
+
+      if (optimizeRes?.ok) {
+        const optimizeData = await optimizeRes.json();
+        setOptimizedResume(optimizeData.optimizedResume);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to generate the final resume report.");
+    }
+  };
+
+  const handleAnswerSubmit = async () => {
     if (!currentAnswer.trim()) {
       alert("Please provide an answer.");
       return;
@@ -308,11 +350,14 @@ export default function ResumeRoundSection() {
 
     if (currentQuestionIdx < questions.length - 1) {
       setCurrentQuestionIdx(currentQuestionIdx + 1);
-    } else if (isGeneratingQuestions && currentQuestionIdx < targetQuestionCount - 1) {
       return;
-    } else {
-      setCurrentStep("report");
     }
+
+    if (isGeneratingQuestions && currentQuestionIdx < targetQuestionCount - 1) {
+      return;
+    }
+
+    await generateFinalReport();
   };
 
   const resetAll = () => {
@@ -322,6 +367,7 @@ export default function ResumeRoundSection() {
     setAtsResult(null);
     setQuestions([]);
     setFeedback("");
+    setIsFeedbackStreaming(false);
     setOptimizedResume(null);
     setIsAtsProcessing(false);
     setIsProcessing(false);
@@ -701,8 +747,14 @@ export default function ResumeRoundSection() {
               <Sparkles className="w-3.5 h-3.5" /> Ollama Insight
             </div>
             <h4 className="text-xl font-bold text-white mb-3">ATS Expert Feedback</h4>
+            {isFeedbackStreaming && (
+              <div className="mb-3 flex items-center gap-2 text-xs text-cyan-400">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Generating live feedback...
+              </div>
+            )}
             <p className="text-sm leading-relaxed text-slate-300 whitespace-pre-line">
-              {feedback || "Calculating feedback details..."}
+              {feedback ? renderFeedbackMarkdown(feedback) : "Calculating feedback details..."}
             </p>
           </div>
 

@@ -33,7 +33,7 @@ export async function POST(request) {
     }
 
     // Try local Ollama model first if available
-    const OLLAMA_URL = (process.env.OLLAMA_URL || "https://audible-nanny-slacks.ngrok-free.dev").trim();
+    const OLLAMA_URL = (process.env.OLLAMA_URL || process.env.OLLAMA_URL_2 || "https://audible-nanny-slacks.ngrok-free.dev").trim();
     const MODEL_NAME = process.env.OLLAMA_MODEL || "gemma3:4b";
     const OLLAMA_USERNAME = (process.env.OLLAMA_USERNAME || "").trim();
     const OLLAMA_PASSWORD = process.env.OLLAMA_PASSWORD || "";

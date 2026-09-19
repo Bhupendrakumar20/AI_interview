@@ -57,13 +57,15 @@ async def get_dsa_question(difficulty: float, asked: list[str]) -> dict:
     problems = await fetch_leetcode_questions(label, limit=8)
     unused = [p for p in problems if p["title"] not in asked]
     chosen = (unused or problems)[0]
-    return {
+    question = {
         "title": chosen["title"],
         "description": f"{chosen['title']} ({chosen['difficulty']}) — solve on LeetCode: {chosen['titleSlug']}",
         "difficulty": chosen["difficulty"],
         "topic": "dsa",
         "source": "leetcode",
     }
+    logger.info(f"[question_gen] Generated DSA question -> title={question['title']}, difficulty={label}, asked_count={len(asked)}")
+    return question
 
 
 def generate_question(topic: str, difficulty: float, persona: str,
@@ -72,6 +74,11 @@ def generate_question(topic: str, difficulty: float, persona: str,
     Gemini -> Groq fallback chain, so a slow/dead local Ollama doesn't stall
     the whole interview session."""
     weak_line = f'Bias the question toward testing: "{target_weak_area}".' if target_weak_area else ""
+
+    logger.info(
+        f"[question_gen] Requesting generated question -> topic={topic}, difficulty={difficulty}, "
+        f"persona={persona}, asked_count={len(asked)}, target_weak={target_weak_area}"
+    )
 
     prompt = f"""You are a {persona} interviewing a candidate for an engineering role.
 
@@ -85,7 +92,7 @@ Return ONLY the question text, nothing else — no preamble, no markdown."""
 
     result = generate_with_fallback(prompt, temperature=0.3, num_predict=300)
     question_text = clean_question_text(result["text"])
-    logger.info(f"[question_gen] topic={topic} source={result['source']}")
+    logger.info(f"[question_gen] Generated question for topic={topic} | source={result['source']} | text={question_text[:200]}")
 
     return {
         "title": topic.title(),
@@ -93,7 +100,7 @@ Return ONLY the question text, nothing else — no preamble, no markdown."""
         "difficulty": difficulty_to_leetcode_label(difficulty),
         "topic": topic,
         "source": "generated",
-        "llm_source": result["source"],  # optional, useful for debugging which provider answered
+        "llm_source": result["source"],
     }
 
 

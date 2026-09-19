@@ -127,13 +127,22 @@ async def start_session(req: StartSessionRequest):
     )
     state._last_touched = time.time()
 
+    logger.info(
+        f"[{session_id}] Start session request -> persona={req.persona}, "
+        f"topics={req.topic_focus}, max_questions={req.max_questions}, difficulty={state.difficulty}"
+    )
+
     topic = pick_next_topic(state)
-    logger.info(f"[{session_id}] New session created, first topic: {topic}")
+    logger.info(f"[{session_id}] Selected initial topic: {topic}")
 
     question = await get_next_question(topic, state.difficulty, state.persona, [], None)
     state.current_topic = topic
     state.current_question = question
-    
+    logger.info(
+        f"[{session_id}] Generated first question for topic={topic}: "
+        f"title={question.get('title')} | source={question.get('source')} | text={question.get('description')[:180]}"
+    )
+
     save_session_state(session_id, state)
 
     return StartSessionResponse(
@@ -151,7 +160,12 @@ async def submit_answer(req: SubmitAnswerRequest):
         raise HTTPException(404, "Session not found — it may have ended or the server restarted")
 
     state._last_touched = time.time()
-    logger.info(f"[{req.session_id}] Answer received for topic={state.current_topic}")
+    current_question = state.current_question.get("description", "") if state.current_question else ""
+    answer_preview = req.answer.strip().replace("\n", " ")[:220]
+    logger.info(
+        f"[{req.session_id}] User submitted answer for topic={state.current_topic} | "
+        f"question={current_question[:140]} | answer={answer_preview}"
+    )
 
     try:
         evaluation = evaluate_answer(
@@ -166,22 +180,34 @@ async def submit_answer(req: SubmitAnswerRequest):
         raise HTTPException(500, f"Unexpected evaluation error: {type(e).__name__}: {e}")
 
     apply_evaluation(state, evaluation, state.current_topic, req.answer)
-    logger.info(f"[{req.session_id}] Score={evaluation['score']} difficulty->{state.difficulty} "
-                f"locked_topic={state.locked_topic}")
+    logger.info(
+        f"[{req.session_id}] Evaluation done -> score={evaluation['score']}, "
+        f"difficulty={state.difficulty}, question_count={state.question_count}, "
+        f"locked_topic={state.locked_topic}, weak_tags={[w['tag'] for w in evaluation['weak_tags']]}"
+    )
 
     if state.question_count >= state.max_questions:
         report = build_report(state)
         delete_session_state(req.session_id)
-        logger.info(f"[{req.session_id}] Session complete")
+        logger.info(f"[{req.session_id}] Session complete after {state.question_count} questions")
         return SubmitAnswerResponse(done=True, evaluation=evaluation, report=report)
 
     next_topic = pick_next_topic(state)
     target_weak = pick_target_weak_area(state, next_topic)
+    logger.info(
+        f"[{req.session_id}] Preparing next question -> next_topic={next_topic}, "
+        f"target_weak={target_weak}, difficulty={state.difficulty}"
+    )
+
     next_question = await get_next_question(
         next_topic, state.difficulty, state.persona, state.asked_questions, target_weak,
     )
     state.current_topic = next_topic
     state.current_question = next_question
+    logger.info(
+        f"[{req.session_id}] Generated next question -> title={next_question.get('title')} | "
+        f"source={next_question.get('source')} | question={next_question.get('description')[:180]}"
+    )
 
     save_session_state(req.session_id, state)
 

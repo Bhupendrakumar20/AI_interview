@@ -50,7 +50,8 @@ def apply_evaluation(state: InterviewState, evaluation: dict, topic: str, answer
             )
 
     state.topic_performance.setdefault(topic, []).append(evaluation["score"])
-    state.asked_questions.append(state.current_question.get("title", state.current_question.get("description", "")))
+    current_question_text = state.current_question.get("title", state.current_question.get("description", ""))
+    state.asked_questions.append(current_question_text)
     state.performance_history.append({
         "topic": topic,
         "question": state.current_question["description"],
@@ -61,6 +62,12 @@ def apply_evaluation(state: InterviewState, evaluation: dict, topic: str, answer
         "feedback": evaluation["feedback"],
     })
     state.question_count += 1
+
+    print(
+        f"[adaptive_interview] apply_evaluation -> topic={topic}, score={evaluation['score']}, "
+        f"question_count={state.question_count}, weak_tags={[w['tag'] for w in evaluation['weak_tags']]}, "
+        f"answer_length={len(answer.strip())}"
+    )
 
     _update_lock_state(state, topic, evaluation["score"])
     return state

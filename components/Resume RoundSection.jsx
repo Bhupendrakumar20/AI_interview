@@ -167,27 +167,46 @@ export default function ResumeRoundSection() {
     setIsGeneratingQuestions(true);
 
     for (let index = 0; index < totalQuestions; index++) {
-      const questionsRes = await fetch("/api/resume/generate-questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          parsedResume: parsedData,
-          focusArea: selectedFocus,
-          persona: selectedPersona,
-          numQuestions: 1,
-        }),
-      });
+      let nextQuestion = null;
 
-      if (!questionsRes.ok) {
-        throw new Error("Failed to generate questions.");
+      try {
+        const questionsRes = await fetch("/api/resume/generate-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            parsedResume: parsedData,
+            focusArea: selectedFocus,
+            persona: selectedPersona,
+            numQuestions: 1,
+          }),
+        });
+
+        if (!questionsRes.ok) {
+          throw new Error(`API error code ${questionsRes.status}`);
+        }
+
+        const questData = await questionsRes.json();
+        const generatedQuestions = questData.verificationQuestions || [];
+        nextQuestion = generatedQuestions[0];
+      } catch (err) {
+        console.warn(`Network/Server error generating question ${index + 1}:`, err);
       }
 
-      const questData = await questionsRes.json();
-      const generatedQuestions = questData.verificationQuestions || [];
-      const nextQuestion = generatedQuestions[0] || {
-        question: "Can you walk me through how you implemented this work in your project?",
-        expectedKeywords: [selectedFocus],
-      };
+      // Safe client-side fallback if fetch fails or returned no questions
+      if (!nextQuestion) {
+        const fallbacks = [
+          `Can you describe a challenging problem you solved related to ${selectedFocus}?`,
+          `How do you typically measure success or verify results when working on ${selectedFocus}?`,
+          `What technologies or methodologies did you use for ${selectedFocus}, and why?`,
+          `Can you explain a trade-off you had to make when implementing ${selectedFocus}?`,
+          `If you had to redo the work related to ${selectedFocus}, what would you do differently?`
+        ];
+        nextQuestion = {
+          question: fallbacks[index % fallbacks.length],
+          expectedKeywords: [selectedFocus],
+          claim: `Demonstrate ${selectedFocus} proficiency`
+        };
+      }
 
       setQuestions((prevQuestions) => {
         const updatedQuestions = [...prevQuestions, nextQuestion];

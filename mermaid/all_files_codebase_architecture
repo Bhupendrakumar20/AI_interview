@@ -1,0 +1,90 @@
+# PrepWise AI Codebase Architecture & File Guide
+
+Below is the directory layout and file-by-file breakdown of the PrepWise AI Mock Interview platform.
+
+## 🌲 Directory Tree Diagram
+
+```
+PrepWise/
+├── AIBuddyMode/                   # Python FastAPI: Adaptive AI Buddy Interview Backend
+│   ├── api.py                     # Main Uvicorn server entrypoint (uses Redis for sessions)
+│   ├── logic.py                   # Adaptive state progression & weak area pick algorithms
+│   ├── evaluator.py               # AI evaluation & grading prompts (Gemini API)
+│   └── state.py                   # InterviewState Pydantic schemas
+├── ResumeInterview/               # Python FastAPI: Resume RAG & Interview Backend
+│   ├── api.py                     # Main Uvicorn server (port 8000)
+│   ├── resumeAnalyzer.py          # PDF Parser & Resume RAG parser
+│   └── questionGeneration.py      # LLM question generator customized to resumes
+├── app/                           # Next.js 16 (App Router) Frontend
+│   ├── (root)/                    # Logged-in shell with responsive sidebar wrapper
+│   │   ├── dashboard/             # User landing, charts, statistics & metrics
+│   │   ├── interview/             # Mock test settings, runner, and custom cards
+│   │   │   └── buddy/             # Lobby and live socket rooms for Buddy Mode
+│   │   └── jobs/                  # Job matches & mock tests linked to jd
+│   └── api/                       # Next.js API Routes
+│       ├── auth/                  # Credentials signup/login & JWT controller
+│       └── interview-buddy/       # Route handlers for updating active buddy rooms
+├── components/                    # React UI Components
+│   ├── ui/                        # Low-level UI primitives (shadcn-based)
+│   ├── InterviewCard.jsx          # Individual interview summary card (displays rating/date)
+│   ├── InterviewRunner.jsx        # Interview logic controller, speech-to-text, timer
+│   └── ThemeToggle.jsx            # Dark/light theme toggler
+├── firebase/                      # Firebase Init configurations
+│   ├── admin.js                   # Node.js Firebase Admin SDK init
+│   └── client.js                  # Frontend Firebase Web SDK init
+├── lib/                           # Core Utilities, Actions, & Helpers
+│   ├── actions/                   # Server Actions (DB reads/writes, authentication logic)
+│   │   ├── auth.action.js         # JWT signing, OTP validation, passwords hashing
+│   │   ├── general.action.js      # Fetching interviews, saving feedback reports
+│   │   └── interview-buddy.action.js # Firestore actions for socket buddy sessions
+│   ├── security/                  # Rate limiters, transactions, & proctoring hooks
+│   │   ├── transaction-manager.js # Concurrency locking for Firestore rooms & stats
+│   │   └── auth-utils.js          # Password hashing, in-memory OTP cache Map
+│   └── ai-provider.js             # Failover LLM provider wrapper (Gemini <-> Groq)
+├── server/                        # Independent node services (Dev Server helpers)
+│   ├── buddy-socket-server.js     # WebSockets room coordinator using Redis
+│   └── piston-local-server.js     # Local sandbox runner wrapper for executing code
+└── docker-compose.yml             # Orchestration for local Redis container
+```
+
+---
+
+## 📄 File-by-File Breakdown
+
+### 1. Python Backends (AI Engines)
+
+#### 🤖 `AIBuddyMode/` (Adaptive AI Buddy Backend)
+* [`api.py`](file:///d:/Projects/AI_interview/AIBuddyMode/api.py): FastAPI app running on port `8001`. Handles starting adaptive interviews (`/interview/start`), processing answers (`/interview/answer`), and ending sessions. Saves dynamic state in Redis.
+* [`logic.py`](file:///d:/Projects/AI_interview/AIBuddyMode/logic.py): Picks the next question based on whether the candidate answered correctly, targets weak areas, and controls dynamic difficulty levels.
+* [`evaluator.py`](file:///d:/Projects/AI_interview/AIBuddyMode/evaluator.py): Formulates system prompts to evaluate correctness, efficiency, and confidence of candidate answers.
+* [`state.py`](file:///d:/Projects/AI_interview/AIBuddyMode/state.py): Holds Pydantic models (like `InterviewState` and `WeakArea`) that define the data schema stored in Redis.
+
+#### 📄 `ResumeInterview/` (Resume Analysis Backend)
+* [`api.py`](file:///d:/Projects/AI_interview/ResumeInterview/api.py): FastAPI server running on port `8000` to process PDF uploads and parse details.
+* [`resumeAnalyzer.py`](file:///d:/Projects/AI_interview/ResumeInterview/resumeAnalyzer.py): Uses RAG (Retrieval-Augmented Generation) to match user resumes with job descriptions, extracting key skills, weaknesses, and experience.
+
+---
+
+### 2. Next.js Frontend Framework (`app/`)
+
+* [`(root)/layout.jsx`](file:///d:/Projects/AI_interview/app/\(root\)/layout.jsx): Renders the main interface layout wrapper containing the responsive navigation sidebar. Skip sidebar logic for buddy mode screens to preserve full-screen layout.
+* [`(root)/dashboard/page.jsx`](file:///d:/Projects/AI_interview/app/\(root\)/dashboard/page.jsx): Dashboard landing page displaying analytics, charts (like score progression), and user stats.
+* [`(root)/interview/page.jsx`](file:///d:/Projects/AI_interview/app/\(root\)/interview/page.jsx): Mock interview set up panel (difficulty selector, role input) and user's past interview list cards.
+* [`(root)/interview/buddy/[inviteCode]/page.jsx`](file:///d:/Projects/AI_interview/app/\(root\)/interview/buddy/\[inviteCode\]/page.jsx): Real-time collaborative interview room with coding editor, shared whiteboard drawing canvas, and chat.
+
+---
+
+### 3. Server Actions & Services (`lib/`)
+
+* [`actions/auth.action.js`](file:///d:/Projects/AI_interview/lib/actions/auth.action.js): Backend server action code for checking logins, credentials matching, cookies verification, email password resetting, and OTP triggers.
+* [`actions/general.action.js`](file:///d:/Projects/AI_interview/lib/actions/general.action.js): Core actions for fetching mock interview lists, storing final feedback reports, and caching static interview questions.
+* [`security/transaction-manager.js`](file:///d:/Projects/AI_interview/lib/security/transaction-manager.js): Prevents race conditions during simultaneous user score increases or room setups by locking operations through Firestore transactions.
+* [`security/auth-utils.js`](file:///d:/Projects/AI_interview/lib/security/auth-utils.js): Password hashing utilities (pbkdf2Sync) and memory cache map to store and verify 6-digit verification codes.
+* [`ai-provider.js`](file:///d:/Projects/AI_interview/lib/ai-provider.js): Virtual language model client that performs key rotation, checks key health status, and fails over from Gemini to Groq automatically.
+
+---
+
+### 4. Custom Node Servers (`server/`)
+
+* [`buddy-socket-server.js`](file:///d:/Projects/AI_interview/server/buddy-socket-server.js): Runs on port `4002`. Manages real-time WebSockets connections. Synchronizes note pads, whiteboard shapes, dynamic code outputs, and active room participants utilizing a local Redis store.
+* [`piston-local-server.js`](file:///d:/Projects/AI_interview/server/piston-local-server.js): Serves as a wrapper API for the local Piston engine to run untrusted candidate code (C++, Python, JS, Java) securely.

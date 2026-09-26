@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithServiceFallback } from "@/lib/service-urls";
 
 export async function POST(request) {
   try {
@@ -9,19 +10,19 @@ export async function POST(request) {
       return NextResponse.json({ error: "No resume file provided" }, { status: 400 });
     }
 
-    const forwardData = new FormData();
-    forwardData.append("resume", file);
-
-    const pythonUrl = process.env.NODE_ENV === "production"
-      ? (process.env.NEXT_PUBLIC_RESUME_API_URL_2 || process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000")
-      : (process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000");
-    const response = await fetch(`${pythonUrl}/parse`, {
-      method: "POST",
-      headers: {
-        "bypass-tunnel-reminder": "true",
+    const { response } = await fetchWithServiceFallback(
+      "resume",
+      "/parse",
+      () => {
+        const forwardData = new FormData();
+        forwardData.append("resume", file);
+        return {
+          method: "POST",
+          body: forwardData,
+        };
       },
-      body: forwardData,
-    });
+      request
+    );
 
     if (!response.ok) {
       const errorText = await response.text();

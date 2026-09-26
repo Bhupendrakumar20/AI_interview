@@ -77,7 +77,7 @@ export default function JobsPage() {
           </p>
         )}
         {source === "api" && (
-          <p className="text-sm text-green-500 mt-2">✅ Live job listings</p>
+          <p className="text-sm text-green-500 mt-2"> Live job listings</p>
         )}
       </div>
 

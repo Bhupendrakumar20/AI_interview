@@ -3,6 +3,7 @@ import { withRateLimit } from "@/lib/rate-limiter";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { checkGeminiRateLimit } from "@/lib/security/rate-limiters";
 import { NextResponse } from "next/server";
+import { fetchWithServiceFallback } from "@/lib/service-urls";
 import { db } from "@/firebase/admin";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
@@ -32,14 +33,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "Answers array is required" }, { status: 400 });
     }
 
-    // Try local Ollama model first if available
-    const OLLAMA_URL = (process.env.OLLAMA_URL || "https://audible-nanny-slacks.ngrok-free.dev").trim();
     const MODEL_NAME = process.env.OLLAMA_MODEL || "gemma3:4b";
-    const OLLAMA_USERNAME = (process.env.OLLAMA_USERNAME || "").trim();
-    const OLLAMA_PASSWORD = process.env.OLLAMA_PASSWORD || "";
-    const authHeader = OLLAMA_USERNAME
-      ? `Basic ${Buffer.from(`${OLLAMA_USERNAME}:${OLLAMA_PASSWORD}`).toString("base64")}`
-      : undefined;
     
     let evaluationData = null;
 
@@ -67,25 +61,27 @@ export async function POST(request) {
         }
       `;
 
-      const response = await fetch(`${OLLAMA_URL.replace(/\/$/, "")}/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authHeader ? { Authorization: authHeader } : {}),
+      const { response } = await fetchWithServiceFallback(
+        "ollama",
+        "/api/chat",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: MODEL_NAME,
+            messages: [{ role: "user", content: prompt }],
+            stream: false,
+            format: "json",
+            options: { temperature: 0.3 }
+          }),
+          signal: controller.signal,
         },
-        body: JSON.stringify({
-          model: MODEL_NAME,
-          messages: [{ role: "user", content: prompt }],
-          stream: false,
-          format: "json",
-          options: { temperature: 0.3 }
-        }),
-        signal: controller.signal,
-      });
+        request
+      );
 
       clearTimeout(timeoutId);
 
-      if (response.ok) {
+      if (response && response.ok) {
         const data = await response.json();
         const textContent = data.message?.content;
         if (textContent) {

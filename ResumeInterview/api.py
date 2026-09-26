@@ -325,13 +325,11 @@ async def optimize_resume(payload: OptimizeResumeRequest):
         if payload.csvPath:
             optimized_resume = generate_optimized_resume(
                 payload.parsedResume,
-                ats_result=payload.atsResult,
                 csv_path=payload.csvPath,
             )
         else:
             optimized_resume = generate_optimized_resume(
                 payload.parsedResume,
-                ats_result=payload.atsResult,
             )
 
         return {

@@ -70,7 +70,9 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
   // Web Speech API
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [interimText, setInterimText] = useState("");
   const recognitionRef = useRef(null);
+  const isLoadingRef = useRef(false);
 
   // Custom Whiteboard State
   const canvasRef = useRef(null);
@@ -81,6 +83,54 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [shapes, setShapes] = useState([]); // Save vector history for RAG and undo
   const [currentShape, setCurrentShape] = useState(null);
+
+  // Dictionaries to persist answer, transcript, and shapes for each question index
+  const [savedAnswers, setSavedAnswers] = useState({});
+  const [savedTranscripts, setSavedTranscripts] = useState({});
+  const [savedShapes, setSavedShapes] = useState({});
+
+  // Load saved state when question index changes
+  useEffect(() => {
+    isLoadingRef.current = true;
+
+    // Load answer
+    const savedCode = savedAnswers[currentQuestionIndex];
+    if (savedCode !== undefined) {
+      setEditorCode(savedCode);
+    } else {
+      const isCoding = filters?.type === "Technical Round" || filters?.type === "Coding Challenge";
+      setEditorCode(isCoding ? (INITIAL_CODE_TEMPLATES[selectedLanguage] || "") : "");
+    }
+
+    // Load transcript
+    setTranscript(savedTranscripts[currentQuestionIndex] || "");
+    setInterimText("");
+
+    // Load shapes
+    setShapes(savedShapes[currentQuestionIndex] || []);
+
+    const tid = setTimeout(() => {
+      isLoadingRef.current = false;
+    }, 50);
+
+    return () => clearTimeout(tid);
+  }, [currentQuestionIndex]);
+
+  // Auto-save state updates in real-time
+  useEffect(() => {
+    if (isLoadingRef.current) return;
+    setSavedAnswers(prev => ({ ...prev, [currentQuestionIndex]: editorCode }));
+  }, [editorCode, currentQuestionIndex]);
+
+  useEffect(() => {
+    if (isLoadingRef.current) return;
+    setSavedTranscripts(prev => ({ ...prev, [currentQuestionIndex]: transcript }));
+  }, [transcript, currentQuestionIndex]);
+
+  useEffect(() => {
+    if (isLoadingRef.current) return;
+    setSavedShapes(prev => ({ ...prev, [currentQuestionIndex]: shapes }));
+  }, [shapes, currentQuestionIndex]);
 
   // AI Nudges
   const [nudges, setNudges] = useState([]);
@@ -143,14 +193,21 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Sync isRecording state to a ref to prevent stale closures in event handlers
+  const isRecordingRef = useRef(isRecording);
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
   // ----------------------------------------------------
   // Speech Recognition (Web Speech API)
   // ----------------------------------------------------
   useEffect(() => {
+    let rec = null;
     if (typeof window !== "undefined") {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
-        const rec = new SpeechRecognition();
+        rec = new SpeechRecognition();
         rec.continuous = true;
         rec.interimResults = true;
         rec.lang = "en-US";
@@ -168,10 +225,18 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
           }
           if (finalTranscript) {
             setTranscript((prev) => prev + finalTranscript);
+            setInterimText("");
+          } else {
+            setInterimText(interimTranscript);
           }
         };
 
         rec.onerror = (e) => {
+          // "aborted" is a normal occurrence when stopping the service programmatically
+          if (e.error === "aborted") {
+            console.log("Speech recognition stopped/aborted programmatically.");
+            return;
+          }
           console.error("Speech recognition error:", e.error, e.message);
           if (e.error === "not-allowed" || e.error === "service-not-allowed") {
             setIsRecording(false);
@@ -183,8 +248,8 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
         };
 
         rec.onend = () => {
-          // Only attempt restart if it was not stopped due to a fatal error
-          if (isRecording) {
+          // Only attempt restart if it was not stopped due to a fatal error or user action
+          if (isRecordingRef.current) {
             try {
               rec.start();
             } catch (err) {
@@ -196,7 +261,17 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
         recognitionRef.current = rec;
       }
     }
-  }, [isRecording]);
+
+    return () => {
+      if (rec) {
+        try {
+          rec.stop();
+        } catch (err) {
+          // ignore cleanup errors
+        }
+      }
+    };
+  }, []);
 
   const toggleSpeechRecording = () => {
     if (!recognitionRef.current) {
@@ -210,6 +285,7 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
       toast.success("Stopped voice recording.");
     } else {
       setTranscript("");
+      setInterimText("");
       recognitionRef.current.start();
       setIsRecording(true);
       toast.success("Started continuous voice transcription. Speak your thoughts!");
@@ -526,16 +602,36 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
     setActiveTab("feedback");
     toast.loading("Analyzing your submission...", { id: "eval-toast" });
 
+    // Save current active state before generating the summary
+    const finalAnswers = { ...savedAnswers, [currentQuestionIndex]: editorCode };
+    const finalTranscripts = { ...savedTranscripts, [currentQuestionIndex]: transcript };
+    const finalShapes = { ...savedShapes, [currentQuestionIndex]: shapes };
+
+    // Build a consolidated submission text
+    let consolidatedSubmission = "";
+    questions.forEach((q, idx) => {
+      const ans = finalAnswers[idx] || "(No answer submitted)";
+      const tr = finalTranscripts[idx] || "(No voice transcript)";
+      const sh = finalShapes[idx] || [];
+      const shSummary = sh.map((s, sIdx) => `${s.type} (color: ${s.color})`).join(", ") || "None";
+      
+      consolidatedSubmission += `=== QUESTION ${idx + 1} ===\n`;
+      consolidatedSubmission += `Question: ${q.question || q.title}\n`;
+      consolidatedSubmission += `Answer:\n${ans}\n\n`;
+      consolidatedSubmission += `Voice Explanation:\n"${tr}"\n\n`;
+      consolidatedSubmission += `Whiteboard Summary: ${shSummary}\n\n`;
+    });
+
     // Generate drawing summary
     const shapesSummary = shapes.map((s, idx) => `Shape ${idx + 1}: ${s.type} (color: ${s.color})`).join(", ");
     const whiteboardSummary = shapesSummary || "No whiteboard drawings submitted.";
 
     try {
       const result = await evaluateMockTest({
-        question: currentQuestion.question,
-        code: editorCode,
-        language: selectedLanguage,
-        transcript: transcript,
+        question: `Consolidated Mock Test Evaluation (${questions.length} questions total)`,
+        code: consolidatedSubmission,
+        language: filters?.type === "Technical Round" || filters?.type === "Coding Challenge" ? selectedLanguage : "text/markdown",
+        transcript: "See consolidated submission details inside code block.",
         whiteboardSummary,
         company: filters.company,
         role: filters.role
@@ -667,7 +763,14 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={() => setCurrentQuestionIndex((p) => Math.max(0, p - 1))}
+                  onClick={() => {
+                    // Save current question values first!
+                    setSavedAnswers(prev => ({ ...prev, [currentQuestionIndex]: editorCode }));
+                    setSavedTranscripts(prev => ({ ...prev, [currentQuestionIndex]: transcript }));
+                    setSavedShapes(prev => ({ ...prev, [currentQuestionIndex]: shapes }));
+                    
+                    setCurrentQuestionIndex((p) => Math.max(0, p - 1));
+                  }}
                   disabled={currentQuestionIndex === 0}
                   className="h-7 w-7 border-slate-800 text-slate-400 hover:text-slate-200"
                 >
@@ -676,7 +779,14 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={() => setCurrentQuestionIndex((p) => Math.min(questions.length - 1, p + 1))}
+                  onClick={() => {
+                    // Save current question values first!
+                    setSavedAnswers(prev => ({ ...prev, [currentQuestionIndex]: editorCode }));
+                    setSavedTranscripts(prev => ({ ...prev, [currentQuestionIndex]: transcript }));
+                    setSavedShapes(prev => ({ ...prev, [currentQuestionIndex]: shapes }));
+                    
+                    setCurrentQuestionIndex((p) => Math.min(questions.length - 1, p + 1));
+                  }}
                   disabled={currentQuestionIndex === questions.length - 1}
                   className="h-7 w-7 border-slate-800 text-slate-400 hover:text-slate-200"
                 >
@@ -781,7 +891,14 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
               </Button>
             </div>
             <div className="h-28 bg-[#090d16] rounded-lg border border-slate-800 p-2.5 text-xs text-slate-400 overflow-y-auto font-mono scrollbar-thin">
-              {transcript || <span className="italic text-slate-600">Start talking to capture your thought process dynamically...</span>}
+              {transcript || interimText ? (
+                <>
+                  <span>{transcript}</span>
+                  {interimText && <span className="text-slate-500 italic">{interimText}</span>}
+                </>
+              ) : (
+                <span className="italic text-slate-600">Start talking to capture your thought process dynamically...</span>
+              )}
             </div>
           </div>
 
@@ -824,7 +941,7 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                 onClick={() => setActiveTab("code")}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${activeTab === "code" ? "bg-slate-800 text-white shadow" : "text-slate-400 hover:text-slate-200"}`}
               >
-                <Code size={14} /> Coding IDE
+                <Code size={14} /> {filters?.type === "Technical Round" || filters?.type === "Coding Challenge" ? "Coding IDE" : "Written Response"}
               </button>
               <button
                 onClick={() => setActiveTab("whiteboard")}
@@ -847,70 +964,91 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
             </div>
           </nav>
 
-          {/* TAB 1: CODING IDE */}
+          {/* TAB 1: CODING IDE / WRITTEN RESPONSE */}
           {activeTab === "code" && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Toolbar */}
-              <div className="px-4 py-2 bg-[#090d16] border-b border-slate-800/80 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-medium">Select Language:</span>
-                  <select
-                    value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="bg-[#172237] border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none"
-                  >
-                    <option value="javascript">JavaScript</option>
-                    <option value="python">Python</option>
-                    <option value="cpp">C++</option>
-                    <option value="java">Java</option>
-                  </select>
-                </div>
+              {filters?.type === "Technical Round" || filters?.type === "Coding Challenge" ? (
+                // CODING MODE
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* Toolbar */}
+                  <div className="px-4 py-2 bg-[#090d16] border-b border-slate-800/80 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400 font-medium">Select Language:</span>
+                      <select
+                        value={selectedLanguage}
+                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        className="bg-[#172237] border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none"
+                      >
+                        <option value="javascript">JavaScript</option>
+                        <option value="python">Python</option>
+                        <option value="cpp">C++</option>
+                        <option value="java">Java</option>
+                      </select>
+                    </div>
 
-                <Button
-                  onClick={handleRunCode}
-                  disabled={isExecuting}
-                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs h-7 px-3 py-1 flex items-center gap-1"
-                >
-                  <Play size={12} /> {isExecuting ? "Executing..." : "Run Code"}
-                </Button>
-              </div>
+                    <Button
+                      onClick={handleRunCode}
+                      disabled={isExecuting}
+                      className="bg-blue-600 hover:bg-blue-500 text-white text-xs h-7 px-3 py-1 flex items-center gap-1"
+                    >
+                      <Play size={12} /> {isExecuting ? "Executing..." : "Run Code"}
+                    </Button>
+                  </div>
 
-              {/* Code Editor */}
-              <div className="flex-1 min-h-[300px]">
-                <Editor
-                  height="100%"
-                  language={selectedLanguage}
-                  value={editorCode}
-                  theme="vs-dark"
-                  onChange={(val) => setEditorCode(val || "")}
-                  options={{
-                    fontSize: 14,
-                    minimap: { enabled: false },
-                    fontFamily: "var(--font-mono, monospace)"
-                  }}
-                />
-              </div>
+                  {/* Code Editor */}
+                  <div className="flex-1 min-h-[300px]">
+                    <Editor
+                      height="100%"
+                      language={selectedLanguage}
+                      value={editorCode}
+                      theme="vs-dark"
+                      onChange={(val) => setEditorCode(val || "")}
+                      options={{
+                        fontSize: 14,
+                        minimap: { enabled: false },
+                        fontFamily: "var(--font-mono, monospace)"
+                      }}
+                    />
+                  </div>
 
-              {/* Console Output */}
-              <div className="h-44 bg-[#0a0e1a] border-t border-slate-800 flex flex-col font-mono">
-                <div className="px-4 py-1.5 bg-[#0c101d] border-b border-slate-800 flex justify-between items-center text-xs text-slate-400">
-                  <span>Console Terminal Output</span>
-                  <Button
-                    onClick={() => { setConsoleOutput(""); setConsoleError(""); }}
-                    size="xs"
-                    className="bg-transparent hover:bg-slate-800 text-slate-400"
-                  >
-                    Clear
-                  </Button>
+                  {/* Console Output */}
+                  <div className="h-44 bg-[#0a0e1a] border-t border-slate-800 flex flex-col font-mono">
+                    <div className="px-4 py-1.5 bg-[#0c101d] border-b border-slate-800 flex justify-between items-center text-xs text-slate-400">
+                      <span>Console Terminal Output</span>
+                      <Button
+                        onClick={() => { setConsoleOutput(""); setConsoleError(""); }}
+                        size="xs"
+                        className="bg-transparent hover:bg-slate-800 text-slate-400"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <div className="flex-1 p-3.5 text-xs overflow-y-auto select-text scrollbar-thin">
+                      {consoleError ? (
+                        <pre className="text-rose-400 font-bold whitespace-pre-wrap">{consoleError}</pre>
+                      ) : (
+                        <pre className="text-slate-300 whitespace-pre-wrap">{consoleOutput || "No stdout. Click \"Run Code\" to run."}</pre>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 p-3.5 text-xs overflow-y-auto select-text scrollbar-thin">
-                  {consoleError ? (
-                    <pre className="text-rose-400 font-bold whitespace-pre-wrap">{consoleError}</pre>
-                  ) : (
-                    <pre className="text-slate-300 whitespace-pre-wrap">{consoleOutput || "No stdout. Click \"Run Code\" to run."}</pre>
-                  )}
+              ) : (
+                // TEXT EDITOR / BEHAVIORAL MODE
+                <div className="flex-1 flex flex-col overflow-hidden p-6 bg-[#0a0e1a]">
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-slate-200">Type Your Answer</h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Explain your approach in detail. For behavioral questions, consider using the <strong>STAR method</strong> (Situation, Task, Action, Result).
+                    </p>
+                  </div>
+                  <textarea
+                    value={editorCode}
+                    onChange={(e) => setEditorCode(e.target.value)}
+                    placeholder="Type your answer here..."
+                    className="flex-1 w-full bg-[#070a12] border border-slate-800 rounded-xl p-5 text-slate-200 text-sm focus:outline-none focus:border-blue-500/50 resize-none font-sans leading-relaxed shadow-inner"
+                  />
                 </div>
-              </div>
+              )}
             </div>
           )}
 

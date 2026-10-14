@@ -3,6 +3,19 @@
 import React, { useState, useRef } from "react";
 import { FileText, Briefcase, User, Clock, CheckCircle, Upload, Shield, AlertTriangle, ArrowRight, Loader2, Sparkles, RefreshCw, Users, Rocket, Zap } from "lucide-react";
 
+async function getApiErrorMessage(response, fallback) {
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  const detail = payload?.details ?? payload?.detail ?? payload?.error;
+  const detailMessage = typeof detail === "string" ? detail : "";
+  return `${fallback} (HTTP ${response.status})${detailMessage ? `: ${detailMessage}` : ""}`;
+}
+
 function renderFeedbackMarkdown(text) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
@@ -152,7 +165,7 @@ export default function ResumeRoundSection() {
         method: "POST",
         body: uploadFormData,
       });
-      if (!parseRes.ok) throw new Error("Failed to parse resume PDF.");
+      if (!parseRes.ok) throw new Error(await getApiErrorMessage(parseRes, "Failed to parse resume PDF"));
       const parseData = await parseRes.json();
       const parsedData = parseData.parsedResume;
       setParsedResume(parsedData);
@@ -164,7 +177,7 @@ export default function ResumeRoundSection() {
         body: JSON.stringify({ parsedResume: parsedData, jobDescription }),
       });
 
-      if (!atsRes.ok) throw new Error("Failed to calculate ATS score.");
+      if (!atsRes.ok) throw new Error(await getApiErrorMessage(atsRes, "Failed to calculate ATS score"));
       const atsData = await atsRes.json();
       setAtsResult(atsData.atsResult);
       setProcessingStage("feedback");
@@ -258,7 +271,7 @@ export default function ResumeRoundSection() {
         method: "POST",
         body: uploadFormData,
       });
-      if (!parseRes.ok) throw new Error("Failed to parse resume PDF.");
+      if (!parseRes.ok) throw new Error(await getApiErrorMessage(parseRes, "Failed to parse resume PDF"));
       const parseData = await parseRes.json();
       const parsedData = parseData.parsedResume;
       setParsedResume(parsedData);
@@ -269,7 +282,7 @@ export default function ResumeRoundSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parsedResume: parsedData, jobDescription }),
       }).then(async (atsRes) => {
-        if (!atsRes.ok) throw new Error("Failed to calculate ATS score.");
+        if (!atsRes.ok) throw new Error(await getApiErrorMessage(atsRes, "Failed to calculate ATS score"));
         const atsJson = await atsRes.json();
         setAtsResult(atsJson.atsResult);
         setProcessingStage("feedback");

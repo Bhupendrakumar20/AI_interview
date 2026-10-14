@@ -70,6 +70,8 @@
 // }
 
 import { NextResponse } from "next/server";
+import { getResumeApiAuthorizationHeader } from "@/lib/resume-api-auth";
+import { fetchResumeApi } from "@/lib/resume-api-fetch";
 
 export async function POST(request) {
   try {
@@ -88,20 +90,17 @@ export async function POST(request) {
       );
     }
 
-    const pythonUrl = process.env.NEXT_PUBLIC_RESUME_API_URL
-      || process.env.NEXT_PUBLIC_RESUME_API_URL_2
-      || "http://127.0.0.1:8000";
-
     const controller = new AbortController();
 
     const timeout = setTimeout(() => {
       controller.abort();
     }, 240000); // 2 minutes
 
-    const response = await fetch(`${pythonUrl}/feedback`, {
+    const response = await fetchResumeApi("/feedback", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: getResumeApiAuthorizationHeader(),
         "bypass-tunnel-reminder": "true",
       },
       signal: controller.signal,

@@ -105,6 +105,8 @@
 // }
 
 import { NextResponse } from "next/server";
+import { getResumeApiAuthorizationHeader } from "@/lib/resume-api-auth";
+import { fetchResumeApi } from "@/lib/resume-api-fetch";
 
 export async function POST(request) {
   try {
@@ -123,10 +125,6 @@ export async function POST(request) {
       );
     }
 
-    const pythonUrl = process.env.NEXT_PUBLIC_RESUME_API_URL
-      || process.env.NEXT_PUBLIC_RESUME_API_URL_2
-      || "http://127.0.0.1:8000";
-
     // Increase timeout since ATS scoring can take time
     const controller = new AbortController();
 
@@ -134,10 +132,11 @@ export async function POST(request) {
       controller.abort();
     }, 120000); // 2 minutes
 
-    const response = await fetch(`${pythonUrl}/ats-score`, {
+    const response = await fetchResumeApi("/ats-score", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: getResumeApiAuthorizationHeader(),
         "bypass-tunnel-reminder": "true",
       },
       signal: controller.signal,

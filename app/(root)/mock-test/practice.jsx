@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -25,75 +25,117 @@ export default function PracticePage() {
   const positions = getPositionsForCompany(companyId);
 
   const requestIdRef = useRef(0);
-const abortControllerRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
-const handleLoadQuestions = useCallback(async () => {
-  if (!selectedPosition) {
-    toast.error("Please select a position");
-    return;
-  }
+  useEffect(() => () => abortControllerRef.current?.abort(), []);
 
-  if (abortControllerRef.current) abortControllerRef.current.abort();
-  const controller = new AbortController();
-  abortControllerRef.current = controller;
-  const myRequestId = ++requestIdRef.current;
+  const resetQuestions = () => {
+    abortControllerRef.current?.abort();
+    requestIdRef.current += 1;
+    setLoading(false);
+    setQuestionsLoaded(false);
+    setQuestions([]);
+  };
 
-  setLoading(true);
-  setQuestions([]);
-  try {
-    const res = await fetch("/api/mock-test/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        company: companyName,
-        role: selectedPosition,
-        difficulty: selectedDifficulty,
-        questionType: "Technical",
-        count: 5,
-      }),
-      signal: controller.signal,
-    });
+  const handleLoadQuestions = useCallback(async () => {
+    if (!selectedPosition) {
+      toast.error("Please select a position");
+      return;
+    }
 
-    if (!res.ok || !res.body) throw new Error("Failed to start question stream");
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const myRequestId = ++requestIdRef.current;
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let firstReceived = false;
+    setLoading(true);
+    setQuestions([]);
+    try {
+      const res = await fetch("/api/mock-test/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: companyName,
+          role: selectedPosition,
+          difficulty: selectedDifficulty,
+          questionType: "Technical",
+          count: 5,
+        }),
+        signal: controller.signal,
+      });
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (myRequestId !== requestIdRef.current) { reader.cancel(); return; }
+      if (!res.ok || !res.body) throw new Error("Failed to start question stream");
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop();
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const parsed = JSON.parse(line);
-        if (parsed.error) throw new Error(parsed.error);
-        if (myRequestId === requestIdRef.current) {
-          setQuestions(parsed.questions);
+      const processLine = (line) => {
+        if (!line.trim()) return;
+        const event = JSON.parse(line);
+        if (event.error) throw new Error(event.error);
+        if (myRequestId !== requestIdRef.current) return;
+
+        if (event.type === "question_start") {
           setQuestionsLoaded(true);
-          if (!firstReceived) { setLoading(false); firstReceived = true; }
+          setQuestions((current) => [
+            ...current,
+            { question: "", difficulty: event.difficulty, isStreaming: true },
+          ]);
+        } else if (event.type === "question_reset") {
+          setQuestions((current) =>
+            current.map((question, index) =>
+              index === event.index
+                ? { ...question, question: "", isStreaming: true }
+                : question
+            )
+          );
+        } else if (event.type === "question_token") {
+          setQuestions((current) =>
+            current.map((question, index) =>
+              index === event.index
+                ? { ...question, question: question.question + event.text }
+                : question
+            )
+          );
+        } else if (event.type === "question_complete") {
+          setQuestions((current) =>
+            current.map((question, index) =>
+              index === event.index
+                ? { ...event.question, isStreaming: false }
+                : question
+            )
+          );
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) processLine(line);
+        if (done) break;
+        if (myRequestId !== requestIdRef.current) {
+          await reader.cancel();
+          return;
         }
       }
-    }
+      if (buffer.trim()) processLine(buffer);
 
-    if (myRequestId === requestIdRef.current) {
-      toast.success(`Loaded questions for ${selectedPosition} at ${companyName}`);
+      if (myRequestId === requestIdRef.current) {
+        toast.success(`Loaded questions for ${selectedPosition} at ${companyName}`);
+      }
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      console.error("Error loading questions:", error);
+      toast.error("Failed to load practice questions");
+      if (myRequestId === requestIdRef.current) setQuestions([]);
+    } finally {
+      if (myRequestId === requestIdRef.current) setLoading(false);
     }
-  } catch (error) {
-    if (error.name === "AbortError") return;
-    console.error("Error loading questions:", error);
-    toast.error("Failed to load practice questions");
-    if (myRequestId === requestIdRef.current) setQuestions([]);
-  } finally {
-    if (myRequestId === requestIdRef.current) setLoading(false);
-  }
-}, [selectedPosition, selectedDifficulty, companyName]);
+  }, [selectedPosition, selectedDifficulty, companyName]);
 
   return (
     <div className="space-y-8">
@@ -190,10 +232,7 @@ const handleLoadQuestions = useCallback(async () => {
               Practice Questions ({questions.length}/5)
             </h2>
             <Button
-              onClick={() => {
-                setQuestionsLoaded(false);
-                setQuestions([]);
-              }}
+              onClick={resetQuestions}
               className="bg-light-400 hover:bg-light-300 text-light-900"
             >
               Change Position
@@ -208,12 +247,13 @@ const handleLoadQuestions = useCallback(async () => {
                 index={index}
                 company={companyName}
                 role={selectedPosition}
+                isStreaming={question.isStreaming}
               />
             ))}
             {loading && questions.length < 5 && (
               <div className="flex items-center gap-2 text-sm text-light-100 py-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-200"></div>
-                Generating question {questions.length + 1} of 5…
+                Generating question {(questions.findIndex((question) => question.isStreaming) + 1) || questions.length + 1} of 5…
               </div>
             )}
           </div>
@@ -227,10 +267,7 @@ const handleLoadQuestions = useCallback(async () => {
               No questions available for this selection. Please try another position or difficulty level.
             </p>
             <Button
-              onClick={() => {
-                setQuestionsLoaded(false);
-                setQuestions([]);
-              }}
+              onClick={resetQuestions}
               className="bg-primary-200 hover:bg-primary-100 text-white"
             >
               Try Again

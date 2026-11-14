@@ -118,6 +118,8 @@ step can be called and tested independently.
 
 import sys
 import os
+import json
+import secrets
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from dotenv import load_dotenv
@@ -132,17 +134,42 @@ import shutil
 import tempfile
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi import Depends, FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ResumeParser.parser import parse_resume
 from ATSScoreChecker.ats_score_checker import ATSScorer
 from ResumeGeneration.generator import generate_optimized_resume
 from ResumeQuestionGeneration.resume_question_generation import generate_questions_for_resume
-from ResumeFeedBack.resume_feedback import get_ats_feedback
+from ResumeFeedBack.resume_feedback import ask_ollama_stream
 
 app = FastAPI(title="Resume Interview API")
+resume_api_basic_auth = HTTPBasic()
+
+
+def require_resume_api_auth(
+    credentials: HTTPBasicCredentials = Depends(resume_api_basic_auth),
+):
+    expected_username = os.getenv("RESUME_API_USERNAME")
+    expected_password = os.getenv("RESUME_API_PASSWORD")
+
+    if not expected_username or not expected_password:
+        raise HTTPException(
+            status_code=500,
+            detail="Resume API credentials are not configured on the server.",
+        )
+
+    valid_username = secrets.compare_digest(credentials.username, expected_username)
+    valid_password = secrets.compare_digest(credentials.password, expected_password)
+    if not (valid_username and valid_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid resume API credentials.",
+            headers={"WWW-Authenticate": "Basic"},
+        )
 
 app.add_middleware(
     CORSMiddleware,
@@ -219,7 +246,7 @@ def health():
 # Step 1: Upload Resume -> POST /parse -> parsedResume
 # ---------------------------------------------------------------------------
 
-@app.post("/parse")
+@app.post("/parse", dependencies=[Depends(require_resume_api_auth)])
 async def parse(resume: UploadFile = File(...)):
     if not resume.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF supported")
@@ -255,7 +282,7 @@ async def parse(resume: UploadFile = File(...)):
 # Step 2a: parsedResume -> POST /ats-score -> atsResult
 # ---------------------------------------------------------------------------
 
-@app.post("/ats-score")
+@app.post("/ats-score", dependencies=[Depends(require_resume_api_auth)])
 async def ats_score(payload: AtsScoreRequest):
     try:
         scorer = ATSScorer()
@@ -277,7 +304,7 @@ async def ats_score(payload: AtsScoreRequest):
 # (independent branch off parsedResume, does not depend on atsResult)
 # ---------------------------------------------------------------------------
 
-@app.post("/generate-questions")
+@app.post("/generate-questions", dependencies=[Depends(require_resume_api_auth)])
 async def generate_questions(payload: GenerateQuestionsRequest):
     try:
         questions = generate_questions_for_resume(
@@ -300,15 +327,20 @@ async def generate_questions(payload: GenerateQuestionsRequest):
 # Step 3a: atsResult -> POST /feedback
 # ---------------------------------------------------------------------------
 
-@app.post("/feedback")
+@app.post("/feedback", dependencies=[Depends(require_resume_api_auth)])
 async def feedback(payload: FeedbackRequest):
     try:
-        result = get_ats_feedback(payload.atsResult, payload.jobDescription)
+        def event_stream():
+            yield f"data: {json.dumps({'type': 'start'})}\n\n"
+            for text in ask_ollama_stream(payload.atsResult, payload.jobDescription):
+                yield f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
-        return {
-            "success": True,
-            "feedback": result,
-        }
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -319,7 +351,7 @@ async def feedback(payload: FeedbackRequest):
 # (sibling branch to /feedback, both hang off atsResult)
 # ---------------------------------------------------------------------------
 
-@app.post("/optimize-resume")
+@app.post("/optimize-resume", dependencies=[Depends(require_resume_api_auth)])
 async def optimize_resume(payload: OptimizeResumeRequest):
     try:
         if payload.csvPath:

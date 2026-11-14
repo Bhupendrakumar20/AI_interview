@@ -70,6 +70,8 @@
 // }
 
 import { NextResponse } from "next/server";
+import { getResumeApiAuthorizationHeader } from "@/lib/resume-api-auth";
+import { fetchResumeApi } from "@/lib/resume-api-fetch";
 
 export async function POST(request) {
   try {
@@ -88,20 +90,17 @@ export async function POST(request) {
       );
     }
 
-    const pythonUrl = process.env.NODE_ENV === "production"
-      ? (process.env.NEXT_PUBLIC_RESUME_API_URL_2 || process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000")
-      : (process.env.NEXT_PUBLIC_RESUME_API_URL || "http://127.0.0.1:8000");
-
     const controller = new AbortController();
 
     const timeout = setTimeout(() => {
       controller.abort();
     }, 240000); // 2 minutes
 
-    const response = await fetch(`${pythonUrl}/feedback`, {
+    const response = await fetchResumeApi("/feedback", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: getResumeApiAuthorizationHeader(),
         "bypass-tunnel-reminder": "true",
       },
       signal: controller.signal,
@@ -113,9 +112,8 @@ export async function POST(request) {
 
     clearTimeout(timeout);
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
       return NextResponse.json(
         {
           success: false,
@@ -127,7 +125,13 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json(data);
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        "Content-Type": response.headers.get("content-type") || "text/event-stream",
+        "Cache-Control": "no-cache",
+      },
+    });
   } catch (error) {
     console.error("Feedback API Error:", error);
 

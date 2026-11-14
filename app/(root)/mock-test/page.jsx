@@ -85,40 +85,61 @@ export default function MockTestPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let firstReceived = false;
+
+      const processLine = (line) => {
+        if (!line.trim()) return;
+        const event = JSON.parse(line);
+        if (event.error) throw new Error(event.error);
+        if (myRequestId !== requestIdRef.current) return;
+
+        if (event.type === "question_start") {
+          setQuestions((current) => [
+            ...current,
+            { question: "", difficulty: event.difficulty, isStreaming: true },
+          ]);
+        } else if (event.type === "question_reset") {
+          setQuestions((current) =>
+            current.map((question, index) =>
+              index === event.index
+                ? { ...question, question: "", isStreaming: true }
+                : question
+            )
+          );
+        } else if (event.type === "question_token") {
+          setQuestions((current) =>
+            current.map((question, index) =>
+              index === event.index
+                ? { ...question, question: question.question + event.text }
+                : question
+            )
+          );
+        } else if (event.type === "question_complete") {
+          setQuestions((current) =>
+            current.map((question, index) =>
+              index === event.index
+                ? { ...event.question, isStreaming: false }
+                : question
+            )
+          );
+        }
+      };
 
       while (true) {
         const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) processLine(line);
         if (done) break;
 
         // If a newer request has started, stop applying this one's results
         if (myRequestId !== requestIdRef.current) {
-          reader.cancel();
+          await reader.cancel();
           return;
         }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const parsed = JSON.parse(line);
-
-          if (parsed.error) {
-            throw new Error(parsed.error);
-          }
-
-          // Only apply if this is still the latest request
-          if (myRequestId === requestIdRef.current) {
-            setQuestions(parsed.questions);
-            if (!firstReceived) {
-              setLoading(false);
-              firstReceived = true;
-            }
-          }
-        }
       }
+      if (buffer.trim()) processLine(buffer);
 
       if (myRequestId === requestIdRef.current) {
         toast.success(`Loaded questions for ${activeFilters.company}`);
@@ -163,6 +184,10 @@ export default function MockTestPage() {
   const handleStartTest = () => {
     if (questions.length === 0) {
       toast.error("No questions loaded");
+      return;
+    }
+    if (questions.some((question) => question.isStreaming)) {
+      toast.error("Please wait for the questions to finish generating");
       return;
     }
     setIsTestActive(true);
@@ -494,12 +519,13 @@ export default function MockTestPage() {
                   index={index}
                   company={filters.company}
                   role={filters.role}
+                  isStreaming={q.isStreaming}
                 />
               ))}
-              {questions.length < filters.count && (
+              {loading && questions.length < filters.count && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  Generating question {questions.length + 1} of {filters.count}…
+                 Generating question {(questions.findIndex((question) => question.isStreaming) + 1) || questions.length + 1} of {filters.count}…
                 </div>
               )}
             </div>

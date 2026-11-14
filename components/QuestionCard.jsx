@@ -1,9 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { getQuestionAnswer, getQuestionTips } from "@/lib/actions/mock-test.action";
 import { Loader2, CheckCircle2, Lightbulb } from "lucide-react";
+
+async function streamMockTestResponse({ responseType, question, company, role, difficulty, signal, onToken, onComplete }) {
+  const response = await fetch("/api/mock-test/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ responseType, question, company, role, difficulty }),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    throw new Error("Failed to start response stream");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let completed = false;
+
+  const processLine = (line) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line);
+    if (event.error) throw new Error(event.error);
+    if (event.type === "response_token") onToken(event.text);
+    if (event.type === "response_complete") {
+      completed = true;
+      onComplete(event.value);
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) processLine(line);
+    if (done) break;
+  }
+  if (buffer.trim()) processLine(buffer);
+  if (!completed) throw new Error("Response stream ended before completion");
+}
 
 const getDifficultyBadge = (diff) => {
   const badges = {
@@ -14,32 +53,42 @@ const getDifficultyBadge = (diff) => {
   return badges[diff] || badges["Medium"];
 };
 
-export default function QuestionCard({ question, index, company, role }) {
+export default function QuestionCard({ question, index, company, role, isStreaming = false }) {
   const [answer, setAnswer] = useState(null);
   const [tips, setTips] = useState(null);
   const [loadingAnswer, setLoadingAnswer] = useState(false);
   const [loadingTips, setLoadingTips] = useState(false);
   const [answerError, setAnswerError] = useState(false);
   const [tipsError, setTipsError] = useState(false);
+  const [streamingTips, setStreamingTips] = useState("");
+  const answerAbortRef = useRef(null);
+  const tipsAbortRef = useRef(null);
+
+  useEffect(() => () => {
+    answerAbortRef.current?.abort();
+    tipsAbortRef.current?.abort();
+  }, []);
 
   const handleShowAnswer = async () => {
-    if (answer || loadingAnswer) return;
+    if ((answer && !answerError) || loadingAnswer) return;
+    const controller = new AbortController();
+    answerAbortRef.current = controller;
     setLoadingAnswer(true);
     setAnswerError(false);
+    setAnswer("");
     try {
-      const res = await getQuestionAnswer({
+      await streamMockTestResponse({
+        responseType: "answer",
         question: question.question,
         company,
         role,
         difficulty: question.difficulty,
+        signal: controller.signal,
+        onToken: (text) => setAnswer((current) => current + text),
+        onComplete: setAnswer,
       });
-      if (res.success) {
-        setAnswer(res.answer);
-      } else {
-        setAnswerError(true);
-      }
-    } catch {
-      setAnswerError(true);
+    } catch (error) {
+      if (error.name !== "AbortError") setAnswerError(true);
     } finally {
       setLoadingAnswer(false);
     }
@@ -47,22 +96,28 @@ export default function QuestionCard({ question, index, company, role }) {
 
   const handleShowTips = async () => {
     if (tips || loadingTips) return;
+    const controller = new AbortController();
+    tipsAbortRef.current = controller;
     setLoadingTips(true);
     setTipsError(false);
+    setTips(null);
+    setStreamingTips("");
     try {
-      const res = await getQuestionTips({
+      await streamMockTestResponse({
+        responseType: "tips",
         question: question.question,
         company,
         role,
         difficulty: question.difficulty,
+        signal: controller.signal,
+        onToken: (text) => setStreamingTips((current) => current + text),
+        onComplete: (value) => {
+          setTips(value);
+          setStreamingTips("");
+        },
       });
-      if (res.success) {
-        setTips(res.tips);
-      } else {
-        setTipsError(true);
-      }
-    } catch {
-      setTipsError(true);
+    } catch (error) {
+      if (error.name !== "AbortError") setTipsError(true);
     } finally {
       setLoadingTips(false);
     }
@@ -79,31 +134,33 @@ export default function QuestionCard({ question, index, company, role }) {
 
       <p className="text-foreground font-medium mb-4">{question.question}</p>
 
-      <div className="flex flex-wrap gap-3">
-        <Button
-          size="sm"
-          onClick={handleShowAnswer}
-          disabled={loadingAnswer}
-          className="flex items-center gap-2 bg-primary-200 hover:bg-primary-100 text-white"
-        >
-          {loadingAnswer ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-          Expected Answer
-        </Button>
-        <Button
-          size="sm"
-          onClick={handleShowTips}
-          disabled={loadingTips}
-          className="flex items-center gap-2 bg-light-400 hover:bg-light-300 text-light-900"
-        >
-          {loadingTips ? <Loader2 size={14} className="animate-spin" /> : <Lightbulb size={14} />}
-          Tips
-        </Button>
-      </div>
+      {!isStreaming && (
+        <div className="flex flex-wrap gap-3">
+          <Button
+            size="sm"
+            onClick={handleShowAnswer}
+            disabled={loadingAnswer}
+            className="flex items-center gap-2 bg-primary-200 hover:bg-primary-100 text-white"
+          >
+            {loadingAnswer ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            Expected Answer
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleShowTips}
+            disabled={loadingTips}
+            className="flex items-center gap-2 bg-light-400 hover:bg-light-300 text-light-900"
+          >
+            {loadingTips ? <Loader2 size={14} className="animate-spin" /> : <Lightbulb size={14} />}
+            Tips
+          </Button>
+        </div>
+      )}
 
       {(loadingAnswer || answer || answerError) && (
         <div className="mt-4 pt-4 border-t border-border">
           <p className="text-sm font-semibold text-foreground mb-1">Expected Answer</p>
-          {loadingAnswer && <p className="text-sm text-muted-foreground">Generating answer…</p>}
+          {loadingAnswer && !answer && <p className="text-sm text-muted-foreground">Generating answer…</p>}
           {answerError && <p className="text-sm text-rose-500">Couldn't generate an answer. Try again.</p>}
           {answer && (
             <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{answer}</p>
@@ -116,8 +173,11 @@ export default function QuestionCard({ question, index, company, role }) {
           <p className="text-sm font-semibold text-foreground mb-1 flex items-center gap-1.5">
             <Lightbulb size={14} className="text-amber-500" /> Tips
           </p>
-          {loadingTips && <p className="text-sm text-muted-foreground">Generating tips…</p>}
+          {loadingTips && !streamingTips && <p className="text-sm text-muted-foreground">Generating tips…</p>}
           {tipsError && <p className="text-sm text-rose-500">Couldn't generate tips. Try again.</p>}
+          {streamingTips && (
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{streamingTips}</p>
+          )}
           {tips && (
             <ul className="space-y-1">
               {tips.map((t, i) => (

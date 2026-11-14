@@ -13,7 +13,7 @@ else:
     load_dotenv()
 
 OLLAMA_URL = os.environ.get(
-    "OLLAMA_URL_2",
+    "OLLAMA_URL",
     os.environ.get("OLLAMA_URL", "https://audible-nanny-slacks.ngrok-free.dev/api/generate"),
 ).strip()
 if not OLLAMA_URL.endswith("/api/generate") and not OLLAMA_URL.endswith("/api/chat"):

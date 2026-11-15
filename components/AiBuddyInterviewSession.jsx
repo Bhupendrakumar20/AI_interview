@@ -33,6 +33,8 @@ const AiBuddyInterviewSession = ({
 
   const performanceHistoryRef = useRef([]);
   const hasInitialized = useRef(false); // blocks React StrictMode's duplicate mount-time effect run
+  const isMountedRef = useRef(false);
+  const speechTimeoutRef = useRef(null);
 
   const isDSAQuestion =
     String(currentQuestion?.topic ?? '').trim().toLowerCase() === 'dsa' ||
@@ -55,6 +57,8 @@ const AiBuddyInterviewSession = ({
           maxQuestions,
         });
 
+        if (!isMountedRef.current) return;
+
         setAdaptiveSessionId(data.session_id);
         setCurrentQuestion(data.question);
         setDifficulty(data.difficulty);
@@ -62,13 +66,17 @@ const AiBuddyInterviewSession = ({
         setSessionStarted(true);
 
         toast.success(`Interview started — question 1 of ${maxQuestions}`);
-        setTimeout(() => readCurrentQuestion(data.question), 500);
+        speechTimeoutRef.current = setTimeout(() => {
+          speechTimeoutRef.current = null;
+          if (isMountedRef.current) readCurrentQuestion(data.question);
+        }, 500);
       } catch (err) {
+        if (!isMountedRef.current) return;
         console.error('[Adaptive Interview] Init error:', err);
         toast.error('Failed to start interview — check the backend is running');
         onClose?.();
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) setLoading(false);
       }
     };
 
@@ -129,6 +137,21 @@ const AiBuddyInterviewSession = ({
     setIsSpeaking(false);
   };
 
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      if (speechTimeoutRef.current !== null) {
+        clearTimeout(speechTimeoutRef.current);
+        speechTimeoutRef.current = null;
+      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   const handleAnswerChange = (text) => setCurrentAnswerText(text);
 
   const handleSubmitAndAdvance = async () => {
@@ -172,7 +195,10 @@ const AiBuddyInterviewSession = ({
         toast.warning(`Focusing on ${result.locked_topic} — let's shore this up before moving on`, { duration: 4000 });
       }
 
-      setTimeout(() => readCurrentQuestion(result.next_question), 300);
+      speechTimeoutRef.current = setTimeout(() => {
+        speechTimeoutRef.current = null;
+        if (isMountedRef.current) readCurrentQuestion(result.next_question);
+      }, 300);
     } catch (err) {
       console.error('[Adaptive Interview] Answer submission failed:', err);
       toast.error(err.message || 'Failed to evaluate answer — try again');

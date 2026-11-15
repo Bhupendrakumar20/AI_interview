@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getPositionsForCompany } from "@/lib/companies-data";
+import { useExitConfirmation } from "@/lib/hooks/useExitConfirmation";
 import QuestionCard from "@/components/QuestionCard";
 import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
@@ -21,13 +22,18 @@ export default function PracticePage() {
   const [loading, setLoading] = useState(false);
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
 
+  useExitConfirmation(loading || questionsLoaded);
+
   const companyId = companyName.toLowerCase().replace(/[^a-z0-9]/g, "-");
   const positions = getPositionsForCompany(companyId);
 
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef(null);
 
-  useEffect(() => () => abortControllerRef.current?.abort(), []);
+  useEffect(() => () => {
+    requestIdRef.current += 1;
+    abortControllerRef.current?.abort();
+  }, []);
 
   const resetQuestions = () => {
     abortControllerRef.current?.abort();

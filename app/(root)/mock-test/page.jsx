@@ -10,6 +10,7 @@ import {
 } from "@/lib/mock-test-constants";
 import QuestionCard from "@/components/QuestionCard";
 import MockTestWorkspace from "@/components/MockTestWorkspace";
+import { useExitConfirmation } from "@/lib/hooks/useExitConfirmation";
 import { toast } from "sonner";
 import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Star } from "lucide-react";
 
@@ -47,10 +48,18 @@ export default function MockTestPage() {
   const [selectedTestType, setSelectedTestType] = useState(TEST_TYPES[0]);
   const [isTestActive, setIsTestActive] = useState(false);
 
+  useExitConfirmation(loading || isTestActive);
+
   // Tracks the "current" request so stale/overlapping responses can be ignored
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef(null);
   const debounceTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    requestIdRef.current += 1;
+    abortControllerRef.current?.abort();
+  }, []);
 
   const loadQuestions = useCallback(async (activeFilters) => {
     // Cancel any in-flight request before starting a new one

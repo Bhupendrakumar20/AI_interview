@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useExitConfirmation } from "@/lib/hooks/useExitConfirmation";
 import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Brain, Radio, BarChart3, Code, Video, FileJson, Film, Trophy, Cpu, Eye } from "lucide-react";
 import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
@@ -69,6 +70,8 @@ const InterviewBuddy = ({ userId }) => {
     sessionsByDifficulty: { easy: 0, medium: 0, hard: 0 },
     recentSessions: [],
   });
+
+  useExitConfirmation(isInterviewActive || (isLoading && currentMode === "ai"));
 
   // Fetch user stats on component mount
   useEffect(() => {

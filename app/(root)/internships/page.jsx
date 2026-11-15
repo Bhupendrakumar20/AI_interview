@@ -10,10 +10,98 @@ import FilterBar from "@/components/FilterBar";
 import ApplicationModal from "@/components/ApplicationModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { searchInternships, getInternshipCounts } from "@/lib/actions/general.action";
+import { searchInternships } from "@/lib/actions/general.action";
 import { searchInternshipsJSearch } from "@/lib/actions/jsearch.action";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { toast } from "sonner";
+
+const INTERNSHIP_CACHE_KEY = "prepwise:internships:v1";
+const CATEGORY_PATTERNS = {
+  tech: /\b(tech|technology|software|developer|engineering|engineer|programming|computer|it|devops|web|mobile)\b/i,
+  data: /\b(data|analytics|machine learning|artificial intelligence|statistics|business intelligence)\b/i,
+  business: /\b(business|marketing|finance|sales|management|operations|human resources|product management)\b/i,
+};
+
+function internshipSearchText(internship) {
+  return [
+    internship.title,
+    internship.company,
+    internship.description,
+    internship.type,
+    ...(Array.isArray(internship.skills) ? internship.skills : []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function matchesCategory(internship, category) {
+  return (
+    String(internship.type || "").toLowerCase() === category ||
+    CATEGORY_PATTERNS[category].test(internshipSearchText(internship))
+  );
+}
+
+function isRemoteInternship(internship) {
+  return internship.isRemote === true || /remote/i.test(String(internship.location || ""));
+}
+
+function stipendAmount(internship) {
+  return Number.parseInt(String(internship.stipend || "").replace(/[^0-9]/g, ""), 10) || 0;
+}
+
+function isOpenInternship(internship) {
+  const status = `${internship.status || ""} ${internship.applicationStatus || ""}`.toLowerCase();
+  if (internship.active === false || /\b(closed|expired)\b/.test(status)) return false;
+
+  const deadline = Date.parse(internship.deadline || "");
+  return !Number.isFinite(deadline) || deadline >= Date.now();
+}
+
+function matchesInternshipType(internship, type) {
+  if (type === "tech" || type === "data" || type === "business") {
+    return matchesCategory(internship, type);
+  }
+  if (type === "quick") {
+    return String(internship.type || "").toLowerCase() === "quick" ||
+      /\bquick apply\b/i.test(internshipSearchText(internship));
+  }
+  if (type === "remote") return isRemoteInternship(internship);
+  if (type === "high") return stipendAmount(internship) >= 8000;
+  return true;
+}
+
+function readCachedInternships() {
+  try {
+    const cached = sessionStorage.getItem(INTERNSHIP_CACHE_KEY);
+    if (!cached) return null;
+    const internships = JSON.parse(cached);
+    return Array.isArray(internships) ? internships : null;
+  } catch (error) {
+    console.error("[internships] failed to read session cache:", error);
+    return null;
+  }
+}
+
+function cacheInternships(internships) {
+  try {
+    sessionStorage.setItem(INTERNSHIP_CACHE_KEY, JSON.stringify(internships));
+  } catch (error) {
+    console.error("[internships] failed to write session cache:", error);
+  }
+}
+
+function calculateInternshipCounts(internships) {
+  return {
+    all: internships.length,
+    tech: internships.filter((item) => matchesCategory(item, "tech")).length,
+    data: internships.filter((item) => matchesCategory(item, "data")).length,
+    business: internships.filter((item) => matchesCategory(item, "business")).length,
+    quick: internships.filter((item) => matchesInternshipType(item, "quick")).length,
+    remote: internships.filter(isRemoteInternship).length,
+    high: internships.filter((item) => stipendAmount(item) >= 8000).length,
+  };
+}
 
 export default function InternshipsPage() {
   const searchParams = useSearchParams();
@@ -55,19 +143,6 @@ export default function InternshipsPage() {
     });
   }, [searchParams]);
 
-  // Load counts once on mount
-  useEffect(() => {
-    const loadCounts = async () => {
-      try {
-        const countsData = await getInternshipCounts();
-        setCounts(countsData);
-      } catch (error) {
-        console.error("Error loading counts:", error);
-      }
-    };
-    loadCounts();
-  }, []);
-
   // Load user
   useEffect(() => {
     const loadUser = async () => {
@@ -85,51 +160,57 @@ export default function InternshipsPage() {
   const loadInternships = useCallback(async () => {
     setLoading(true);
     try {
-      // Build search query
-      let searchQuery = filters.search || "internship";
-      
-      // Fetch from JSearch API
-      const apiResult = await searchInternshipsJSearch({
-        searchTerm: searchQuery,
-        location: filters.location === "all" ? "" : filters.location,
-        type: filters.type === "all" ? "internship" : filters.type,
-        page: 1,
-      });
+      let allInternships = readCachedInternships();
 
-      let allInternships = apiResult.internships || [];
-
-      // Fallback to Firebase if JSearch returns empty
-      if (allInternships.length === 0) {
-        console.log("JSearch returned no results, falling back to Firebase");
-        const firebaseData = await searchInternships({
-          type: filters.type === "all" ? null : filters.type,
-          location: filters.location === "all" ? null : filters.location,
-          search: filters.search,
-          limit: 50,
+      if (allInternships === null) {
+        console.log("[internships] fetching from configured providers");
+        const apiResult = await searchInternshipsJSearch({
+          searchTerm: "internship",
+          location: "all",
+          type: "internship",
+          page: 1,
         });
-        allInternships = firebaseData || [];
-      } else {
-        // Apply additional filters locally if JSearch has data
-        if (filters.search) {
-          const searchLower = filters.search.toLowerCase();
-          allInternships = allInternships.filter(
-            (item) =>
-              item.title?.toLowerCase().includes(searchLower) ||
-              item.company?.toLowerCase().includes(searchLower) ||
-              item.description?.toLowerCase().includes(searchLower) ||
-              item.skills?.some((skill) =>
-                skill.toLowerCase().includes(searchLower)
-              )
-          );
+
+        console.log("[internships] provider results:", apiResult.providers || []);
+        allInternships = (apiResult.internships || []).filter(isOpenInternship);
+
+        if (allInternships.length === 0) {
+          console.log("[internships] no open provider results; falling back to Firebase");
+          const firebaseData = await searchInternships({
+            type: null,
+            location: null,
+            search: "",
+            limit: 50,
+          });
+          allInternships = (firebaseData || []).filter(isOpenInternship);
         }
 
-        if (filters.location !== "all" && filters.location !== "remote") {
-          allInternships = allInternships.filter((item) => {
-            return item.location?.toLowerCase().includes(filters.location.toLowerCase());
-          });
-        } else if (filters.location === "remote") {
-          allInternships = allInternships.filter((item) => item.isRemote);
-        }
+        cacheInternships(allInternships);
+      } else {
+        console.log(`[internships] reusing ${allInternships.length} session-cached result(s)`);
+      }
+
+      allInternships = allInternships.filter(isOpenInternship);
+
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        allInternships = allInternships.filter((item) =>
+          internshipSearchText(item).includes(searchLower)
+        );
+      }
+
+      if (filters.location !== "all") {
+        allInternships = allInternships.filter((item) =>
+          filters.location === "remote"
+            ? isRemoteInternship(item)
+            : String(item.location || "").toLowerCase().includes(filters.location.toLowerCase())
+        );
+      }
+
+      if (filters.type !== "all") {
+        allInternships = allInternships.filter((item) =>
+          matchesInternshipType(item, filters.type)
+        );
       }
 
       // Apply sorting
@@ -155,10 +236,12 @@ export default function InternshipsPage() {
       }
 
       setInternships(sortedData);
+      setCounts(calculateInternshipCounts(allInternships));
     } catch (error) {
       console.error("Error loading internships:", error);
       toast.error("Failed to load internships");
       setInternships([]);
+      setCounts(calculateInternshipCounts([]));
     } finally {
       setLoading(false);
     }
@@ -184,7 +267,6 @@ export default function InternshipsPage() {
       if (contentType === "internships") {
         console.log("🔄 Real-time internships update triggered!");
         loadInternships();
-        getInternshipCounts().then(setCounts).catch(console.error);
       }
     });
 

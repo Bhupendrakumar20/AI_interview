@@ -47,10 +47,14 @@ const InternshipCard = ({ internship }) => {
 
   const getApplicationStatus = () => {
     const today = new Date();
-    const deadline = new Date(internship.deadline);
+    const deadline = internship.deadline ? new Date(internship.deadline) : null;
 
-    if (today > deadline) {
+    if (deadline && !Number.isNaN(deadline.getTime()) && today > deadline) {
       return { status: "closed", text: "Application Closed" };
+    }
+
+    if (!deadline || Number.isNaN(deadline.getTime())) {
+      return { status: "open", text: "Apply Now" };
     }
 
     const daysLeft = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));

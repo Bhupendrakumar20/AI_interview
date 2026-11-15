@@ -15,7 +15,7 @@ import { searchInternshipsJSearch } from "@/lib/actions/jsearch.action";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { toast } from "sonner";
 
-const INTERNSHIP_CACHE_KEY = "prepwise:internships:v1";
+const INTERNSHIP_CACHE_KEY = "prepwise:internships:v2";
 const CATEGORY_PATTERNS = {
   tech: /\b(tech|technology|software|developer|engineering|engineer|programming|computer|it|devops|web|mobile)\b/i,
   data: /\b(data|analytics|machine learning|artificial intelligence|statistics|business intelligence)\b/i,
@@ -50,6 +50,47 @@ function stipendAmount(internship) {
   return Number.parseInt(String(internship.stipend || "").replace(/[^0-9]/g, ""), 10) || 0;
 }
 
+function getDurationMonths(internship) {
+  const text = `${internship.duration || ""} ${internship.description || ""}`;
+  const match = text.match(/(\d+(?:\.\d+)?)(?:\s*[-–]\s*(\d+(?:\.\d+)?))?\s*(weeks?|months?|mos?|years?)/i);
+  if (!match) return null;
+
+  const multiplier = /^week/i.test(match[3]) ? 0.25 : /^year/i.test(match[3]) ? 12 : 1;
+  const first = Number(match[1]) * multiplier;
+  const second = match[2] ? Number(match[2]) * multiplier : first;
+  return { min: Math.min(first, second), max: Math.max(first, second) };
+}
+
+function matchesDuration(internship, duration) {
+  if (duration === "all") return true;
+  const months = getDurationMonths(internship);
+  if (!months) return false;
+
+  const ranges = {
+    "1-3": { min: 1, max: 3 },
+    "3-6": { min: 3, max: 6 },
+    "6-12": { min: 6, max: 12 },
+  };
+  const range = ranges[duration];
+  return months.max >= range.min && months.min <= range.max;
+}
+
+function matchesWorkMode(internship, mode) {
+  if (mode === "all") return true;
+  const text = `${internshipSearchText(internship)} ${internship.location || ""}`.toLowerCase();
+  if (mode === "remote") return isRemoteInternship(internship);
+  if (mode === "hybrid") return /\bhybrid\b/i.test(text);
+  return /\b(on[- ]?site|in[- ]office|in[- ]person)\b/i.test(text);
+}
+
+function matchesDatePosted(internship, datePosted) {
+  if (datePosted === "all") return true;
+  const postedAt = Date.parse(internship.postedDate || internship.postedAt || internship.createdAt || "");
+  if (!Number.isFinite(postedAt)) return false;
+  const maxAge = datePosted === "24h" ? 24 : datePosted === "7d" ? 24 * 7 : 24 * 30;
+  return Date.now() - postedAt <= maxAge * 60 * 60 * 1000;
+}
+
 function isOpenInternship(internship) {
   const status = `${internship.status || ""} ${internship.applicationStatus || ""}`.toLowerCase();
   if (internship.active === false || /\b(closed|expired)\b/.test(status)) return false;
@@ -63,10 +104,15 @@ function matchesInternshipType(internship, type) {
     return matchesCategory(internship, type);
   }
   if (type === "quick") {
-    return String(internship.type || "").toLowerCase() === "quick" ||
+    return internship.quickApply === true ||
+      String(internship.type || "").toLowerCase() === "quick" ||
       /\bquick apply\b/i.test(internshipSearchText(internship));
   }
   if (type === "remote") return isRemoteInternship(internship);
+  if (type === "paid") {
+    return stipendAmount(internship) > 0 &&
+      !/\b(unpaid|not disclosed|competitive|negotiable)\b/i.test(String(internship.stipend || ""));
+  }
   if (type === "high") return stipendAmount(internship) >= 8000;
   return true;
 }
@@ -99,6 +145,7 @@ function calculateInternshipCounts(internships) {
     business: internships.filter((item) => matchesCategory(item, "business")).length,
     quick: internships.filter((item) => matchesInternshipType(item, "quick")).length,
     remote: internships.filter(isRemoteInternship).length,
+    paid: internships.filter((item) => matchesInternshipType(item, "paid")).length,
     high: internships.filter((item) => stipendAmount(item) >= 8000).length,
   };
 }
@@ -119,6 +166,13 @@ export default function InternshipsPage() {
       search: searchParams.get("search") || "",
       location: searchParams.get("location") || "all",
       type: searchParams.get("type") || "all",
+      domain: searchParams.get("domain") || "all",
+      stipendMin: searchParams.get("stipendMin") || "",
+      stipendMax: searchParams.get("stipendMax") || "",
+      duration: searchParams.get("duration") || "all",
+      workMode: searchParams.get("workMode") || "all",
+      datePosted: searchParams.get("datePosted") || "all",
+      skills: searchParams.get("skills") || "",
       sort: searchParams.get("sort") || "deadline",
     };
   });
@@ -128,6 +182,13 @@ export default function InternshipsPage() {
     const type = searchParams.get("type") || "all";
     const search = searchParams.get("search") || "";
     const location = searchParams.get("location") || "all";
+    const domain = searchParams.get("domain") || "all";
+    const stipendMin = searchParams.get("stipendMin") || "";
+    const stipendMax = searchParams.get("stipendMax") || "";
+    const duration = searchParams.get("duration") || "all";
+    const workMode = searchParams.get("workMode") || "all";
+    const datePosted = searchParams.get("datePosted") || "all";
+    const skills = searchParams.get("skills") || "";
     const sort = searchParams.get("sort") || "deadline";
 
     setFilters((prev) => {
@@ -135,11 +196,30 @@ export default function InternshipsPage() {
         prev.type === type &&
         prev.search === search &&
         prev.location === location &&
+        prev.domain === domain &&
+        prev.stipendMin === stipendMin &&
+        prev.stipendMax === stipendMax &&
+        prev.duration === duration &&
+        prev.workMode === workMode &&
+        prev.datePosted === datePosted &&
+        prev.skills === skills &&
         prev.sort === sort
       ) {
         return prev; // No change, skip update
       }
-      return { search, location, type, sort };
+      return {
+        search,
+        location,
+        type,
+        domain,
+        stipendMin,
+        stipendMax,
+        duration,
+        workMode,
+        datePosted,
+        skills,
+        sort,
+      };
     });
   }, [searchParams]);
 
@@ -191,6 +271,10 @@ export default function InternshipsPage() {
       }
 
       allInternships = allInternships.filter(isOpenInternship);
+      setFilterOptions({
+        locations: [...new Set(allInternships.map((item) => item.location).filter(Boolean))].sort(),
+        types: [],
+      });
 
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -210,6 +294,44 @@ export default function InternshipsPage() {
       if (filters.type !== "all") {
         allInternships = allInternships.filter((item) =>
           matchesInternshipType(item, filters.type)
+        );
+      }
+
+      if (filters.domain !== "all") {
+        allInternships = allInternships.filter((item) => matchesCategory(item, filters.domain));
+      }
+
+      if (filters.stipendMin || filters.stipendMax) {
+        allInternships = allInternships.filter((item) => {
+          const stipend = stipendAmount(item);
+          if (stipend === 0) return false;
+          return (!filters.stipendMin || stipend >= Number(filters.stipendMin)) &&
+            (!filters.stipendMax || stipend <= Number(filters.stipendMax));
+        });
+      }
+
+      if (filters.duration !== "all") {
+        allInternships = allInternships.filter((item) =>
+          matchesDuration(item, filters.duration)
+        );
+      }
+
+      if (filters.workMode !== "all") {
+        allInternships = allInternships.filter((item) =>
+          matchesWorkMode(item, filters.workMode)
+        );
+      }
+
+      if (filters.datePosted !== "all") {
+        allInternships = allInternships.filter((item) =>
+          matchesDatePosted(item, filters.datePosted)
+        );
+      }
+
+      if (filters.skills) {
+        const requiredSkill = filters.skills.toLowerCase();
+        allInternships = allInternships.filter((item) =>
+          internshipSearchText(item).includes(requiredSkill)
         );
       }
 
@@ -301,15 +423,49 @@ export default function InternshipsPage() {
     updateFilters(filters);
   };
 
+  const clearFilters = () => {
+    const clearedFilters = {
+      search: "",
+      location: "all",
+      type: "all",
+      domain: "all",
+      stipendMin: "",
+      stipendMax: "",
+      duration: "all",
+      workMode: "all",
+      datePosted: "all",
+      skills: "",
+      sort: "deadline",
+    };
+    setFilters(clearedFilters);
+    updateFilters(clearedFilters);
+  };
+
+  const clearAdvancedFilters = () => {
+    const clearedFilters = {
+      ...filters,
+      domain: "all",
+      stipendMin: "",
+      stipendMax: "",
+      duration: "all",
+      workMode: "all",
+      datePosted: "all",
+      skills: "",
+    };
+    setFilters(clearedFilters);
+    updateFilters(clearedFilters);
+  };
+
   // Calculate filter counts
   const filterCounts = [
-    { label: "All", value: "all", count: counts.all || 0 },
+    { label: "All Internships", value: "all", count: counts.all || 0 },
     { label: "Tech", value: "tech", count: counts.tech || 0 },
     { label: "Data", value: "data", count: counts.data || 0 },
     { label: "Business", value: "business", count: counts.business || 0 },
-    { label: "Quick", value: "quick", count: counts.quick || 0 },
     { label: "Remote", value: "remote", count: counts.remote || 0 },
+    { label: "Paid", value: "paid", count: counts.paid || 0 },
     { label: "High Stipend", value: "high", count: counts.high || 0 },
+    { label: "Quick Apply", value: "quick", count: counts.quick || 0 },
   ];
 
   const featuredInternships = internships.filter((i) => i.featured).slice(0, 3);
@@ -355,6 +511,8 @@ export default function InternshipsPage() {
               >
                 <option value="all">All Locations</option>
                 <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="on-site">On-site</option>
                 {filterOptions.locations.map((loc) => (
                   <option key={loc} value={loc}>
                     {loc}
@@ -367,6 +525,103 @@ export default function InternshipsPage() {
             </form>
           </div>
         </div>
+
+        <details className="card-border group">
+          <summary className="card px-5 py-4 cursor-pointer font-semibold">
+            Advanced Filters
+          </summary>
+          <div className="card p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <label className="space-y-2 text-sm text-light-100">
+              <span>Internship Domain</span>
+              <select
+                className="w-full bg-dark-200 text-light-100 px-3 py-2 rounded-lg"
+                value={filters.domain}
+                onChange={(event) => handleFilterChange("domain", event.target.value)}
+              >
+                <option value="all">All domains</option>
+                <option value="tech">Tech</option>
+                <option value="data">Data</option>
+                <option value="business">Business</option>
+              </select>
+            </label>
+
+            <div className="space-y-2 text-sm text-light-100">
+              <span>Stipend Range</span>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="Min"
+                  value={filters.stipendMin}
+                  onChange={(event) => setFilters((current) => ({ ...current, stipendMin: event.target.value }))}
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="Max"
+                  value={filters.stipendMax}
+                  onChange={(event) => setFilters((current) => ({ ...current, stipendMax: event.target.value }))}
+                />
+              </div>
+            </div>
+
+            <label className="space-y-2 text-sm text-light-100">
+              <span>Duration</span>
+              <select
+                className="w-full bg-dark-200 text-light-100 px-3 py-2 rounded-lg"
+                value={filters.duration}
+                onChange={(event) => handleFilterChange("duration", event.target.value)}
+              >
+                <option value="all">Any duration</option>
+                <option value="1-3">1–3 months</option>
+                <option value="3-6">3–6 months</option>
+                <option value="6-12">6–12 months</option>
+              </select>
+            </label>
+
+            <label className="space-y-2 text-sm text-light-100">
+              <span>Work Mode</span>
+              <select
+                className="w-full bg-dark-200 text-light-100 px-3 py-2 rounded-lg"
+                value={filters.workMode}
+                onChange={(event) => handleFilterChange("workMode", event.target.value)}
+              >
+                <option value="all">All work modes</option>
+                <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="on-site">On-site</option>
+              </select>
+            </label>
+
+            <label className="space-y-2 text-sm text-light-100">
+              <span>Date Posted</span>
+              <select
+                className="w-full bg-dark-200 text-light-100 px-3 py-2 rounded-lg"
+                value={filters.datePosted}
+                onChange={(event) => handleFilterChange("datePosted", event.target.value)}
+              >
+                <option value="all">Any time</option>
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+              </select>
+            </label>
+
+            <label className="space-y-2 text-sm text-light-100">
+              <span>Skills Required</span>
+              <Input
+                placeholder="e.g. React, Python"
+                value={filters.skills}
+                onChange={(event) => setFilters((current) => ({ ...current, skills: event.target.value }))}
+              />
+            </label>
+            <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
+              <Button type="button" variant="outline" onClick={clearAdvancedFilters}>
+                Clear Advanced Filters
+              </Button>
+            </div>
+          </div>
+        </details>
 
         {/* Featured Internships */}
         {featuredInternships.length > 0 && (
@@ -445,10 +700,7 @@ export default function InternshipsPage() {
                 </p>
                 <Button 
                   className="mt-4"
-                  onClick={() => {
-                    setFilters({ search: "", location: "all", type: "all", sort: "deadline" });
-                    updateFilters({ search: "", location: "all", type: "all", sort: "deadline" });
-                  }}
+                  onClick={clearFilters}
                 >
                   Clear All Filters
                 </Button>

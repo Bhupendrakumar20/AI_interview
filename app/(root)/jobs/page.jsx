@@ -76,8 +76,8 @@ export default function JobsPage() {
             Showing sample jobs (API temporarily unavailable)
           </p>
         )}
-        {source === "api" && (
-          <p className="text-sm text-green-500 mt-2">✅ Live job listings</p>
+        {source === "aggregated" && jobs.length > 0 && (
+          <p className="text-sm text-green-500 mt-2">Live job listings from connected providers</p>
         )}
       </div>
 

@@ -324,6 +324,8 @@ export default function HomeClient({ latestInterviews = [], userInterviews = [],
                 type={interview.type}
                 techstack={interview.techstack}
                 createdAt={interview.createdAt}
+                questions={interview.questions}
+                level={interview.level}
               />
             ))}
           </div>
@@ -352,6 +354,8 @@ export default function HomeClient({ latestInterviews = [], userInterviews = [],
                 type={interview.type}
                 techstack={interview.techstack}
                 createdAt={interview.createdAt}
+                questions={interview.questions}
+                level={interview.level}
               />
             ))}
           </div>

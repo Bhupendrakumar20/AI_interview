@@ -47,20 +47,57 @@ app.include_router(debug_router)
 _SESSION_STORE: dict[str, InterviewState] = {}
 _SESSION_LOCK = Lock()
 
+SESSION_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".sessions_cache")
+os.makedirs(SESSION_CACHE_DIR, exist_ok=True)
+
+
+def _get_session_file_path(session_id: str) -> str:
+    safe_id = "".join(c for c in session_id if c.isalnum() or c in "-_")
+    return os.path.join(SESSION_CACHE_DIR, f"{safe_id}.json")
+
 
 def get_session_state(session_id: str) -> InterviewState | None:
     with _SESSION_LOCK:
-        return _SESSION_STORE.get(session_id)
+        if session_id in _SESSION_STORE:
+            return _SESSION_STORE[session_id]
+
+        # Try to restore session from disk cache (survives process reloads/restarts)
+        filepath = _get_session_file_path(session_id)
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    state = InterviewState(**data)
+                    _SESSION_STORE[session_id] = state
+                    logger.info(f"[{session_id}] Restored session state from disk cache")
+                    return state
+            except Exception as e:
+                logger.warning(f"Failed to load session {session_id} from disk: {e}")
+        return None
 
 
 def save_session_state(session_id: str, state: InterviewState):
     with _SESSION_LOCK:
         _SESSION_STORE[session_id] = state
+        try:
+            filepath = _get_session_file_path(session_id)
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(state.json())
+        except Exception as e:
+            logger.warning(f"Failed to persist session {session_id} to disk: {e}")
 
 
 def delete_session_state(session_id: str):
     with _SESSION_LOCK:
         _SESSION_STORE.pop(session_id, None)
+        # We do NOT immediately delete from disk so late/delayed requests can still retrieve the report
+        filepath = _get_session_file_path(session_id)
+        if os.path.exists(filepath):
+            try:
+                # Mark as ended or keep file for grace period
+                pass
+            except Exception:
+                pass
 
 
 @app.exception_handler(Exception)
@@ -160,6 +197,17 @@ async def submit_answer(req: SubmitAnswerRequest):
         raise HTTPException(404, "Session not found — it may have ended or the server restarted")
 
     state._last_touched = time.time()
+
+    # If session is already completed, return existing report rather than failing
+    if state.question_count >= state.max_questions:
+        report = build_report(state)
+        logger.info(f"[{req.session_id}] Session was already completed; returning report")
+        return SubmitAnswerResponse(
+            done=True,
+            evaluation={"score": 10, "feedback": "Interview already finished.", "weak_tags": []},
+            report=report,
+        )
+
     current_question = state.current_question.get("description", "") if state.current_question else ""
     answer_preview = req.answer.strip().replace("\n", " ")[:220]
     logger.info(
@@ -188,7 +236,7 @@ async def submit_answer(req: SubmitAnswerRequest):
 
     if state.question_count >= state.max_questions:
         report = build_report(state)
-        delete_session_state(req.session_id)
+        save_session_state(req.session_id, state)
         logger.info(f"[{req.session_id}] Session complete after {state.question_count} questions")
         return SubmitAnswerResponse(done=True, evaluation=evaluation, report=report)
 

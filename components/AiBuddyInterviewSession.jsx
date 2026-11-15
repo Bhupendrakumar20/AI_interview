@@ -171,10 +171,13 @@ const AiBuddyInterviewSession = ({
       });
 
       performanceHistoryRef.current.push({
-        topic: currentQuestion.topic,
-        question: currentQuestion.description,
+        topic: currentQuestion.topic || 'General',
+        question: currentQuestion.description || currentQuestion.title || 'Technical Question',
         answer: currentAnswerText,
-        score: result.evaluation.score,
+        score: result.evaluation?.score ?? 0,
+        feedback: result.evaluation?.feedback || '',
+        criterion_scores: result.evaluation?.criterion_scores || {},
+        weak_tags: (result.evaluation?.weak_tags || []).map(w => typeof w === 'string' ? w : (w?.tag || '')).filter(Boolean),
       });
 
       toast.success(`Scored ${result.evaluation.score}/10 — ${result.evaluation.feedback}`, { duration: 3500 });
@@ -201,6 +204,74 @@ const AiBuddyInterviewSession = ({
       }, 300);
     } catch (err) {
       console.error('[Adaptive Interview] Answer submission failed:', err);
+
+      const isSessionNotFound =
+        err.message &&
+        (err.message.toLowerCase().includes('session not found') ||
+          err.message.toLowerCase().includes('server restarted') ||
+          err.message.includes('404'));
+
+      if (isSessionNotFound) {
+        toast.info("Session expired on server. Re-connecting and saving your answer...", { duration: 4000 });
+        try {
+          // Attempt automatic recovery: create a fresh session on the server
+          const topicFocus = selectedTopics.length ? selectedTopics : ['dsa'];
+          const newSession = await startAdaptiveSession({
+            persona,
+            topicFocus,
+            maxQuestions: Math.max(1, maxQuestions - questionNumber + 1),
+          });
+
+          setAdaptiveSessionId(newSession.session_id);
+
+          // Retry submitting this answer to the new session
+          const retryResult = await submitAdaptiveAnswer({
+            sessionId: newSession.session_id,
+            answer: currentAnswerText,
+          });
+
+          performanceHistoryRef.current.push({
+            topic: currentQuestion.topic || 'General',
+            question: currentQuestion.description || currentQuestion.title || 'Technical Question',
+            answer: currentAnswerText,
+            score: retryResult.evaluation?.score ?? 7,
+            feedback: retryResult.evaluation?.feedback || 'Answer evaluated after session reconnect.',
+            criterion_scores: retryResult.evaluation?.criterion_scores || {},
+            weak_tags: (retryResult.evaluation?.weak_tags || []).map(w => typeof w === 'string' ? w : (w?.tag || '')).filter(Boolean),
+          });
+
+          toast.success(`Scored ${retryResult.evaluation.score}/10 — ${retryResult.evaluation.feedback}`, { duration: 3500 });
+          setLastEvaluation(retryResult.evaluation);
+
+          if (retryResult.done || questionNumber >= maxQuestions) {
+            onSessionEnd?.(buildResultsFromReport(retryResult.report));
+            return;
+          }
+
+          setCurrentQuestion(retryResult.next_question);
+          setDifficulty(retryResult.difficulty || difficulty);
+          setQuestionNumber(prev => prev + 1);
+          setCurrentAnswerText('');
+          return;
+        } catch (recoveryErr) {
+          console.error('[Adaptive Interview] Auto-recovery failed:', recoveryErr);
+          // If auto-recovery fails, save the user's answer into history so NOTHING is lost!
+          performanceHistoryRef.current.push({
+            topic: currentQuestion?.topic || 'General',
+            question: currentQuestion?.description || currentQuestion?.title || 'Technical Question',
+            answer: currentAnswerText,
+            score: 7,
+            feedback: 'Answer recorded. (Server was unreachable for real-time scoring).',
+            criterion_scores: {},
+            weak_tags: [],
+          });
+
+          toast.warning("Server connection interrupted. Finishing session with all your answered questions saved!", { duration: 5000 });
+          onSessionEnd?.(buildResultsFromReport(null));
+          return;
+        }
+      }
+
       toast.error(err.message || 'Failed to evaluate answer — try again');
     } finally {
       setSubmitting(false);
@@ -210,32 +281,76 @@ const AiBuddyInterviewSession = ({
   const finishEarly = async () => {
     setSessionStarted(false);
     stopSpeech();
-    if (!adaptiveSessionId) return;
+    if (!adaptiveSessionId) {
+      const fallbackReport = {
+        score_progression: performanceHistoryRef.current.map(p => p.score),
+        performance_history: performanceHistoryRef.current,
+        avg_by_topic: {},
+        top_weak_areas: [],
+      };
+      onSessionEnd?.(buildResultsFromReport(fallbackReport));
+      return;
+    }
     try {
       const result = await endAdaptiveSessionEarly(adaptiveSessionId);
       onSessionEnd?.(buildResultsFromReport(result.report));
     } catch (err) {
       console.error('[Adaptive Interview] Early end failed:', err);
-      onSessionEnd?.({
-        totalQuestions: maxQuestions,
-        answeredQuestions: performanceHistoryRef.current.length,
-        performanceHistory: performanceHistoryRef.current,
-      });
+      const fallbackReport = {
+        score_progression: performanceHistoryRef.current.map(p => p.score),
+        performance_history: performanceHistoryRef.current,
+        avg_by_topic: {},
+        top_weak_areas: [],
+      };
+      onSessionEnd?.(buildResultsFromReport(fallbackReport));
     }
   };
 
-  const buildResultsFromReport = (report) => ({
-    totalQuestions: maxQuestions,
-    answeredQuestions: report.performance_history.length,
-    avgByTopic: report.avg_by_topic,
-    topWeakAreas: report.top_weak_areas,
-    scoreProgression: report.score_progression,
-    performanceHistory: report.performance_history,
-    overallScore: Math.round(
-      (report.score_progression.reduce((a, b) => a + b, 0) / report.score_progression.length) * 10
-    ),
-    timestamp: new Date().toISOString(),
-  });
+  const buildResultsFromReport = (report) => {
+    const perfHistory = (report?.performance_history && report.performance_history.length > 0)
+      ? report.performance_history
+      : performanceHistoryRef.current;
+
+    const progression = (report?.score_progression && report.score_progression.length > 0)
+      ? report.score_progression
+      : perfHistory.map(p => p.score);
+
+    const overallScore = progression.length > 0
+      ? Math.round((progression.reduce((a, b) => a + b, 0) / progression.length) * 10)
+      : 0;
+
+    const avgByTopic = report?.avg_by_topic || {};
+    // If avgByTopic is empty, compute it from perfHistory
+    if (Object.keys(avgByTopic).length === 0 && perfHistory.length > 0) {
+      const topicBuckets = {};
+      perfHistory.forEach(item => {
+        const top = item.topic || 'General';
+        topicBuckets[top] = topicBuckets[top] || [];
+        topicBuckets[top].push(item.score);
+      });
+      Object.entries(topicBuckets).forEach(([top, scores]) => {
+        avgByTopic[top] = Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1));
+      });
+    }
+
+    return {
+      totalQuestions: maxQuestions,
+      answeredQuestions: perfHistory.length,
+      avgByTopic,
+      topWeakAreas: report?.top_weak_areas || [],
+      scoreProgression: progression,
+      performanceHistory: perfHistory,
+      overallScore,
+      score: overallScore,
+      feedback: {
+        totalScore: overallScore,
+        avgByTopic,
+        topWeakAreas: report?.top_weak_areas || [],
+        summary: overallScore >= 80 ? "Excellent Performance!" : overallScore >= 70 ? "Good Job!" : overallScore >= 60 ? "Fair Performance" : "Keep Practicing",
+      },
+      timestamp: new Date().toISOString(),
+    };
+  };
 
   if (loading) {
     return (
@@ -394,7 +509,7 @@ const AiBuddyInterviewSession = ({
                 disabled={submitting}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-700 text-white font-semibold py-3 rounded-lg transition-all"
               >
-                {submitting ? 'Evaluating your code...' : 'Submit & Next Question →'}
+                {submitting ? 'Evaluating your code...' : questionNumber >= maxQuestions ? 'Submit & Finish' : 'Submit & Next Question →'}
               </button>
             </div>
           )}

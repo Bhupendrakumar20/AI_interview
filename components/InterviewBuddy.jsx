@@ -238,7 +238,7 @@ const InterviewBuddy = ({ userId }) => {
   ];
 
   // Format recent sessions for display
-  const recentSessions = (stats.recentSessions || []).map(session => {
+  const recentSessions = (stats.recentSessions || []).slice(0, 3).map(session => {
     let dateStr = "Date unknown";
     try {
       const date = new Date(session.createdAt);
@@ -254,13 +254,16 @@ const InterviewBuddy = ({ userId }) => {
     }
 
     const score = session.score !== null && session.score !== undefined ? Math.round(session.score) : 0;
+    const topicTitle = Array.isArray(session.topics) && session.topics.length > 0
+      ? session.topics.join(", ")
+      : (session.topic || 'Interview Round');
     
     return {
       type: session.mode,
-      title: `${session.mode === 'ai' ? 'AI Buddy' : 'Human Buddy'} · ${session.topics?.[0] || 'Interview'} Round`,
+      title: `${session.mode === 'ai' ? 'AI Buddy' : 'Human Buddy'} · ${topicTitle}`,
       meta: `${session.persona || session.mode} · ${session.difficulty} · ${session.duration || 0} min · ${dateStr}`,
       score: `${score}%`,
-      scoreType: score >= 80 ? "good" : "mid",
+      scoreType: score >= 75 ? "good" : score >= 50 ? "mid" : "low",
       label: "Overall Score",
     };
   });
@@ -362,39 +365,47 @@ const InterviewBuddy = ({ userId }) => {
     try {
       // Save session results to Firebase
       if (activeSessionId) {
-        // Priority: AI feedback score > manual score > 0
-        const scoreToSave = results.feedback?.totalScore !== undefined 
-          ? results.feedback.totalScore
-          : (results.score || 0);
+        // Priority: overallScore > score > feedback totalScore > 0
+        const scoreToSave = typeof results?.overallScore === 'number'
+          ? Math.round(results.overallScore)
+          : typeof results?.score === 'number'
+          ? Math.round(results.score)
+          : typeof results?.feedback?.totalScore === 'number'
+          ? Math.round(results.feedback.totalScore)
+          : 0;
 
         console.log('[InterviewBuddy] Saving session results:', {
           sessionId: activeSessionId,
           score: scoreToSave,
-          hasFeedback: !!results.feedback,
-          feedbackTotalScore: results.feedback?.totalScore,
-          resultsScore: results.score,
+          hasFeedback: !!results?.feedback,
+          overallScore: results?.overallScore,
+          resultsScore: results?.score,
         });
 
-        // Clean the feedback object before sending (only keep serializable fields)
-        const cleanedFeedback = results.feedback ? {
-          totalScore: results.feedback.totalScore,
-          categoryScores: results.feedback.categoryScores,
-          strengths: results.feedback.strengths,
-          areasForImprovement: results.feedback.areasForImprovement,
-          finalAssessment: results.feedback.finalAssessment,
-        } : null;
+        const feedbackToSave = results?.feedback || {
+          totalScore: scoreToSave,
+          avgByTopic: results?.avgByTopic || {},
+          topWeakAreas: results?.topWeakAreas || [],
+          summary: scoreToSave >= 80 ? "Excellent Performance!" : scoreToSave >= 70 ? "Good Job!" : scoreToSave >= 60 ? "Fair Performance" : "Keep Practicing",
+        };
 
         const requestBody = {
           status: "completed",
           score: scoreToSave,
-          feedback: cleanedFeedback,
+          feedback: feedbackToSave,
+          performanceHistory: results?.performanceHistory || [],
+          avgByTopic: results?.avgByTopic || {},
+          topWeakAreas: results?.topWeakAreas || [],
+          scoreProgression: results?.scoreProgression || [],
+          totalQuestions: results?.totalQuestions || (results?.performanceHistory?.length || 0),
+          answeredQuestions: results?.answeredQuestions || (results?.performanceHistory?.length || 0),
           transcriptUrl: null,
         };
 
         console.log('[InterviewBuddy] Request payload ready:', {
           status: requestBody.status,
           score: requestBody.score,
-          feedbackKeys: cleanedFeedback ? Object.keys(cleanedFeedback) : null,
+          historyCount: requestBody.performanceHistory.length,
         });
 
         const response = await fetch(
@@ -413,16 +424,15 @@ const InterviewBuddy = ({ userId }) => {
           console.error("❌ Failed to save session results");
           console.error("   Status:", response.status);
           console.error("   Response:", errorData);
-          
-          // Still show results even if save fails, but warn user
           toast.warning("Session completed but results may not be saved. Try refreshing.");
         } else {
           const savedData = await response.json();
           console.log("✅ Session results saved to Firebase:", {
-            score: savedData.score,
-            status: savedData.status,
+            score: savedData.session?.score ?? savedData.score,
+            status: savedData.session?.status ?? savedData.status,
           });
-          // Refresh stats to show updated session
+          toast.success("Interview report saved successfully!");
+          // Refresh stats immediately so history reflects newly completed test
           await fetchStats();
         }
       }
@@ -432,8 +442,6 @@ const InterviewBuddy = ({ userId }) => {
       setIsInterviewActive(false);
     } catch (error) {
       console.error("❌ Error in handleSessionEnd:", error);
-      console.error("   Message:", error.message);
-      console.error("   Stack:", error.stack);
       // Still show results even if save fails
       setSessionResults(results);
       setShowResults(true);
@@ -1037,7 +1045,7 @@ const InterviewBuddy = ({ userId }) => {
                           })
                           .map((session, idx) => (
                             <div
-                              key={idx}
+                              key={session.id || idx}
                               onClick={() => setSelectedSessionForDetail(session)}
                               className="p-4 bg-slate-800 border border-slate-700 rounded-lg hover:border-slate-600 hover:bg-slate-800/80 cursor-pointer transition"
                             >
@@ -1050,15 +1058,27 @@ const InterviewBuddy = ({ userId }) => {
                                     <span className="font-bold text-sm">
                                       {session.mode === "ai" ? "🤖 AI Interview" : "👥 Human Buddy"}
                                     </span>
-                                    <span className="text-xs text-slate-500">
-                                      • {session.difficulty || "Unknown"}
+                                    <span className="text-xs text-slate-500 capitalize">
+                                      • {session.difficulty || "medium"}
                                     </span>
+                                    {session.status && (
+                                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
+                                        session.status === "completed"
+                                          ? "bg-emerald-950/70 text-emerald-300 border border-emerald-800/60"
+                                          : "bg-amber-950/70 text-amber-300 border border-amber-800/60"
+                                      }`}>
+                                        {session.status}
+                                      </span>
+                                    )}
                                   </div>
-                                  <div className="text-sm text-slate-400 mb-2">
-                                    {session.topic || session.topics || "Mixed Topics"}
+                                  <div className="text-sm font-semibold text-slate-300 mb-2">
+                                    {Array.isArray(session.topics) && session.topics.length > 0
+                                      ? session.topics.join(", ")
+                                      : session.topic || "Technical Interview"}
                                   </div>
                                   <div className="text-xs text-slate-500">
-                                    {session.date || new Date(session.createdAt).toLocaleDateString()} • {session.duration || 'N/A'} min
+                                    {session.date || (session.createdAt ? new Date(session.createdAt).toLocaleDateString() : "Recent")} • {session.duration || 'N/A'} min
+                                    {session.answeredQuestions > 0 ? ` • ${session.answeredQuestions} answered` : ""}
                                   </div>
                                 </div>
                                 <div className="text-right shrink-0">
@@ -1111,21 +1131,47 @@ const InterviewBuddy = ({ userId }) => {
                           </div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-500 mb-1">Topic</div>
-                          <div className="text-sm font-medium">{selectedSessionForDetail.topic || selectedSessionForDetail.topics || "Mixed Topics"}</div>
+                          <div className="text-xs text-slate-500 mb-1">Topics</div>
+                          <div className="text-sm font-medium text-slate-200">
+                            {Array.isArray(selectedSessionForDetail.topics) && selectedSessionForDetail.topics.length > 0
+                              ? selectedSessionForDetail.topics.join(", ")
+                              : selectedSessionForDetail.topic || "Mixed Topics"}
+                          </div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Difficulty</div>
                           <div className="text-sm font-medium capitalize">{selectedSessionForDetail.difficulty || "Unknown"}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-500 mb-1">Duration</div>
-                          <div className="text-sm font-medium">{selectedSessionForDetail.duration || 'N/A'} minutes</div>
+                          <div className="text-xs text-slate-500 mb-1">Duration & Status</div>
+                          <div className="text-sm font-medium flex items-center gap-2">
+                            <span>{selectedSessionForDetail.duration || 'N/A'} minutes</span>
+                            {selectedSessionForDetail.status && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
+                                selectedSessionForDetail.status === "completed"
+                                  ? "bg-emerald-950/70 text-emerald-300 border border-emerald-800/60"
+                                  : "bg-amber-950/70 text-amber-300 border border-amber-800/60"
+                              }`}>
+                                {selectedSessionForDetail.status}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-500 mb-1">Date</div>
-                          <div className="text-sm font-medium">{selectedSessionForDetail.date || new Date(selectedSessionForDetail.createdAt).toLocaleDateString()}</div>
+                          <div className="text-xs text-slate-500 mb-1">Date & Time</div>
+                          <div className="text-sm font-medium">
+                            {selectedSessionForDetail.date || (selectedSessionForDetail.createdAt ? new Date(selectedSessionForDetail.createdAt).toLocaleString() : 'N/A')}
+                          </div>
                         </div>
+                        {(selectedSessionForDetail.answeredQuestions > 0 || (selectedSessionForDetail.performanceHistory?.length > 0)) && (
+                          <div>
+                            <div className="text-xs text-slate-500 mb-1">Questions Answered</div>
+                            <div className="text-sm font-medium text-blue-400">
+                              {selectedSessionForDetail.answeredQuestions || selectedSessionForDetail.performanceHistory?.length}
+                              {selectedSessionForDetail.totalQuestions ? ` / ${selectedSessionForDetail.totalQuestions}` : ""}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1149,11 +1195,142 @@ const InterviewBuddy = ({ userId }) => {
                     </div>
                   </div>
 
+                  {/* FEEDBACK SUMMARY */}
                   {selectedSessionForDetail.feedback && (
-                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
-                      <h3 className="text-lg font-bold mb-4">📋 Feedback Summary</h3>
-                      <div className="bg-slate-800/50 rounded-lg p-4 text-sm text-slate-300 leading-relaxed">
-                        <p>{selectedSessionForDetail.feedback}</p>
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 mb-8">
+                      <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <FileText size={20} className="text-blue-400" />
+                        📋 Feedback & Assessment
+                      </h3>
+                      <div className="bg-slate-800/50 rounded-lg p-5 text-sm text-slate-300 leading-relaxed space-y-4">
+                        {typeof selectedSessionForDetail.feedback === 'string' ? (
+                          <p>{selectedSessionForDetail.feedback}</p>
+                        ) : (
+                          <>
+                            {selectedSessionForDetail.feedback.summary && (
+                              <p className="font-semibold text-slate-200">
+                                {selectedSessionForDetail.feedback.summary}
+                              </p>
+                            )}
+                            {selectedSessionForDetail.feedback.finalAssessment && (
+                              <p className="text-slate-300">
+                                {selectedSessionForDetail.feedback.finalAssessment}
+                              </p>
+                            )}
+                            {Array.isArray(selectedSessionForDetail.feedback.strengths) && selectedSessionForDetail.feedback.strengths.length > 0 && (
+                              <div>
+                                <div className="text-xs uppercase tracking-wider text-emerald-400 font-bold mb-1.5">Key Strengths</div>
+                                <ul className="list-disc list-inside space-y-1 text-slate-300 text-xs">
+                                  {selectedSessionForDetail.feedback.strengths.map((str, i) => (
+                                    <li key={i}>{str}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {Array.isArray(selectedSessionForDetail.feedback.areasForImprovement) && selectedSessionForDetail.feedback.areasForImprovement.length > 0 && (
+                              <div>
+                                <div className="text-xs uppercase tracking-wider text-amber-400 font-bold mb-1.5">Areas for Improvement</div>
+                                <ul className="list-disc list-inside space-y-1 text-slate-300 text-xs">
+                                  {selectedSessionForDetail.feedback.areasForImprovement.map((imp, i) => (
+                                    <li key={i}>{imp}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SCORE BY TOPIC */}
+                  {selectedSessionForDetail.avgByTopic && Object.keys(selectedSessionForDetail.avgByTopic).length > 0 && (
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 mb-8">
+                      <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <BarChart3 size={20} className="text-purple-400" />
+                        Score by Topic
+                      </h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {Object.entries(selectedSessionForDetail.avgByTopic).map(([topic, avg]) => (
+                          <div key={topic} className="bg-slate-800/60 rounded-lg p-4 border border-slate-700/60">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-semibold text-slate-200 capitalize">{topic}</span>
+                              <span className="text-blue-400 font-bold">{avg}/10</span>
+                            </div>
+                            <div className="w-full bg-slate-700 rounded-full h-2">
+                              <div
+                                className="bg-linear-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
+                                style={{ width: `${Math.min(100, Math.max(0, (avg / 10) * 100))}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* QUESTION-BY-QUESTION BREAKDOWN WITH CANDIDATE ANSWERS */}
+                  {Array.isArray(selectedSessionForDetail.performanceHistory) && selectedSessionForDetail.performanceHistory.length > 0 && (
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 mb-8">
+                      <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <Brain size={20} className="text-blue-400" />
+                        Question-by-Question Breakdown
+                      </h3>
+                      <div className="space-y-4">
+                        {selectedSessionForDetail.performanceHistory.map((item, idx) => (
+                          <div key={idx} className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                            <div className="flex items-start justify-between gap-4 mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                  Q{idx + 1}
+                                </span>
+                                <span className="text-sm font-semibold text-slate-300 capitalize">
+                                  {item.topic || 'General'}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className={`text-base font-black ${
+                                  (item.score ?? 0) >= 8 ? 'text-emerald-400' : (item.score ?? 0) >= 5 ? 'text-yellow-400' : 'text-red-400'
+                                }`}>
+                                  {item.score ?? 0}/10
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className="text-slate-200 text-sm font-medium mb-3">
+                              {item.question}
+                            </p>
+
+                            {/* Candidate's submitted answer */}
+                            <div className="bg-slate-950/80 rounded-lg p-3.5 border border-slate-800 mb-3">
+                              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                Your Answer
+                              </div>
+                              <pre className="text-xs text-slate-200 font-mono whitespace-pre-wrap break-words leading-relaxed font-normal">
+                                {item.answer?.trim() ? item.answer : '(No answer provided)'}
+                              </pre>
+                            </div>
+
+                            {/* Evaluation / Feedback */}
+                            {item.feedback && (
+                              <div className="text-xs text-slate-300 bg-slate-900/60 rounded-lg p-3 border border-slate-800">
+                                <span className="text-slate-400 font-semibold">Evaluation: </span>
+                                {item.feedback}
+                              </div>
+                            )}
+
+                            {/* Weak tags */}
+                            {Array.isArray(item.weak_tags) && item.weak_tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-3">
+                                {item.weak_tags.map((tag, tIdx) => (
+                                  <span key={tIdx} className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-950/40 text-yellow-300 border border-yellow-800/40 capitalize">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

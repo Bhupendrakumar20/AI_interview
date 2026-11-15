@@ -71,7 +71,7 @@ export async function POST(request) {
     // ✅ FIX #1: Generate cryptographically secure session code (128-bit entropy)
     const sessionCode = mode === "human" ? generateSecureSessionCode() : null;
 
-    const sessionRef = await db.collection("interview_buddy_sessions").add({
+    const sessionDocData = {
       createdBy: userId,
       mode,
       persona,
@@ -81,7 +81,7 @@ export async function POST(request) {
       jobDescription,
       sessionCode,
       status: "created",
-      startTime: null,
+      startTime: new Date(),
       endTime: null,
       participants: [userId],
       score: null,
@@ -90,7 +90,21 @@ export async function POST(request) {
       transcriptUrl: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-    });
+    };
+
+    const sessionRef = await db.collection("interview_buddy_sessions").add(sessionDocData);
+
+    // Also persist under user profile in Firebase: users/{userId}/interview_buddy_sessions/{sessionId}
+    try {
+      await db
+        .collection("users")
+        .doc(userId)
+        .collection("interview_buddy_sessions")
+        .doc(sessionRef.id)
+        .set(sessionDocData);
+    } catch (userSubErr) {
+      console.warn("Could not save to user profile subcollection:", userSubErr.message);
+    }
 
     // 🔗 Generate invite link for sharing
     const origin = request.headers.get("origin") || process.env.VERCEL_URL 

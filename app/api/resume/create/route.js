@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@/lib/ai-provider";
 
 function jsonToLatex(data) {
-  // Safe helper to escape LaTeX special characters
+  // Safe helper to escape LaTeX special characters, supporting numbers and strings
   const esc = (str) => {
-    if (!str) return "";
-    return str
+    if (str === null || str === undefined) return "";
+    const s = typeof str === "string" ? str : String(str);
+    return s
       .replace(/\\/g, "\\textbackslash{}")
       .replace(/&/g, "\\&")
       .replace(/%/g, "\\%")
@@ -18,12 +19,21 @@ function jsonToLatex(data) {
       .replace(/\^/g, "\\textasciicircum{}");
   };
 
+  const cleanUrl = (url) => {
+    if (!url) return "";
+    let u = String(url).trim();
+    if (!/^https?:\/\//i.test(u)) {
+      u = `https://${u}`;
+    }
+    return u;
+  };
+
   const name = esc(data.name) || "Your Name";
   const location = esc(data.location) || "";
   const phone = esc(data.phone) || "";
   const email = esc(data.email) || "";
-  const linkedin = esc(data.linkedin) || "";
-  const github = esc(data.github) || "";
+  const rawLinkedin = data.linkedin || "";
+  const rawGithub = data.github || "";
   const summary = esc(data.summary) || "Professional qualifications...";
 
   const skillsStr = Array.isArray(data.skills)
@@ -88,9 +98,15 @@ ${inst} ${gpa ? `\\hfill GPA: ${gpa}` : ""} \\\\
   return `\\documentclass[10pt,letterpaper]{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage[margin=0.75in]{geometry}
-\\usepackage{hyperref}
+\\usepackage[hidelinks]{hyperref}
 \\usepackage{titlesec}
 \\usepackage{enumitem}
+
+\\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue
+}
 
 \\titleformat{\\section}{\\large\\bfseries}{}{0em}{}[\\titlerule]
 \\titlespacing{\\section}{0pt}{10pt}{5pt}
@@ -101,9 +117,9 @@ ${inst} ${gpa ? `\\hfill GPA: ${gpa}` : ""} \\\\
 \\begin{center}
     {\\LARGE \\textbf{${name}}} \\\\
     \\vspace{4pt}
-    ${location ? `${location} | ` : ""}${phone ? `${phone} | ` : ""}\\href{mailto:${email}}{${email}} \\\\
+    ${location ? `${location} | ` : ""}${phone ? `${phone} | ` : ""}${email ? `\\href{mailto:${email}}{${email}}` : ""} \\\\
     \\vspace{2pt}
-    ${linkedin ? `\\href{https://${linkedin}}{LinkedIn} | ` : ""}${github ? `\\href{https://${github}}{GitHub}` : ""}
+    ${rawLinkedin ? `\\href{${cleanUrl(rawLinkedin)}}{LinkedIn} | ` : ""}${rawGithub ? `\\href{${cleanUrl(rawGithub)}}{GitHub}` : ""}
 \\end{center}
 
 \\section*{Professional Summary}
@@ -157,7 +173,7 @@ export async function POST(request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
 
     const prompt = `You are a professional resume writer and formatter. 
 Please convert the following raw resume details/description into a beautifully structured, comprehensive JSON object that represents a standard resume.
@@ -219,7 +235,8 @@ You MUST output ONLY a valid JSON object matching this schema, without markdown 
 
     const result = await model.generateContent(prompt);
     const textOutput = await result.response.text();
-    const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
+    const cleaned = textOutput.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("Model failed to output a valid JSON structure.");
     }

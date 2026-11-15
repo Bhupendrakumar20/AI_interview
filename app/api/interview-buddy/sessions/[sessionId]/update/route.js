@@ -62,7 +62,19 @@ export async function PUT(request, { params }) {
       );
     }
 
-    const { status, score, feedback, recordingUrl, transcriptUrl } = body;
+    const {
+      status,
+      score,
+      feedback,
+      recordingUrl,
+      transcriptUrl,
+      performanceHistory,
+      avgByTopic,
+      topWeakAreas,
+      scoreProgression,
+      totalQuestions,
+      answeredQuestions,
+    } = body;
 
     // Build update object
     const updateData = {};
@@ -70,13 +82,6 @@ export async function PUT(request, { params }) {
     // ✅ Validate status transitions
     if (status) {
       const validStatuses = ["created", "in-progress", "completed", "paused"];
-      const validTransitions = {
-        created: ["in-progress", "paused"],
-        "in-progress": ["completed", "paused"],
-        paused: ["in-progress", "completed"],
-        completed: [], // Terminal state
-      };
-
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
           { error: `Invalid status: ${status}` },
@@ -85,28 +90,60 @@ export async function PUT(request, { params }) {
       }
 
       updateData.status = status;
+      if (status === "completed") {
+        updateData.endTime = new Date();
+      } else if (status === "in-progress") {
+        updateData.startTime = new Date();
+      }
     }
 
-    // ✅ Validate score
-    if (score !== undefined) {
-      if (typeof score !== "number" || score < 0 || score > 100) {
+    // ✅ Validate and parse score
+    if (score !== undefined && score !== null) {
+      const parsedScore = Number(score);
+      if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 100) {
         return NextResponse.json(
           { error: "Score must be a number between 0 and 100" },
           { status: 400 }
         );
       }
-      updateData.score = score;
+      updateData.score = Math.round(parsedScore);
     }
 
     // ✅ Validate feedback structure
-    if (feedback !== undefined) {
-      if (typeof feedback !== "object") {
+    if (feedback !== undefined && feedback !== null) {
+      if (typeof feedback !== "object" && typeof feedback !== "string") {
         return NextResponse.json(
-          { error: "Feedback must be an object" },
+          { error: "Feedback must be an object or string" },
           { status: 400 }
         );
       }
       updateData.feedback = feedback;
+    }
+
+    // ✅ Performance history (questions, answers, scores, feedback)
+    if (performanceHistory && Array.isArray(performanceHistory)) {
+      updateData.performanceHistory = performanceHistory;
+    }
+
+    // ✅ Topic breakdowns and reports
+    if (avgByTopic && typeof avgByTopic === "object") {
+      updateData.avgByTopic = avgByTopic;
+    }
+
+    if (topWeakAreas && Array.isArray(topWeakAreas)) {
+      updateData.topWeakAreas = topWeakAreas;
+    }
+
+    if (scoreProgression && Array.isArray(scoreProgression)) {
+      updateData.scoreProgression = scoreProgression;
+    }
+
+    if (typeof totalQuestions === "number") {
+      updateData.totalQuestions = totalQuestions;
+    }
+
+    if (typeof answeredQuestions === "number") {
+      updateData.answeredQuestions = answeredQuestions;
     }
 
     // ✅ Validate URLs

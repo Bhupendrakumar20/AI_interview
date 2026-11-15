@@ -18,12 +18,45 @@ export async function GET(request) {
       );
     }
 
-    const query = await db
-      .collection("interview_buddy_sessions")
-      .where("participants", "array-contains", userId)
-      .get();
+    // Query from both shared sessions and user subcollection to find all sessions
+    const [createdBySnap, participantsSnap, userSubSnap] = await Promise.all([
+      db.collection("interview_buddy_sessions")
+        .where("createdBy", "==", userId)
+        .get()
+        .catch(() => ({ docs: [] })),
+      db.collection("interview_buddy_sessions")
+        .where("participants", "array-contains", userId)
+        .get()
+        .catch(() => ({ docs: [] })),
+      db.collection("users")
+        .doc(userId)
+        .collection("interview_buddy_sessions")
+        .get()
+        .catch(() => ({ docs: [] })),
+    ]);
 
-    const sessions = query.docs.map((doc) => doc.data());
+    // De-duplicate by document ID and merge best data (e.g. completed over created, has score over 0)
+    const sessionMap = new Map();
+    [...createdBySnap.docs, ...participantsSnap.docs, ...userSubSnap.docs].forEach((doc) => {
+      const data = doc.data();
+      const existing = sessionMap.get(doc.id);
+      if (!existing) {
+        sessionMap.set(doc.id, { id: doc.id, ...data });
+      } else {
+        // Merge: prefer completed status, higher/valid score, and presence of performanceHistory
+        const existingScore = typeof existing.score === "number" ? existing.score : 0;
+        const currentScore = typeof data.score === "number" ? data.score : 0;
+        const isBetter =
+          (data.status === "completed" && existing.status !== "completed") ||
+          currentScore > existingScore ||
+          (data.performanceHistory && !existing.performanceHistory);
+        if (isBetter) {
+          sessionMap.set(doc.id, { id: doc.id, ...existing, ...data });
+        }
+      }
+    });
+
+    const sessions = Array.from(sessionMap.values());
 
     const stats = {
       totalSessions: sessions.length,
@@ -53,13 +86,17 @@ export async function GET(request) {
 
       // Count by difficulty
       if (session.difficulty) {
-        stats.sessionsByDifficulty[session.difficulty] =
-          (stats.sessionsByDifficulty[session.difficulty] || 0) + 1;
+        const diff = session.difficulty.toLowerCase();
+        if (stats.sessionsByDifficulty[diff] !== undefined) {
+          stats.sessionsByDifficulty[diff]++;
+        }
       }
 
       // Collect topics
       if (session.topics && Array.isArray(session.topics)) {
         session.topics.forEach((topic) => stats.topicsCovered.add(topic));
+      } else if (session.topic) {
+        stats.topicsCovered.add(session.topic);
       }
 
       // Calculate total practice time
@@ -67,8 +104,8 @@ export async function GET(request) {
         stats.totalPracticeTime += session.duration;
       }
 
-      // Calculate average score
-      if (session.score !== null && session.score !== undefined) {
+      // Calculate average score for completed sessions with a score
+      if (session.status === "completed" && typeof session.score === "number" && session.score > 0) {
         totalScore += session.score;
         scoredSessions++;
       }
@@ -77,31 +114,64 @@ export async function GET(request) {
     stats.topicsCovered = Array.from(stats.topicsCovered);
     stats.avgScore = scoredSessions > 0 ? Math.round(totalScore / scoredSessions) : 0;
 
-    // Get recent sessions (last 3)
+    // Get sorted recent sessions (up to 50 for full dynamic history)
     stats.recentSessions = sessions
       .sort((a, b) => {
-        const aTime = a.createdAt?.toMillis?.() || new Date(a.createdAt).getTime() || 0;
-        const bTime = b.createdAt?.toMillis?.() || new Date(b.createdAt).getTime() || 0;
+        const aTime = a.createdAt?.toMillis?.() || new Date(a.createdAt || 0).getTime() || 0;
+        const bTime = b.createdAt?.toMillis?.() || new Date(b.createdAt || 0).getTime() || 0;
         return bTime - aTime;
       })
-      .slice(0, 3)
+      .slice(0, 50)
       .map((session) => {
-        // Ensure score is always a number (not null)
-        const score = typeof session.score === 'number' ? session.score : 0;
-        
+        const score = typeof session.score === "number" ? Math.round(session.score) : 0;
+        const topicList = Array.isArray(session.topics)
+          ? session.topics
+          : session.topics
+          ? [session.topics]
+          : session.topic
+          ? [session.topic]
+          : [];
+        const topicFormatted = topicList.length > 0 ? topicList.join(", ") : "DSA";
+
+        let createdAtIso = new Date().toISOString();
+        try {
+          if (session.createdAt) {
+            createdAtIso = (session.createdAt.toDate?.() || new Date(session.createdAt)).toISOString();
+          }
+        } catch {
+          createdAtIso = new Date().toISOString();
+        }
+
+        let endTimeIso = null;
+        try {
+          if (session.endTime) {
+            endTimeIso = (session.endTime.toDate?.() || new Date(session.endTime)).toISOString();
+          }
+        } catch {
+          endTimeIso = null;
+        }
+
         return {
-        mode: session.mode,
-        persona: session.persona,
-        topics: session.topics,
-        difficulty: session.difficulty,
-        score: score, // Force to number
-        status: session.status,
-        duration: session.duration || 0,
-        // Convert Firestore timestamp to ISO string
-        createdAt: session.createdAt 
-          ? (session.createdAt.toDate?.() || new Date(session.createdAt)).toISOString()
-          : new Date().toISOString(),
-      };
+          id: session.id,
+          sessionId: session.id,
+          mode: session.mode || "ai",
+          persona: session.persona || "hiring-manager",
+          topics: topicList,
+          topic: topicFormatted,
+          difficulty: session.difficulty || "medium",
+          score,
+          status: session.status || "created",
+          duration: session.duration || 0,
+          feedback: session.feedback || null,
+          performanceHistory: session.performanceHistory || [],
+          avgByTopic: session.avgByTopic || {},
+          topWeakAreas: session.topWeakAreas || [],
+          scoreProgression: session.scoreProgression || [],
+          totalQuestions: session.totalQuestions || 0,
+          answeredQuestions: session.answeredQuestions || (session.performanceHistory?.length || 0),
+          createdAt: createdAtIso,
+          endTime: endTimeIso,
+        };
       });
 
     return NextResponse.json(stats);

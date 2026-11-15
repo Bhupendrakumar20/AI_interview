@@ -98,6 +98,8 @@ async function InterviewPage() {
                 type={interview.type}
                 techstack={interview.techstack}
                 createdAt={interview.createdAt}
+                questions={interview.questions}
+                level={interview.level}
               />
             ))
           ) : (
@@ -123,6 +125,8 @@ async function InterviewPage() {
                 type={interview.type}
                 techstack={interview.techstack}
                 createdAt={interview.createdAt}
+                questions={interview.questions}
+                level={interview.level}
               />
             ))
           ) : (

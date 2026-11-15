@@ -3,6 +3,14 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  AlertTriangle,
+  X,
+  Play,
+  Save,
+  LogOut,
+  CheckCircle2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { createFeedback } from "@/lib/actions/general.action";
@@ -21,6 +29,7 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isSubmitting, startTransition] = useTransition();
+  const [showExitModal, setShowExitModal] = useState(false);
 
   const videoRef = useRef(null);
   const mediaStreamRef = useRef(null);
@@ -273,23 +282,69 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
     }
   };
 
+  const cleanupMedia = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.log("Recognition stop error:", e);
+      }
+      recognitionRef.current = null;
+    }
+    setIsCameraOn(false);
+    setIsRecordingVoice(false);
+    setIsSpeaking(false);
+  };
+
+  const handleExitWithoutSave = () => {
+    cleanupMedia();
+    setShowExitModal(false);
+    toast.info("Exited interview without saving.");
+    router.push("/interview");
+    router.refresh();
+  };
+
   // ---------- Submit & Feedback ----------
-  const handleFinish = () => {
+  const handleFinish = (isEarlyExit = false) => {
     if (!questions.length) {
       toast.error("No questions available for this interview.");
       return;
     }
 
-    const emptyCount = answers.filter((a) => !a || !a.trim()).length;
-    if (emptyCount === questions.length) {
-      toast.error("Please answer at least one question.");
+    const totalQuestions = questions.length;
+    const answeredCount = answers.filter((a) => a && a.trim().length > 0).length;
+
+    // If candidate clicks Exit & Save without answering any questions, exit cleanly
+    if (isEarlyExit && answeredCount === 0) {
+      cleanupMedia();
+      setShowExitModal(false);
+      toast.info("Exited interview. No answers were saved.");
+      router.push("/interview");
+      router.refresh();
       return;
     }
 
+    if (answeredCount === 0) {
+      toast.error("Please answer at least one question before finishing.");
+      return;
+    }
+
+    const isCompleted = !isEarlyExit && answeredCount === totalQuestions;
+    const quitAtQuestion = isCompleted ? null : currentIndex + 1;
+
     console.log("🏁 [Interview] Finishing interview...");
-    console.log(`📊 Total questions: ${questions.length}`);
-    console.log(`✅ Answered: ${questions.length - emptyCount}`);
-    console.log(`⏭️ Skipped: ${emptyCount}`);
+    console.log(`📊 Total questions: ${totalQuestions}`);
+    console.log(`✅ Answered: ${answeredCount}`);
+    console.log(`🚪 Is early exit: ${isEarlyExit}`);
+    console.log(`🎯 Is completed: ${isCompleted}`);
+    console.log(`📍 Quit at question: ${quitAtQuestion}`);
 
     startTransition(async () => {
       try {
@@ -300,36 +355,66 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
             role: "system",
             content: `Question ${idx + 1}: ${q}`,
           });
-          transcript.push({
-            role: "user",
-            content: answers[idx] || "",
-          });
+
+          const answerText = answers[idx]?.trim();
+          if (answerText) {
+            transcript.push({
+              role: "user",
+              content: answerText,
+            });
+          } else if (isEarlyExit && idx >= currentIndex) {
+            transcript.push({
+              role: "user",
+              content: "[Candidate exited interview early - Question not reached]",
+            });
+          } else {
+            transcript.push({
+              role: "user",
+              content: "[No answer provided]",
+            });
+          }
         });
 
         console.log("📝 [Interview] Calling createFeedback with:");
         console.log(`  - interviewId: ${interview.id}`);
         console.log(`  - userId: ${user.id}`);
-        console.log(`  - transcript items: ${transcript.length}`);
-        console.log(`  - feedbackId: ${existingFeedback?.id || "new"}`);
+        console.log(`  - isCompleted: ${isCompleted}`);
+        console.log(`  - quitAtQuestion: ${quitAtQuestion}`);
+        console.log(`  - answeredCount: ${answeredCount}`);
+        console.log(`  - totalQuestions: ${totalQuestions}`);
 
         const result = await createFeedback({
           interviewId: interview.id,
           userId: user.id,
           transcript,
           feedbackId: existingFeedback?.id,
+          isCompleted,
+          quitAtQuestion,
+          answeredCount,
+          totalQuestions,
         });
 
         console.log("🎯 [Interview] Feedback result:", result);
 
+        cleanupMedia();
+        setShowExitModal(false);
+
         if (result?.success && result.feedbackId) {
           console.log(`✅ [Interview] Feedback saved with ID: ${result.feedbackId}`);
-          toast.success("Interview finished! Check your feedback card.");
+          if (isCompleted) {
+            toast.success("Interview completed! Check your feedback card.");
+          } else {
+            toast.success(
+              `Progress saved! Scored up to Question ${quitAtQuestion} (${answeredCount}/${totalQuestions} answered).`
+            );
+          }
           router.push(`/interview`);
+          router.refresh();
         } else {
           console.error("❌ [Interview] Feedback generation failed:", result);
-          console.error("Error:", result?.error);
-          toast.error(result?.error || "Failed to save feedback. Returning to dashboard.");
-          router.push("/");
+          toast.error(result?.error || "Failed to save feedback.");
+          router.push("/interview");
+          router.refresh();
         }
       } catch (err) {
         console.error("❌ [Interview] Exception during feedback generation:", err);
@@ -339,6 +424,19 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
   };
 
   const currentQuestion = questions[currentIndex] || "";
+  const answeredCount = answers.filter((a) => a && a.trim().length > 0).length;
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && showExitModal && !isSubmitting) {
+        setShowExitModal(false);
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [showExitModal, isSubmitting]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -354,12 +452,23 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
             </p>
           </div>
 
-          {existingFeedback && (
-            <p className="text-xs text-light-100 max-w-xs text-right">
-              You&apos;ve already completed this interview. Finishing again will
-              update your feedback report.
-            </p>
-          )}
+          <div className="flex items-center gap-3">
+            {existingFeedback && (
+              <p className="text-xs text-light-100 max-w-xs text-right hidden sm:block">
+                You&apos;ve already completed this interview. Finishing again will
+                update your feedback report.
+              </p>
+            )}
+            <Button
+              type="button"
+              className="bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 text-xs px-3.5 py-1.5 h-auto rounded-full flex items-center gap-1.5 transition-all"
+              onClick={() => setShowExitModal(true)}
+              disabled={isSubmitting}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Exit Interview</span>
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -418,7 +527,7 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                   <Button
                     type="button"
                     className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/20"
-                    onClick={handleFinish}
+                    onClick={() => setShowExitModal(true)}
                     disabled={isSubmitting}
                   >
                     Exit & Save
@@ -443,7 +552,7 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                     <Button
                       type="button"
                       className="btn-primary"
-                      onClick={handleFinish}
+                      onClick={() => handleFinish(false)}
                       disabled={isSubmitting}
                     >
                       {isSubmitting
@@ -503,6 +612,140 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
           </div>
         </div>
       </section>
+
+      {/* ========================================================================= */}
+      {/* Exit Confirmation Modal (Glassmorphism Transparent Card with Blurred Backdrop) */}
+      {/* ========================================================================= */}
+      {showExitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          {/* Blurred Background Overlay */}
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity animate-in fade-in duration-300"
+            onClick={() => !isSubmitting && setShowExitModal(false)}
+          />
+
+          {/* Transparent Glassmorphism Card */}
+          <div className="relative w-full max-w-lg rounded-3xl p-6 sm:p-8 bg-[#0d0f17]/85 backdrop-blur-2xl border border-white/10 shadow-[0_0_60px_rgba(0,0,0,0.85)] z-10 animate-in zoom-in-95 duration-200 flex flex-col gap-6 text-center">
+            {/* Ambient amber glow in background */}
+            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Close (X) button */}
+            <button
+              type="button"
+              onClick={() => !isSubmitting && setShowExitModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-full text-light-100/50 hover:text-white hover:bg-white/5 transition-colors"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Top Alert Icon */}
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto shadow-lg shadow-amber-500/10">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+
+            {/* Title & Progress Headline */}
+            <div className="space-y-1.5">
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                Do you really want to exit?
+              </h3>
+              <p className="text-sm text-light-100/80 leading-relaxed">
+                You are currently at{" "}
+                <span className="text-white font-semibold">
+                  Question {currentIndex + 1} of {questions.length}
+                </span>
+                .
+              </p>
+            </div>
+
+            {/* Progress & Status Box */}
+            <div className="rounded-2xl bg-dark-200/60 border border-white/5 p-4 text-left flex flex-col gap-3">
+              <div className="flex items-center justify-between text-xs text-light-100/70">
+                <span>Interview Progress</span>
+                <span className="font-semibold text-white">
+                  {answeredCount} of {questions.length} answered
+                </span>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full h-2 bg-dark-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 to-cyan-400 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.round(
+                      (answeredCount / (questions.length || 1)) * 100
+                    )}%`,
+                  }}
+                />
+              </div>
+
+              <p className="text-xs text-light-100/90 leading-relaxed mt-1">
+                {answeredCount > 0 ? (
+                  <>
+                    If you exit now, your answers up to this point will be saved
+                    and evaluated. You will receive a{" "}
+                    <span className="text-amber-300 font-semibold">
+                      partial score till Question {currentIndex + 1}
+                    </span>
+                    .
+                  </>
+                ) : (
+                  <>
+                    You haven&apos;t answered any questions yet. Exiting will
+                    return you to the interviews dashboard without saving any score.
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col gap-3 mt-1">
+              {/* Primary: Continue Interview */}
+              <Button
+                type="button"
+                className="btn-primary w-full py-3 h-auto font-bold flex items-center justify-center gap-2 text-sm shadow-lg shadow-primary-200/20"
+                onClick={() => setShowExitModal(false)}
+                disabled={isSubmitting}
+              >
+                <Play className="w-4 h-4 fill-black text-black" />
+                <span>Continue Interview</span>
+              </Button>
+
+              {/* Secondary: Save & Exit (Only if answered > 0) */}
+              {answeredCount > 0 ? (
+                <Button
+                  type="button"
+                  className="w-full py-2.5 h-auto text-sm font-semibold rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-all flex items-center justify-center gap-2"
+                  onClick={() => {
+                    handleFinish(true);
+                  }}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <span>Saving Progress & Scoring...</span>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Save Progress & Exit Early</span>
+                    </>
+                  )}
+                </Button>
+              ) : null}
+
+              {/* Tertiary: Exit Without Saving */}
+              <button
+                type="button"
+                className="text-xs text-light-100/50 hover:text-rose-400 py-1 transition-colors flex items-center justify-center gap-1.5 mt-1"
+                onClick={handleExitWithoutSave}
+                disabled={isSubmitting}
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Exit Without Saving</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
 
 

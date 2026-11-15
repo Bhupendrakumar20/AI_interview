@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 import {
   getFeedbackByInterviewId,
@@ -52,6 +53,45 @@ export default async function Feedback({ params }) {
     : "N/A";
 
   const transcript = feedback.transcript || [];
+  const systemQuestions = transcript.filter((m) => m.role === "system");
+  const userValidAnswers = transcript.filter(
+    (m) =>
+      m.role === "user" &&
+      m.content &&
+      m.content.trim().length > 0 &&
+      !m.content.includes("[Candidate exited") &&
+      !m.content.includes("[Interview exited") &&
+      !m.content.includes("[No answer")
+  );
+
+  const totalQuestions =
+    feedback.totalQuestions ||
+    interview.questions?.length ||
+    systemQuestions.length ||
+    5;
+
+  const answeredCount =
+    feedback.answeredCount ?? userValidAnswers.length;
+
+  const isCompleted =
+    feedback.isCompleted !== undefined
+      ? Boolean(feedback.isCompleted)
+      : feedback.status === "completed" ||
+        (totalQuestions > 0 &&
+          answeredCount >= totalQuestions &&
+          (feedback.totalScore || 0) > 0 &&
+          !feedback.finalAssessment
+            ?.toLowerCase()
+            ?.includes("failed the interview by not providing"));
+
+  const quitAtQuestion =
+    feedback.quitAtQuestion ||
+    (!isCompleted
+      ? answeredCount > 0
+        ? Math.min(answeredCount + 1, totalQuestions)
+        : 1
+      : null);
+
   const categoryScoresArray = getCategoryScoresArray(feedback.categoryScores);
   const strengthsArray = getArrayField(feedback.strengths);
   const areasArray = getArrayField(feedback.areasForImprovement);
@@ -66,16 +106,53 @@ export default async function Feedback({ params }) {
         </h1>
       </div>
 
+      {/* Early Exit / Incomplete Alert Banner */}
+      {!isCompleted && (
+        <div className="w-full max-w-3xl mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 flex items-start gap-3.5 text-amber-300">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" />
+          <div className="space-y-1 text-left">
+            <h3 className="font-semibold text-amber-200 text-sm md:text-base">
+              Interview Incomplete — Quit Early at Question {quitAtQuestion}
+            </h3>
+            <p className="text-xs md:text-sm text-amber-300/80 leading-relaxed">
+              You answered {answeredCount} of {totalQuestions} questions before
+              exiting. The evaluation and partial score below are calculated strictly
+              on the questions you attempted. You can resume or retake the interview
+              anytime to complete the full session.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Summary Row */}
       <div className="flex flex-row justify-center">
-        <div className="flex flex-row gap-5 flex-wrap justify-center">
+        <div className="flex flex-row gap-5 flex-wrap justify-center items-center">
+          {/* Status Badge */}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dark-200 border border-white/10">
+            {isCompleted ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-400">
+                  Completed ({answeredCount}/{totalQuestions} Qs)
+                </span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-amber-400">
+                  Quit at Q{quitAtQuestion} ({answeredCount}/{totalQuestions} Qs)
+                </span>
+              </>
+            )}
+          </div>
+
           {/* Overall Impression */}
           <div className="flex flex-row gap-2 items-center">
             <Image src="/star.svg" width={22} height={22} alt="star" />
             <p>
-              Overall Impression:{" "}
+              {isCompleted ? "Overall Score: " : "Partial Score: "}
               <span className="text-primary-200 font-bold">
-                {feedback.totalScore}
+                {typeof feedback.totalScore === "number" ? Math.round(feedback.totalScore) : 0}
               </span>
               /100
             </p>
@@ -178,9 +255,9 @@ export default async function Feedback({ params }) {
       {/* Buttons */}
       <div className="buttons">
         <Button className="btn-secondary flex-1">
-          <Link href="/" className="flex w-full justify-center">
+          <Link href="/interview" className="flex w-full justify-center">
             <p className="text-sm font-semibold text-primary-200 text-center">
-              Back to dashboard
+              Back to Interviews
             </p>
           </Link>
         </Button>
@@ -191,7 +268,7 @@ export default async function Feedback({ params }) {
             className="flex w-full justify-center"
           >
             <p className="text-sm font-semibold text-black text-center">
-              Retake Interview
+              {isCompleted ? "Retake Interview" : "Resume / Retake Interview"}
             </p>
           </Link>
         </Button>

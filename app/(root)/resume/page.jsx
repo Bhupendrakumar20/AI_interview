@@ -16,7 +16,13 @@ import {
   Eye,
   Settings,
   RefreshCw,
-  FileCode
+  FileCode,
+  Download,
+  FileDown,
+  ExternalLink,
+  Briefcase,
+  GraduationCap,
+  Award
 } from "lucide-react";
 import { toast } from "sonner";
 import ResumeRoundSection from "@/components/Resume RoundSection";
@@ -36,6 +42,8 @@ export default function ResumePage() {
   const [generatedJson, setGeneratedJson] = useState(null);
   const [generatedLatex, setGeneratedLatex] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  const [outputTab, setOutputTab] = useState("latex"); // "latex" | "preview"
+  const [isCompilingPdf, setIsCompilingPdf] = useState(false);
   
   const docFileInputRef = useRef(null);
 
@@ -52,6 +60,86 @@ export default function ResumePage() {
     setIsCopied(true);
     toast.success("LaTeX code copied to clipboard!");
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!generatedLatex) return;
+    setIsCompilingPdf(true);
+    const toastId = toast.loading("Compiling LaTeX into downloadable PDF...");
+    try {
+      const baseName = (name || generatedJson?.name || "Resume").trim().replace(/[^a-zA-Z0-9_\-]/g, "_");
+      const filename = `${baseName}_Resume.pdf`;
+
+      const response = await fetch("/api/resume/compile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latexCode: generatedLatex,
+          filename,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || "Failed to compile PDF.");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Resume PDF compiled & downloaded successfully!", { id: toastId });
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to compile PDF. You can also export to Overleaf.", { id: toastId });
+    } finally {
+      setIsCompilingPdf(false);
+    }
+  };
+
+  const handleDownloadTex = () => {
+    if (!generatedLatex) return;
+    const baseName = (name || generatedJson?.name || "Resume").trim().replace(/[^a-zA-Z0-9_\-]/g, "_");
+    const filename = `${baseName}_Resume.tex`;
+    const blob = new Blob([generatedLatex], { type: "text/x-tex;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    toast.success("LaTeX .tex file saved!");
+  };
+
+  const handleOpenOverleaf = () => {
+    if (!generatedLatex) return;
+    try {
+      const form = document.createElement("form");
+      form.action = "https://www.overleaf.com/docs";
+      form.method = "POST";
+      form.target = "_blank";
+
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "snip";
+      input.value = generatedLatex;
+      form.appendChild(input);
+
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+      toast.success("Opening in Overleaf editor...");
+    } catch (e) {
+      window.open("https://www.overleaf.com", "_blank");
+    }
   };
 
   const handleGenerateResume = async () => {
@@ -100,8 +188,10 @@ export default function ResumePage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to generate resume template.");
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to generate resume template.");
+      }
 
       setGeneratedJson(data.resumeJson);
       setGeneratedLatex(data.latexCode);
@@ -122,6 +212,7 @@ export default function ResumePage() {
     setDocFile(null);
     setGeneratedJson(null);
     setGeneratedLatex("");
+    setOutputTab("latex");
   };
 
   return (
@@ -332,46 +423,288 @@ export default function ResumePage() {
 
             {generatedJson && (
               <div className="flex flex-col gap-6 animate-fadeIn">
-                {/* LaTeX Code Box */}
-                <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden flex flex-col shadow-xl">
-                  <div className="bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-slate-800">
-                    <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
-                      <Code className="w-4 h-4 text-cyan-400" />
-                      LaTeX Source Code (Overleaf Compatible)
-                    </span>
+                {/* Actions & Download Bar */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
-                      onClick={handleCopyLatex}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-xs font-bold text-slate-200 transition-colors flex items-center gap-1.5"
+                      onClick={handleDownloadPdf}
+                      disabled={isCompilingPdf}
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl transition-all duration-300 shadow-md shadow-cyan-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      {isCopied ? (
+                      {isCompilingPdf ? (
                         <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          Copied!
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Compiling PDF...
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3.5 h-3.5" />
-                          Copy LaTeX
+                          <Download className="w-3.5 h-3.5" />
+                          Download PDF
                         </>
                       )}
                     </button>
+
+                    <button
+                      onClick={handleDownloadTex}
+                      className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700/80 transition-colors flex items-center gap-1.5"
+                    >
+                      <FileDown className="w-3.5 h-3.5 text-cyan-400" />
+                      Save .tex
+                    </button>
+
+                    <button
+                      onClick={handleOpenOverleaf}
+                      className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700/80 transition-colors flex items-center gap-1.5"
+                      title="Open directly in Overleaf online editor"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                      Overleaf
+                    </button>
                   </div>
-                  <pre className="p-5 text-[11px] font-mono text-cyan-300 max-h-96 overflow-y-auto leading-relaxed scrollbar-thin">
-                    <code>{generatedLatex}</code>
-                  </pre>
+
+                  {/* Output Switcher Tabs */}
+                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto shrink-0">
+                    <button
+                      onClick={() => setOutputTab("latex")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                        outputTab === "latex"
+                          ? "bg-cyan-500 text-white shadow"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <Code className="w-3.5 h-3.5" />
+                      LaTeX Code
+                    </button>
+                    <button
+                      onClick={() => setOutputTab("preview")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                        outputTab === "preview"
+                          ? "bg-cyan-500 text-white shadow"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Live Preview
+                    </button>
+                  </div>
                 </div>
 
-                {/* Email Delivery Warning Card */}
-                <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border border-cyan-500/25 p-6 rounded-2xl">
-                  <div className="flex gap-4">
-                    <Mail className="w-6 h-6 text-cyan-400 shrink-0" />
+                {/* Tab 1: LaTeX Code View */}
+                {outputTab === "latex" && (
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden flex flex-col shadow-xl animate-fadeIn">
+                    <div className="bg-slate-900 px-6 py-3.5 flex items-center justify-between border-b border-slate-800">
+                      <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
+                        <Code className="w-4 h-4 text-cyan-400" />
+                        LaTeX Source Code (Standard TeX Live / Overleaf Format)
+                      </span>
+                      <button
+                        onClick={handleCopyLatex}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-xs font-bold text-slate-200 transition-colors flex items-center gap-1.5"
+                      >
+                        {isCopied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            Copy Code
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="p-5 text-[11px] font-mono text-cyan-300 max-h-[500px] overflow-y-auto leading-relaxed scrollbar-thin selection:bg-cyan-900 selection:text-white">
+                      <code>{generatedLatex}</code>
+                    </pre>
+                  </div>
+                )}
+
+                {/* Tab 2: Visual Resume Preview */}
+                {outputTab === "preview" && (
+                  <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl max-h-[560px] overflow-y-auto scrollbar-thin text-slate-900 dark:text-slate-100 flex flex-col gap-6 animate-fadeIn">
+                    {/* Header */}
+                    <div className="text-center pb-4 border-b border-slate-200 dark:border-slate-800">
+                      <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                        {generatedJson.name || "Your Name"}
+                      </h2>
+                      <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-2">
+                        {generatedJson.location && <span>{generatedJson.location}</span>}
+                        {generatedJson.phone && <span>• {generatedJson.phone}</span>}
+                        {generatedJson.email && <span>• {generatedJson.email}</span>}
+                        {generatedJson.linkedin && (
+                          <span>
+                            • <a href={generatedJson.linkedin.startsWith("http") ? generatedJson.linkedin : `https://${generatedJson.linkedin}`} target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline">LinkedIn</a>
+                          </span>
+                        )}
+                        {generatedJson.github && (
+                          <span>
+                            • <a href={generatedJson.github.startsWith("http") ? generatedJson.github : `https://${generatedJson.github}`} target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline">GitHub</a>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    {generatedJson.summary && (
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-500 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                          Professional Summary
+                        </h3>
+                        <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                          {generatedJson.summary}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Skills */}
+                    {generatedJson.skills && generatedJson.skills.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-500 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                          Technical Skills
+                        </h3>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {(Array.isArray(generatedJson.skills) ? generatedJson.skills : [generatedJson.skills]).map((skill, idx) => (
+                            <span key={idx} className="px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-[11px] rounded font-medium">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Experience */}
+                    {generatedJson.experience && generatedJson.experience.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-500 border-b border-slate-200 dark:border-slate-800 pb-1 mb-3">
+                          Work Experience
+                        </h3>
+                        <div className="flex flex-col gap-4">
+                          {generatedJson.experience.map((exp, idx) => (
+                            <div key={idx} className="flex flex-col gap-1">
+                              <div className="flex justify-between items-baseline text-xs">
+                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                  {exp.title} <span className="text-slate-500 dark:text-slate-400 font-normal">-- {exp.company}</span>
+                                </span>
+                                <span className="text-slate-500 dark:text-slate-400 text-[11px]">{exp.duration}</span>
+                              </div>
+                              {exp.responsibilities && (
+                                <ul className="list-disc list-inside text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5 mt-1 ml-1">
+                                  {exp.responsibilities.map((r, rIdx) => (
+                                    <li key={rIdx}>{r}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Projects */}
+                    {generatedJson.projects && generatedJson.projects.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-500 border-b border-slate-200 dark:border-slate-800 pb-1 mb-3">
+                          Projects
+                        </h3>
+                        <div className="flex flex-col gap-4">
+                          {generatedJson.projects.map((proj, idx) => (
+                            <div key={idx} className="flex flex-col gap-1">
+                              <div className="flex justify-between items-baseline text-xs">
+                                <span className="font-bold text-slate-800 dark:text-slate-200">{proj.name}</span>
+                                <span className="text-slate-500 dark:text-slate-400 italic text-[11px]">
+                                  {Array.isArray(proj.technologies) ? proj.technologies.join(", ") : proj.technologies}
+                                </span>
+                              </div>
+                              {proj.description && (
+                                <p className="text-[11px] italic text-slate-500 dark:text-slate-400">{proj.description}</p>
+                              )}
+                              {proj.highlights && (
+                                <ul className="list-disc list-inside text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5 mt-0.5 ml-1">
+                                  {proj.highlights.map((h, hIdx) => (
+                                    <li key={hIdx}>{h}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Education */}
+                    {generatedJson.education && generatedJson.education.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-500 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                          Education
+                        </h3>
+                        <div className="flex flex-col gap-2">
+                          {generatedJson.education.map((edu, idx) => (
+                            <div key={idx} className="flex justify-between items-baseline text-xs">
+                              <div>
+                                <span className="font-bold text-slate-800 dark:text-slate-200">{edu.degree}</span>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400">{edu.institution} {edu.gpa ? `• GPA: ${edu.gpa}` : ""}</p>
+                              </div>
+                              <span className="text-slate-500 dark:text-slate-400 text-[11px]">{edu.year}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Achievements & Certifications */}
+                    {((generatedJson.achievements && generatedJson.achievements.length > 0) || (generatedJson.certifications && generatedJson.certifications.length > 0)) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {generatedJson.achievements && generatedJson.achievements.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-500 border-b border-slate-200 dark:border-slate-800 pb-1 mb-1.5">
+                              Achievements
+                            </h3>
+                            <ul className="list-disc list-inside text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5">
+                              {generatedJson.achievements.map((ach, idx) => (
+                                <li key={idx}>{ach}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {generatedJson.certifications && generatedJson.certifications.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-500 border-b border-slate-200 dark:border-slate-800 pb-1 mb-1.5">
+                              Certifications
+                            </h3>
+                            <ul className="list-disc list-inside text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5">
+                              {generatedJson.certifications.map((cert, idx) => (
+                                <li key={idx}>{cert}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* PDF & Export Info Card */}
+                <div className="bg-gradient-to-br from-cyan-900/20 via-blue-900/15 to-indigo-900/20 border border-cyan-500/25 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-bold text-sm text-slate-950 dark:text-white">LaTeX Compiler Queue</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-300 mt-1 leading-relaxed">
-                        Your LaTeX source code has been structured successfully. Since compiling PDFs with LaTeX packages is resource-intensive, a compiled version will automatically be delivered directly to your email in the background (email feature integrations coming soon).
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">
+                        ATS-Optimized LaTeX & PDF Template
+                      </h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Ready to download as a compiled PDF, exportable directly to Overleaf, or usable with local LaTeX distributions (<code className="text-cyan-400">pdflatex</code> / <code className="text-cyan-400">xelatex</code>).
                       </p>
                     </div>
                   </div>
+                  <button
+                    onClick={handleDownloadPdf}
+                    disabled={isCompilingPdf}
+                    className="shrink-0 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isCompilingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                    Download PDF
+                  </button>
                 </div>
               </div>
             )}

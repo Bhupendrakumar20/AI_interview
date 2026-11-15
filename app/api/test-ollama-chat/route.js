@@ -1,26 +1,22 @@
+
 export async function GET() {
-  const OLLAMA_URL = (
-    process.env.OLLAMA_URL ||
-    process.env.OLLAMA_URL_2 ||
-    ""
-  ).trim();
+  const OLLAMA_URLS = [
+    process.env.OLLAMA_URL,
+    process.env.OLLAMA_URL_2,
+  ]
+    .filter(Boolean)
+    .map((url) => url.trim());
 
   const MODEL_NAME =
     process.env.OLLAMA_MODEL || "gemma3:4b";
 
-  if (!OLLAMA_URL) {
+  if (OLLAMA_URLS.length === 0) {
     return Response.json({
       success: false,
       stage: "configuration",
-      error: "OLLAMA_URL is missing",
+      error: "OLLAMA_URL and OLLAMA_URL_2 are missing",
     });
   }
-
-  const baseUrl = OLLAMA_URL
-    .replace(/\/api\/(chat|generate|tags|ps)\/?$/i, "")
-    .replace(/\/+$/, "");
-
-  const endpoint = `${baseUrl}/api/chat`;
 
   const username = (
     process.env.OLLAMA_USERNAME || ""
@@ -35,93 +31,139 @@ export async function GET() {
       ).toString("base64")}`
     : undefined;
 
-  const controller = new AbortController();
+  const requestHeaders = {
+    "Content-Type": "application/json",
+    ...(authHeader
+      ? { Authorization: authHeader }
+      : {}),
+  };
 
-  const timeout = setTimeout(
-    () => controller.abort(),
-    180000
-  );
+  const errors = [];
 
-  const startTime = Date.now();
+  // Try each configured Ollama URL
+  for (let index = 0; index < OLLAMA_URLS.length; index++) {
+    const currentUrl = OLLAMA_URLS[index];
 
-  try {
-    console.log("[TEST] Calling Ollama:", endpoint);
-    console.log("[TEST] Model:", MODEL_NAME);
+    const baseUrl = currentUrl
+      .replace(/\/api\/(chat|generate|tags|ps)\/?$/i, "")
+      .replace(/\/+$/, "");
 
-    const response = await fetch(endpoint, {
-      method: "POST",
+    const endpoint = `${baseUrl}/api/chat`;
 
-      headers: {
-        "Content-Type": "application/json",
-        ...(authHeader
-          ? { Authorization: authHeader }
-          : {}),
-      },
+    const startTime = Date.now();
 
-      body: JSON.stringify({
-        model: MODEL_NAME,
+    const controller = new AbortController();
 
-        messages: [
-          {
-            role: "user",
-            content: "Hello! Reply with: Ollama is working.",
+    const timeout = setTimeout(
+      () => controller.abort(),
+      180000
+    );
+
+    try {
+      console.log(
+        `[TEST] Attempt ${index + 1}/${OLLAMA_URLS.length}`
+      );
+
+      console.log("[TEST] Endpoint:", endpoint);
+      console.log("[TEST] Model:", MODEL_NAME);
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+
+        headers: requestHeaders,
+
+        body: JSON.stringify({
+          model: MODEL_NAME,
+
+          messages: [
+            {
+              role: "user",
+              content: "Hello! Reply with: Ollama is working.",
+            },
+          ],
+
+          stream: false,
+
+          options: {
+            temperature: 0.3,
           },
-        ],
+        }),
 
-        stream: false,
+        signal: controller.signal,
+      });
 
-        options: {
-          temperature: 0.3,
-        },
-      }),
+      const responseTime = Date.now() - startTime;
 
-      signal: controller.signal,
-    });
+      const responseText = await response.text();
 
-    const responseTime =
-      Date.now() - startTime;
+      console.log(
+        "[TEST] HTTP Status:",
+        response.status
+      );
 
-    const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}: ${responseText.slice(0, 500)}`
+        );
+      }
 
-    console.log("[TEST] HTTP Status:", response.status);
-    console.log("[TEST] Response:", responseText.slice(0, 1000));
+      const data = JSON.parse(responseText);
 
-    if (!response.ok) {
+      const generatedText =
+        data.message?.content || data.response;
+
+      if (!generatedText) {
+        throw new Error("Ollama returned empty content");
+      }
+
+      console.log(
+        `[TEST] Success using URL ${index + 1}`
+      );
+
       return Response.json({
-        success: false,
-        stage: "ollama_http",
+        success: true,
+        stage: "ollama_generation",
+        attempt: index + 1,
+        totalUrls: OLLAMA_URLS.length,
+        source: index === 0 ? "OLLAMA_URL" : "OLLAMA_URL_2",
         status: response.status,
-        endpoint,
-        response: responseText,
+        model: MODEL_NAME,
+        response: generatedText,
         responseTime,
       });
+
+    } catch (error) {
+      const errorDetails = {
+        attempt: index + 1,
+        source: index === 0 ? "OLLAMA_URL" : "OLLAMA_URL_2",
+        error: error.message,
+        errorName: error.name,
+        cause: error.cause?.message,
+        endpoint,
+        responseTime: Date.now() - startTime,
+      };
+
+      console.error(
+        "[TEST] Ollama URL failed:",
+        errorDetails
+      );
+
+      errors.push(errorDetails);
+
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data = JSON.parse(responseText);
-
-    return Response.json({
-      success: true,
-      stage: "ollama_generation",
-      status: response.status,
-      model: MODEL_NAME,
-      response: data.message?.content || data.response,
-      responseTime,
-    });
-
-  } catch (error) {
-    console.error("[TEST] Ollama failed:", error);
-
-    return Response.json({
-      success: false,
-      stage: "network_or_timeout",
-      error: error.message,
-      errorName: error.name,
-      cause: error.cause?.message,
-      endpoint,
-      responseTime: Date.now() - startTime,
-    });
-
-  } finally {
-    clearTimeout(timeout);
   }
+
+  // Both URLs failed
+  return Response.json(
+    {
+      success: false,
+      stage: "all_ollama_urls_failed",
+      model: MODEL_NAME,
+      attempts: errors.length,
+      errors,
+    },
+    { status: 502 }
+  );
 }

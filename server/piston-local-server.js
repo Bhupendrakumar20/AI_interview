@@ -342,21 +342,21 @@ function executeLocally(language, sourceCode, stdin, workDir) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// API ROUTES  (Piston v2 compatible)
+// API ROUTES  (Piston v2 compatible - supports both /api/v2 and /api/v2/piston)
 // ─────────────────────────────────────────────────────────────────
 
-// GET /api/v2/piston/runtimes
-app.get("/api/v2/piston/runtimes", (req, res) => {
+// GET /api/v2/runtimes
+app.get(["/api/v2/runtimes", "/api/v2/piston/runtimes"], (req, res) => {
   res.json(AVAILABLE_RUNTIMES.map(({ language, version, aliases }) => ({ language, version, aliases })));
 });
 
-// GET /api/v2/piston/packages  (Piston compat — mirrors runtimes)
-app.get("/api/v2/piston/packages", (req, res) => {
+// GET /api/v2/packages  (Piston compat — mirrors runtimes)
+app.get(["/api/v2/packages", "/api/v2/piston/packages"], (req, res) => {
   res.json(AVAILABLE_RUNTIMES.map(({ language, version }) => ({ language, version, installed: true })));
 });
 
-// POST /api/v2/piston/execute
-app.post("/api/v2/piston/execute", (req, res) => {
+// POST /api/v2/execute
+app.post(["/api/v2/execute", "/api/v2/piston/execute"], (req, res) => {
   const { language, version, files, stdin = "", run_timeout } = req.body;
 
   if (!language || !Array.isArray(files) || files.length === 0) {
@@ -455,18 +455,26 @@ app.get("/", (req, res) => {
 // START
 // ─────────────────────────────────────────────────────────────────
 
-app.listen(PORT, "127.0.0.1", () => {
+const server = app.listen(PORT, "127.0.0.1", () => {
   console.log("\n╔══════════════════════════════════════════════╗");
   console.log("║   Piston-Compatible Local Execution Server  ║");
   console.log("╚══════════════════════════════════════════════╝");
-  console.log(`\n🚀 Running on: http://localhost:${PORT}/api/v2/piston`);
+  console.log(`\n🚀 Running on: http://localhost:${PORT}/api/v2`);
   console.log(`📦 Runtimes  : ${AVAILABLE_RUNTIMES.length}`);
   AVAILABLE_RUNTIMES.forEach((r) =>
     console.log(`   • ${r.language.padEnd(12)} ${r.version}`)
   );
-  console.log("\n   GET  /api/v2/piston/runtimes");
-  console.log("   POST /api/v2/piston/execute");
+  console.log("\n   GET  /api/v2/runtimes");
+  console.log("   POST /api/v2/execute");
   console.log("\n   Press Ctrl+C to stop\n");
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.log(`\n[Piston Local] Port ${PORT} is already in use (Docker Piston is likely active). Using active service.`);
+  } else {
+    console.error("[Piston Local] Server error:", err);
+  }
 });
 
 module.exports = app;

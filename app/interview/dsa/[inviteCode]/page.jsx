@@ -62,6 +62,10 @@ export default function DSALiveRoomPage() {
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [codeMap, setCodeMap] = useState({});
   const [language, setLanguage] = useState('javascript');
+  const languageRef = useRef(language);
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
   const [timerText, setTimerText] = useState('30:00');
   const [isLowTime, setIsLowTime] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -104,21 +108,16 @@ export default function DSALiveRoomPage() {
     }
   }, [roomState.status, roomState.startTime, roomState.questions]);
 
-  // Handle language switch to auto-extract snippets if not modified yet
+  // Handle language switch to auto-extract snippets for the active question without touching other room state
   const handleLanguageChange = (newLang) => {
     setLanguage(newLang);
-    if (roomState.questions && roomState.questions.length > 0) {
-      setCodeMap((prev) => {
-        const updated = { ...prev };
-        roomState.questions.forEach((q) => {
-          const snippet = getSnippetForLanguage(q?.codeSnippets, newLang);
-          updated[q.id] = snippet;
-        });
-        return updated;
-      });
-    } else if (roomState.question) {
-      const snippet = getSnippetForLanguage(roomState.question?.codeSnippets, newLang);
-      setCodeMap({ [roomState.question.id]: snippet });
+    languageRef.current = newLang;
+    if (activeQuestion) {
+      const snippet = getSnippetForLanguage(activeQuestion?.codeSnippets, newLang);
+      setCodeMap((prev) => ({
+        ...prev,
+        [activeQuestion.id]: snippet,
+      }));
     }
   };
 
@@ -167,7 +166,7 @@ export default function DSALiveRoomPage() {
           let changed = false;
           state.questions.forEach((q) => {
             if (updated[q.id] === undefined) {
-              const snippet = getSnippetForLanguage(q?.codeSnippets, language);
+              const snippet = getSnippetForLanguage(q?.codeSnippets, languageRef.current);
               updated[q.id] = snippet;
               changed = true;
             }
@@ -182,7 +181,7 @@ export default function DSALiveRoomPage() {
       
       const initialCodeMap = {};
       questions?.forEach((q) => {
-        const snippet = getSnippetForLanguage(q?.codeSnippets, language);
+        const snippet = getSnippetForLanguage(q?.codeSnippets, languageRef.current);
         initialCodeMap[q.id] = snippet;
       });
 
@@ -216,7 +215,7 @@ export default function DSALiveRoomPage() {
     return () => {
       socketIo.disconnect();
     };
-  }, [roomCode, usernameParam, language]);
+  }, [roomCode, usernameParam]);
 
   // Fetch and Start Game
   const handleStartGame = async () => {

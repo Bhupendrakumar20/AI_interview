@@ -48,7 +48,7 @@ export async function POST(request) {
 
     // ✅ FIX #4: Verify user authentication
     const currentUser = await getCurrentUser();
-    if (!currentUser) {
+    if (!currentUser || currentUser.id === "dummy-user-id") {
       return NextResponse.json(
         { error: "User not authenticated" },
         { status: 401 }
@@ -80,7 +80,7 @@ export async function POST(request) {
 
     // Find session by code
     const query = await db
-      .collection("interview_buddy_sessions")
+      .collectionGroup("interview_buddy_sessions")
       .where("sessionCode", "==", sessionCode)
       .limit(1)
       .get();

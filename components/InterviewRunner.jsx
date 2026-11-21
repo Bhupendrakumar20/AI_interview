@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { createFeedback } from "@/lib/actions/general.action";
+import {
+  abandonInterviewSession,
+  createFeedback,
+} from "@/lib/actions/general.action";
 
 const InterviewRunner = ({ interview, user, existingFeedback }) => {
   const router = useRouter();
@@ -26,6 +29,50 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
   const mediaStreamRef = useRef(null);
   const recognitionRef = useRef(null);
   const answerTextAreaRef = useRef(null);
+
+  useEffect(() => {
+    console.info("[Interview session]", {
+      page: `/interview/${interview.id}`,
+      user_id: user.id,
+      thread_id: interview.threadId || interview.id,
+      mode: "mock-interview",
+    });
+  }, [interview.id, interview.threadId, user.id]);
+
+  useEffect(() => {
+    if (!interview.threadId) return undefined;
+    let active = true;
+
+    const checkSessionStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/interview-sessions?sessionId=${encodeURIComponent(interview.threadId)}`,
+          { cache: "no-store" }
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to fetch session status");
+        if (!active) return;
+
+        if (data.session && data.session.status !== "active") {
+          toast.info(
+            data.session.status === "completed"
+              ? "This interview ended on another device. Your results are saved."
+              : "This interview was ended on another device without saving."
+          );
+          router.replace("/interview");
+        }
+      } catch (error) {
+        if (active) console.error("Failed to check interview session status:", error);
+      }
+    };
+
+    checkSessionStatus();
+    const intervalId = setInterval(checkSessionStatus, 10000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [interview.threadId, router]);
 
   // ---------- Camera setup ----------
   const enableCamera = async () => {
@@ -338,6 +385,20 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
     });
   };
 
+  const handleAbandon = async () => {
+    const result = await abandonInterviewSession({
+      interviewId: interview.id,
+      userId: user.id,
+    });
+    if (!result.success) {
+      toast.error(result.error || "Failed to end interview");
+      return;
+    }
+
+    toast.success("Interview ended.");
+    router.push("/interview");
+  };
+
   const currentQuestion = questions[currentIndex] || "";
 
   return (
@@ -415,6 +476,14 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                 </Button>
 
                 <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    className="bg-slate-700 text-white hover:bg-slate-600"
+                    onClick={handleAbandon}
+                    disabled={isSubmitting}
+                  >
+                    End Without Saving
+                  </Button>
                   <Button
                     type="button"
                     className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/20"

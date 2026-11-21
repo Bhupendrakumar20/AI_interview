@@ -7,11 +7,13 @@ import { startAdaptiveSession, submitAdaptiveAnswer, endAdaptiveSessionEarly } f
 import CodeEditorPanel from '@/components/CodeEditorPanel';
 
 const AiBuddyInterviewSession = ({
+  sessionId,
   interviewId,
   persona = 'Hiring Manager',
   selectedTopics = [],
   duration = 30,
   onSessionEnd,
+  onSessionClosed,
   onClose,
 }) => {
   const [adaptiveSessionId, setAdaptiveSessionId] = useState(null);
@@ -33,6 +35,7 @@ const AiBuddyInterviewSession = ({
 
   const performanceHistoryRef = useRef([]);
   const hasInitialized = useRef(false); // blocks React StrictMode's duplicate mount-time effect run
+  const hasHandledSessionClose = useRef(false);
   const isMountedRef = useRef(false);
   const speechTimeoutRef = useRef(null);
 
@@ -83,6 +86,41 @@ const AiBuddyInterviewSession = ({
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    let active = true;
+
+    const checkSessionStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/interview-sessions?sessionId=${encodeURIComponent(sessionId)}`,
+          { cache: 'no-store' }
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch session status');
+        if (!active) return;
+
+        if (
+          data.session &&
+          data.session.status !== "active" &&
+          !hasHandledSessionClose.current
+        ) {
+          hasHandledSessionClose.current = true;
+          onSessionClosed?.(data.session);
+        }
+      } catch (error) {
+        if (active) console.error('Failed to check AI Buddy session status:', error);
+      }
+    };
+
+    checkSessionStatus();
+    const intervalId = setInterval(checkSessionStatus, 10000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [sessionId, onSessionClosed]);
 
   useEffect(() => {
     setAnswerMode(isDSAQuestion ? 'code' : 'text');
@@ -224,18 +262,31 @@ const AiBuddyInterviewSession = ({
     }
   };
 
-  const buildResultsFromReport = (report) => ({
-    totalQuestions: maxQuestions,
-    answeredQuestions: report.performance_history.length,
-    avgByTopic: report.avg_by_topic,
-    topWeakAreas: report.top_weak_areas,
-    scoreProgression: report.score_progression,
-    performanceHistory: report.performance_history,
-    overallScore: Math.round(
-      (report.score_progression.reduce((a, b) => a + b, 0) / report.score_progression.length) * 10
-    ),
-    timestamp: new Date().toISOString(),
-  });
+  const buildResultsFromReport = (report) => {
+    const performanceHistory = Array.isArray(report.performance_history)
+      ? report.performance_history
+      : [];
+    const scoreProgression = Array.isArray(report.score_progression)
+      ? report.score_progression
+      : [];
+
+    return {
+      totalQuestions: maxQuestions,
+      answeredQuestions: performanceHistory.length,
+      avgByTopic: report.avg_by_topic || {},
+      topWeakAreas: report.top_weak_areas || [],
+      scoreProgression,
+      performanceHistory,
+      overallScore: scoreProgression.length
+        ? Math.round(
+            (scoreProgression.reduce((total, score) => total + score, 0) /
+              scoreProgression.length) *
+              10
+          )
+        : 0,
+      timestamp: new Date().toISOString(),
+    };
+  };
 
   if (loading) {
     return (

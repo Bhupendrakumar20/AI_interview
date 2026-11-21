@@ -77,6 +77,12 @@ const InterviewSetup = ({ userId }) => {
       }
 
       if (result?.success && result.interviewId) {
+        console.info("[Interview session]", {
+          page: "/interview",
+          user_id: userId,
+          thread_id: result.interviewId,
+          mode: "mock-interview",
+        });
         toast.success("Interview created! Starting now...");
         router.push(`/interview/${result.interviewId}`);
       } else {

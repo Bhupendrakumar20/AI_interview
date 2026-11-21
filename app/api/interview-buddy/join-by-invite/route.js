@@ -6,10 +6,19 @@
 import { NextResponse } from "next/server";
 import * as admin from "firebase-admin";
 import { db } from "@/firebase/admin";
+import { getCurrentUser } from "@/lib/actions/auth.action";
 
 export async function POST(request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.id === "dummy-user-id") {
+      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
+    }
+
     const { userId, inviteCode } = await request.json();
+    if (userId !== currentUser.id) {
+      return NextResponse.json({ error: "User ID mismatch" }, { status: 403 });
+    }
 
     console.log(`\n${'═'.repeat(60)}`);
     console.log(`🔗 [join-by-invite] REQUEST`);
@@ -29,7 +38,7 @@ export async function POST(request) {
 
     // Query for session with this invite code (same as sessionCode)
     const query = await db
-      .collection("interview_buddy_sessions")
+      .collectionGroup("interview_buddy_sessions")
       .where("sessionCode", "==", inviteCode)
       .limit(1)
       .get();

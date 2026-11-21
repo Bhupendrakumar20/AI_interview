@@ -46,6 +46,9 @@ import {
 } from "recharts";
 import { getAiNudge, evaluateMockTest, runCodeAction } from "@/lib/actions/mock-test-ai.action";
 import { getQuestionAnswer, getQuestionTips } from "@/lib/actions/mock-test.action";
+import {
+  finishInterviewModeSessionAction,
+} from "@/lib/actions/interview-session.action";
 
 const INITIAL_CODE_TEMPLATES = {
   javascript: `// Write your JavaScript solution here\nfunction solve(input) {\n  console.log("Hello PrepWise JS");\n  return true;\n}\n\nsolve();`,
@@ -54,7 +57,7 @@ const INITIAL_CODE_TEMPLATES = {
   java: `// Write your Java solution here\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello PrepWise Java");\n    }\n}`
 };
 
-export default function MockTestWorkspace({ filters, questions, onClose }) {
+export default function MockTestWorkspace({ filters, questions, sessionId, onClose, onSessionComplete }) {
   const [activeTab, setActiveTab] = useState("code"); // code, whiteboard, feedback, leaderboard
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
@@ -89,6 +92,11 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
   // Expected Answer / Tips — keyed by question index so results persist
   // when navigating between questions and each question fetches independently.
   const [answersByIndex, setAnswersByIndex] = useState({}); // { [index]: string }
+  const [candidateAnswersByIndex, setCandidateAnswersByIndex] = useState({});
+  const [codeByIndex, setCodeByIndex] = useState({});
+  const [transcriptByIndex, setTranscriptByIndex] = useState({});
+  const [whiteboardByIndex, setWhiteboardByIndex] = useState({});
+  const [languageByIndex, setLanguageByIndex] = useState({});
   const [tipsByIndex, setTipsByIndex] = useState({}); // { [index]: string[] }
   const [loadingAnswer, setLoadingAnswer] = useState(false);
   const [loadingTips, setLoadingTips] = useState(false);
@@ -98,6 +106,8 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
   // Final evaluation feedback
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [evaluation, setEvaluation] = useState(null);
+  const onCloseRef = useRef(onClose);
+  const hasHandledRemoteCloseRef = useRef(false);
 
   // Leaderboard data
   const [leaderboard, setLeaderboard] = useState([
@@ -117,10 +127,123 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
   const currentAnswer = answersByIndex[currentQuestionIndex];
   const currentTips = tipsByIndex[currentQuestionIndex];
 
-  // Sync templates on language selection change
   useEffect(() => {
-    setEditorCode(INITIAL_CODE_TEMPLATES[selectedLanguage] || "");
-  }, [selectedLanguage]);
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    let active = true;
+
+    const checkSessionStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/interview-sessions?sessionId=${encodeURIComponent(sessionId)}`,
+          { cache: "no-store" }
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to fetch session status");
+        if (!active) return;
+
+        if (
+          data.session?.status === "abandoned" &&
+          !hasHandledRemoteCloseRef.current
+        ) {
+          hasHandledRemoteCloseRef.current = true;
+          toast.warning("This mock test was ended from another device.");
+          await onCloseRef.current?.();
+        } else if (
+          data.session?.status === "completed" &&
+          !evaluation &&
+          data.session.result?.evaluation
+        ) {
+          setEvaluation(data.session.result.evaluation);
+          setIsTimerRunning(false);
+        }
+      } catch (error) {
+        if (active) console.error("Failed to check mock test session status:", error);
+      }
+    };
+
+    checkSessionStatus();
+    const intervalId = setInterval(checkSessionStatus, 10000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [evaluation, sessionId]);
+
+  const handleLanguageChange = (language) => {
+    const starterCode = INITIAL_CODE_TEMPLATES[language] || "";
+    setSelectedLanguage(language);
+    setLanguageByIndex((previous) => ({
+      ...previous,
+      [currentQuestionIndex]: language,
+    }));
+    setEditorCode(starterCode);
+    setCodeByIndex((previous) => ({
+      ...previous,
+      [currentQuestionIndex]: starterCode,
+    }));
+  };
+
+  const handleQuestionChange = (nextIndex) => {
+    if (nextIndex < 0 || nextIndex >= questions.length || nextIndex === currentQuestionIndex) {
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+    }
+
+    setCodeByIndex((previous) => ({ ...previous, [currentQuestionIndex]: editorCode }));
+    setTranscriptByIndex((previous) => ({ ...previous, [currentQuestionIndex]: transcript }));
+    setWhiteboardByIndex((previous) => ({ ...previous, [currentQuestionIndex]: shapes }));
+    setLanguageByIndex((previous) => ({ ...previous, [currentQuestionIndex]: selectedLanguage }));
+
+    const nextLanguage = languageByIndex[nextIndex] || selectedLanguage;
+    setCurrentQuestionIndex(nextIndex);
+    setSelectedLanguage(nextLanguage);
+    setEditorCode(codeByIndex[nextIndex] ?? INITIAL_CODE_TEMPLATES[nextLanguage] ?? "");
+    setTranscript(transcriptByIndex[nextIndex] || "");
+    setShapes(whiteboardByIndex[nextIndex] || []);
+  };
+
+  const buildQuestionsAndAnswers = () => questions.map((question, index) => {
+    const code = index === currentQuestionIndex
+      ? editorCode
+      : codeByIndex[index] || "";
+    const answerText = candidateAnswersByIndex[index] || "";
+    const answerTranscript = index === currentQuestionIndex
+      ? transcript
+      : transcriptByIndex[index] || "";
+    const whiteboard = index === currentQuestionIndex
+      ? shapes
+      : whiteboardByIndex[index] || [];
+    const language = index === currentQuestionIndex
+      ? selectedLanguage
+      : languageByIndex[index] || selectedLanguage;
+
+    return {
+      questionNumber: index + 1,
+      question: question.question || question.title || "",
+      difficulty: question.difficulty || filters.difficulty,
+      answer: {
+        text: answerText,
+        transcript: answerTranscript,
+        code,
+        language,
+        whiteboard,
+      },
+    };
+  });
+
+  const handleEditorChange = (value) => {
+    const code = value || "";
+    setEditorCode(code);
+    setCodeByIndex((previous) => ({ ...previous, [currentQuestionIndex]: code }));
+  };
 
   // Countdown timer logic
   useEffect(() => {
@@ -543,7 +666,25 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
 
       if (result.success) {
         setEvaluation(result.evaluation);
-        toast.success("Evaluation complete!", { id: "eval-toast" });
+        const questionsAndAnswers = buildQuestionsAndAnswers();
+        const savedSession = await finishInterviewModeSessionAction({
+          sessionId,
+          result: {
+            company: filters.company,
+            role: filters.role,
+            questionsAndAnswers,
+            evaluation: result.evaluation,
+          },
+        });
+        if (savedSession.success) {
+          toast.success("Evaluation complete and saved to your account.", { id: "eval-toast" });
+          await onSessionComplete?.();
+        } else {
+          toast.error(
+            savedSession.error || "Evaluation completed, but the result could not be saved.",
+            { id: "eval-toast" }
+          );
+        }
         
         // Update user rank in leaderboard
         setLeaderboard((prev) =>
@@ -645,7 +786,7 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
 
           <Button
             variant="outline"
-            onClick={onClose}
+            onClick={() => onClose?.({ questionsAndAnswers: buildQuestionsAndAnswers() })}
             className="border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200"
           >
             Exit Workspace
@@ -667,7 +808,7 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={() => setCurrentQuestionIndex((p) => Math.max(0, p - 1))}
+                  onClick={() => handleQuestionChange(currentQuestionIndex - 1)}
                   disabled={currentQuestionIndex === 0}
                   className="h-7 w-7 border-slate-800 text-slate-400 hover:text-slate-200"
                 >
@@ -676,7 +817,7 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={() => setCurrentQuestionIndex((p) => Math.min(questions.length - 1, p + 1))}
+                  onClick={() => handleQuestionChange(currentQuestionIndex + 1)}
                   disabled={currentQuestionIndex === questions.length - 1}
                   className="h-7 w-7 border-slate-800 text-slate-400 hover:text-slate-200"
                 >
@@ -763,6 +904,28 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                 )}
               </div>
             )}
+          </div>
+
+          <div className="bg-[#0e1526] border border-slate-800 rounded-xl p-4">
+            <label
+              htmlFor="mock-test-answer"
+              className="mb-2 block text-xs font-bold text-slate-300"
+            >
+              Your answer for this question
+            </label>
+            <textarea
+              id="mock-test-answer"
+              value={candidateAnswersByIndex[currentQuestionIndex] || ""}
+              onChange={(event) => {
+                const answer = event.target.value;
+                setCandidateAnswersByIndex((previous) => ({
+                  ...previous,
+                  [currentQuestionIndex]: answer,
+                }));
+              }}
+              placeholder="Write your answer here..."
+              className="min-h-24 w-full resize-y rounded-lg border border-slate-800 bg-[#090d16] p-3 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+            />
           </div>
 
           {/* continuous voice transcription */}
@@ -856,7 +1019,7 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                   <span className="text-xs text-slate-400 font-medium">Select Language:</span>
                   <select
                     value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    onChange={(e) => handleLanguageChange(e.target.value)}
                     className="bg-[#172237] border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none"
                   >
                     <option value="javascript">JavaScript</option>
@@ -882,7 +1045,7 @@ export default function MockTestWorkspace({ filters, questions, onClose }) {
                   language={selectedLanguage}
                   value={editorCode}
                   theme="vs-dark"
-                  onChange={(val) => setEditorCode(val || "")}
+                  onChange={handleEditorChange}
                   options={{
                     fontSize: 14,
                     minimap: { enabled: false },

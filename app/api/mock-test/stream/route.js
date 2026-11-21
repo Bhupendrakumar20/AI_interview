@@ -1,6 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { streamText } from "ai";
 import { groq } from "@ai-sdk/groq";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { getCurrentUser } from "@/lib/actions/auth.action";
+import {
+  acquireMockTestQuestionLoad,
+  ActiveInterviewModeError,
+  ActiveInterviewRoundError,
+  releaseMockTestQuestionLoad,
+} from "@/lib/modules/interview-session.service";
 import { DIFFICULTY_LEVELS } from "@/lib/mock-test-constants";
 import { getCachedData, setCachedData, generateCacheKey } from "@/lib/cache-helpers";
 import { FALLBACK_MOCK_TEST_QUESTIONS } from "@/lib/fallback-data";
@@ -212,10 +220,15 @@ export async function POST(req) {
     difficulty = "Medium",
     questionType = "Technical",
     count = 5,
-    userId = "anonymous",
+    userId: requestUserId = "anonymous",
+    roundId,
     responseType,
     question,
   } = body;
+  let userId = requestUserId;
+  let questionLoadUserId = null;
+  let questionLoadRequestId = null;
+  let questionLoadReleasePromise = null;
 
   if (responseType && !["answer", "tips"].includes(responseType)) {
     return Response.json({ error: "Unsupported response type" }, { status: 400 });
@@ -224,6 +237,57 @@ export async function POST(req) {
   if (responseType && (typeof question !== "string" || !question.trim())) {
     return Response.json({ error: "A question is required" }, { status: 400 });
   }
+
+  if (!responseType && roundId) {
+    let currentUser;
+    try {
+      currentUser = await getCurrentUser();
+    } catch (error) {
+      console.error("Could not authenticate mock-test question request:", error);
+      return Response.json({ error: "Could not verify the current user" }, { status: 500 });
+    }
+
+    if (currentUser?.id && currentUser.id !== "dummy-user-id") {
+      questionLoadUserId = currentUser.id;
+      userId = currentUser.id;
+      questionLoadRequestId = randomUUID();
+      try {
+        await acquireMockTestQuestionLoad({
+          userId: questionLoadUserId,
+          roundId,
+          requestId: questionLoadRequestId,
+        });
+      } catch (error) {
+        if (
+          error instanceof ActiveInterviewModeError ||
+          error instanceof ActiveInterviewRoundError
+        ) {
+          return Response.json(
+            { error: error.message, activeMode: error.activeMode, activeRound: error.activeRound },
+            { status: 409 }
+          );
+        }
+        console.error("Could not reserve mock-test question loading:", error);
+        return Response.json(
+          { error: error.message || "Could not reserve mock-test question loading" },
+          { status: 500 }
+        );
+      }
+    }
+  }
+
+  const releaseQuestionLoad = () => {
+    if (!questionLoadUserId || !questionLoadRequestId) return Promise.resolve();
+    if (!questionLoadReleasePromise) {
+      questionLoadReleasePromise = releaseMockTestQuestionLoad({
+        userId: questionLoadUserId,
+        requestId: questionLoadRequestId,
+      }).catch((error) => {
+        console.error("Could not release mock-test question loading:", error);
+      });
+    }
+    return questionLoadReleasePromise;
+  };
 
   const cacheKey = generateCacheKey("mocktest-list-v2", { company, role, difficulty, questionType, count });
   const cached = getCachedData(cacheKey);
@@ -243,7 +307,8 @@ export async function POST(req) {
     }
   };
 
-  const safeClose = (controller) => {
+  const safeClose = async (controller) => {
+    await releaseQuestionLoad();
     if (streamClosed) return;
     streamClosed = true;
     try {
@@ -333,7 +398,7 @@ Return only the tips, with one tip per line. Do not use numbering, bullets, mark
             value,
           }) + "\n"));
           safeEnqueue(controller, encoder.encode(JSON.stringify({ type: "done" }) + "\n"));
-          safeClose(controller);
+          await safeClose(controller);
           return;
         }
 
@@ -356,7 +421,7 @@ Return only the tips, with one tip per line. Do not use numbering, bullets, mark
             }) + "\n"));
           });
           safeEnqueue(controller, encoder.encode(JSON.stringify({ type: "done" }) + "\n"));
-          safeClose(controller);
+          await safeClose(controller);
           return;
         }
 
@@ -451,7 +516,7 @@ Return only the tips, with one tip per line. Do not use numbering, bullets, mark
 
         setCachedData(cacheKey, questions);
         safeEnqueue(controller, encoder.encode(JSON.stringify({ type: "done" }) + "\n"));
-        safeClose(controller);
+        await safeClose(controller);
       } catch (error) {
         console.error("Stream error:", error);
         if (streamClosed) return;
@@ -459,11 +524,14 @@ Return only the tips, with one tip per line. Do not use numbering, bullets, mark
           controller,
           encoder.encode(JSON.stringify({ error: error.message || "Generation failed" }) + "\n")
         );
-        safeClose(controller);
+        await safeClose(controller);
+      } finally {
+        await releaseQuestionLoad();
       }
     },
-    cancel() {
+    async cancel() {
       streamClosed = true;
+      await releaseQuestionLoad();
     },
   });
 

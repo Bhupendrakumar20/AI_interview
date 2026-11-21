@@ -1,4 +1,5 @@
 import InterviewBuddy from "@/components/InterviewBuddy";
+import ActiveInterviewSessions from "@/components/ActiveInterviewSessions";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 
 export const metadata = {
@@ -11,6 +12,7 @@ async function InterviewBuddyPage() {
 
   return (
     <div>
+      <ActiveInterviewSessions />
       <InterviewBuddy userId={user?.id} />
     </div>
   );

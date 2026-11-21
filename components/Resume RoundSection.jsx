@@ -2,6 +2,11 @@
 
 import React, { useState, useRef } from "react";
 import { FileText, Briefcase, User, Clock, CheckCircle, Upload, Shield, AlertTriangle, ArrowRight, Loader2, Sparkles, RefreshCw, Users, Rocket, Zap } from "lucide-react";
+import {
+  finishInterviewModeSessionAction,
+  startInterviewModeSessionAction,
+} from "@/lib/actions/interview-session.action";
+import { toast } from "sonner";
 
 async function getApiErrorMessage(response, fallback) {
   let payload;
@@ -55,6 +60,7 @@ export default function ResumeRoundSection() {
   const [targetQuestionCount, setTargetQuestionCount] = useState(0);
 
   const fileInputRef = useRef(null);
+  const resumeSessionIdRef = useRef(null);
 
   const focusOptions = ["Projects", "Experience", "Skills", "Gaps", "Leadership", "Metrics"];
   
@@ -264,6 +270,24 @@ export default function ResumeRoundSection() {
     setProcessingStage("parsing");
 
     try {
+      const sessionResponse = await startInterviewModeSessionAction({
+        mode: "resume-round",
+        details: {
+          focusArea: selectedFocus,
+          persona: selectedPersona,
+          duration: Number(selectedDuration),
+        },
+      });
+      if (!sessionResponse.success) {
+        if (sessionResponse.activeMode) {
+          toast.warning(sessionResponse.error || "End the active interview session before starting Resume Round.");
+        } else {
+          toast.error(sessionResponse.error || "Could not start Resume Round.");
+        }
+        return;
+      }
+      resumeSessionIdRef.current = sessionResponse.sessionId;
+
       const uploadFormData = new FormData();
       uploadFormData.append("resume", file);
 
@@ -298,6 +322,18 @@ export default function ResumeRoundSection() {
     } catch (err) {
       console.error(err);
       alert(err.message || "An error occurred during resume processing.");
+      if (resumeSessionIdRef.current) {
+        const sessionId = resumeSessionIdRef.current;
+        const result = await finishInterviewModeSessionAction({
+          sessionId,
+          status: "abandoned",
+        });
+        if (!result.success) {
+          toast.error(result.error || "Could not release the Resume Round session.");
+        } else {
+          resumeSessionIdRef.current = null;
+        }
+      }
     } finally {
       setIsProcessing(false);
       setIsGeneratingQuestions(false);
@@ -305,7 +341,7 @@ export default function ResumeRoundSection() {
     }
   };
 
-  const generateFinalReport = async () => {
+  const generateFinalReport = async (finalAnswers = answers) => {
     if (!atsResult) return;
 
     setCurrentStep("report");
@@ -336,6 +372,32 @@ export default function ResumeRoundSection() {
     } catch (err) {
       console.error(err);
       alert(err.message || "Unable to generate the final resume report.");
+    } finally {
+      if (resumeSessionIdRef.current) {
+        const sessionId = resumeSessionIdRef.current;
+        const result = await finishInterviewModeSessionAction({
+          sessionId,
+          result: {
+            focusArea: selectedFocus,
+            persona: selectedPersona,
+            answers: finalAnswers,
+            atsResult: atsResult
+              ? {
+                  final_score: atsResult.final_score ?? null,
+                  skills_score: atsResult.skills_score ?? null,
+                  experience_score: atsResult.experience_score ?? null,
+                  projects_score: atsResult.projects_score ?? null,
+                  education_score: atsResult.education_score ?? null,
+                }
+              : null,
+          },
+        });
+        if (!result.success) {
+          toast.error(result.error || "Resume report is ready, but the session could not be released.");
+        } else {
+          resumeSessionIdRef.current = null;
+        }
+      }
     }
   };
 
@@ -370,7 +432,7 @@ export default function ResumeRoundSection() {
       return;
     }
 
-    await generateFinalReport();
+    await generateFinalReport(newAnswers);
   };
 
   const resetAll = () => {

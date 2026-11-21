@@ -1,7 +1,8 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useExitConfirmation } from "@/lib/hooks/useExitConfirmation";
+import { finishInterviewModeSessionAction } from "@/lib/actions/interview-session.action";
 import { Briefcase, Users, Rocket, Award, FolderOpen, AlertCircle, FileText, Brain, Radio, BarChart3, Code, Video, FileJson, Film, Trophy, Cpu, Eye } from "lucide-react";
 import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
@@ -54,6 +55,7 @@ const InterviewBuddy = ({ userId }) => {
   const [isSessionOwner, setIsSessionOwner] = useState(false); // 🔥 NEW: Track if user created or joined
   const [showResults, setShowResults] = useState(false);
   const [sessionResults, setSessionResults] = useState(null);
+  const [sessionResultsSaved, setSessionResultsSaved] = useState(false);
   const [dsaRoomActive, setDsaRoomActive] = useState(false);
   const [modalTab, setModalTab] = useState("create"); // "create" or "join"
   const [joinCode, setJoinCode] = useState("");
@@ -73,24 +75,27 @@ const InterviewBuddy = ({ userId }) => {
 
   useExitConfirmation(isInterviewActive || (isLoading && currentMode === "ai"));
 
-  // Fetch user stats on component mount
-  useEffect(() => {
-    if (userId) {
-      fetchStats();
-    }
-  }, [userId]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await fetch(`/api/interview-buddy/stats?userId=${userId}`);
-      if (!response.ok) throw new Error("Failed to fetch stats");
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Stats request failed (${response.status})`);
+      }
       setStats(data);
     } catch (error) {
       console.error("Error fetching stats:", error);
       // Show fallback stats
     }
-  };
+  }, [userId]);
+
+  // Fetch user stats on component mount
+  useEffect(() => {
+    if (!userId) return undefined;
+    fetchStats();
+    const intervalId = setInterval(fetchStats, 10000);
+    return () => clearInterval(intervalId);
+  }, [fetchStats, userId]);
 
   const handleCreateSession = async () => {
     if (!userId) {
@@ -115,10 +120,22 @@ const InterviewBuddy = ({ userId }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to create session");
+        const message = errorData.error || "Failed to create session";
+        if (response.status === 409) {
+          toast.warning(message);
+          return;
+        }
+        toast.error(message);
+        return;
       }
       const data = await response.json();
 
+      console.info("[Interview session]", {
+        page: "/interview/buddy",
+        user_id: userId,
+        thread_id: data.sessionId,
+        mode: currentMode === "ai" ? "ai-buddy-mode" : "human-buddy",
+      });
 
       setActiveSessionId(data.sessionId);
       setSessionCode(data.sessionCode);
@@ -136,7 +153,7 @@ const InterviewBuddy = ({ userId }) => {
         window.location.href = `/interview/buddy/${data.sessionCode}`;
       }
     } catch (error) {
-      console.error("Error creating session:", error);
+      console.error("Unexpected error creating session:", error);
       toast.error(error.message || "Failed to create session");
     } finally {
       setIsLoading(false);
@@ -359,13 +376,17 @@ const InterviewBuddy = ({ userId }) => {
   };
 
   const handleSessionEnd = async (results) => {
+    setSessionResultsSaved(false);
     try {
       // Save session results to Firebase
       if (activeSessionId) {
         // Priority: AI feedback score > manual score > 0
-        const scoreToSave = results.feedback?.totalScore !== undefined 
-          ? results.feedback.totalScore
-          : (results.score || 0);
+        const scoreCandidate = typeof results.overallScore === "number"
+          ? results.overallScore
+          : results.feedback?.totalScore !== undefined
+            ? results.feedback.totalScore
+            : (results.score || 0);
+        const scoreToSave = Number.isFinite(scoreCandidate) ? scoreCandidate : 0;
 
         console.log('[InterviewBuddy] Saving session results:', {
           sessionId: activeSessionId,
@@ -375,26 +396,36 @@ const InterviewBuddy = ({ userId }) => {
           resultsScore: results.score,
         });
 
-        // Clean the feedback object before sending (only keep serializable fields)
-        const cleanedFeedback = results.feedback ? {
-          totalScore: results.feedback.totalScore,
-          categoryScores: results.feedback.categoryScores,
-          strengths: results.feedback.strengths,
-          areasForImprovement: results.feedback.areasForImprovement,
-          finalAssessment: results.feedback.finalAssessment,
-        } : null;
+        const report = {
+          totalQuestions: results.totalQuestions || 0,
+          answeredQuestions: results.answeredQuestions || results.performanceHistory?.length || 0,
+          avgByTopic: results.avgByTopic || {},
+          topWeakAreas: results.topWeakAreas || [],
+          scoreProgression: results.scoreProgression || [],
+          performanceHistory: results.performanceHistory || [],
+          overallScore: scoreToSave,
+          timestamp: results.timestamp || new Date().toISOString(),
+        };
+        const feedback = {
+          summary: scoreToSave >= 60 ? "Good Job!" : "Keep Practicing",
+          totalScore: scoreToSave,
+          avgByTopic: report.avgByTopic,
+          topWeakAreas: report.topWeakAreas,
+        };
 
         const requestBody = {
           status: "completed",
           score: scoreToSave,
-          feedback: cleanedFeedback,
+          feedback,
+          report,
           transcriptUrl: null,
         };
 
         console.log('[InterviewBuddy] Request payload ready:', {
           status: requestBody.status,
           score: requestBody.score,
-          feedbackKeys: cleanedFeedback ? Object.keys(cleanedFeedback) : null,
+          feedbackKeys: Object.keys(feedback),
+          answeredQuestions: report.answeredQuestions,
         });
 
         const response = await fetch(
@@ -418,6 +449,7 @@ const InterviewBuddy = ({ userId }) => {
           toast.warning("Session completed but results may not be saved. Try refreshing.");
         } else {
           const savedData = await response.json();
+          setSessionResultsSaved(true);
           console.log("✅ Session results saved to Firebase:", {
             score: savedData.score,
             status: savedData.status,
@@ -436,25 +468,77 @@ const InterviewBuddy = ({ userId }) => {
       console.error("   Stack:", error.stack);
       // Still show results even if save fails
       setSessionResults(results);
+      setSessionResultsSaved(false);
       setShowResults(true);
       setIsInterviewActive(false);
       toast.error("Error saving session: " + error.message);
     }
   };
 
-  const handleCloseResults = () => {
-    setShowResults(false);
-    setSessionResults(null);
-    setActiveSessionId(null);
-    fetchStats(); // Refresh stats after closing results
+  const handleAbandonSession = async () => {
+    if (!activeSessionId) {
+      setIsInterviewActive(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/interview-buddy/sessions/${activeSessionId}/update`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "abandoned" }),
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to end interview");
+      }
+
+      setIsInterviewActive(false);
+      setActiveSessionId(null);
+      await fetchStats();
+    } catch (error) {
+      console.error("Error ending AI Buddy session:", error);
+      toast.error(error.message || "Failed to end interview");
+    }
   };
 
-  const handleRetryInterview = () => {
+  const handleRemoteSessionClose = useCallback((session) => {
+    setIsInterviewActive(false);
+    setActiveSessionId(null);
+    toast.info(
+      session.status === "completed"
+        ? "This interview ended on another device. Its result is saved in past reports."
+        : "This interview was ended from another device."
+    );
+    fetchStats();
+  }, [fetchStats]);
+
+  const handleCloseResults = async () => {
+    if (activeSessionId && sessionResults && !sessionResultsSaved) {
+      const savedSession = await finishInterviewModeSessionAction({
+        sessionId: activeSessionId,
+        result: sessionResults,
+      });
+      if (!savedSession.success) {
+        toast.error(savedSession.error || "Failed to save interview results");
+        return false;
+      }
+    }
+
     setShowResults(false);
     setSessionResults(null);
+    setSessionResultsSaved(false);
     setActiveSessionId(null);
-    // Optionally auto-start another session
-    handleCreateSession();
+    fetchStats(); // Refresh stats after closing results
+    return true;
+  };
+
+  const handleRetryInterview = async () => {
+    const closed = await handleCloseResults();
+    if (closed === false) return;
+    await handleCreateSession();
   };
 
   return (
@@ -487,10 +571,8 @@ const InterviewBuddy = ({ userId }) => {
           difficulty={selectedDifficulty}
           duration={sessionDuration}
           onSessionEnd={handleSessionEnd}
-          onClose={() => {
-            setIsInterviewActive(false);
-            setActiveSessionId(null);
-          }}
+          onSessionClosed={handleRemoteSessionClose}
+          onClose={handleAbandonSession}
         />
       ) : (
         <div className="min-h-screen bg-slate-950 text-slate-100">

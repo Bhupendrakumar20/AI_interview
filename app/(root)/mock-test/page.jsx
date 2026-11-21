@@ -9,7 +9,12 @@ import {
   DIFFICULTY_LEVELS,
 } from "@/lib/mock-test-constants";
 import QuestionCard from "@/components/QuestionCard";
+import ActiveInterviewSessions from "@/components/ActiveInterviewSessions";
 import MockTestWorkspace from "@/components/MockTestWorkspace";
+import {
+  finishInterviewModeSessionAction,
+  startInterviewModeSessionAction,
+} from "@/lib/actions/interview-session.action";
 import { useExitConfirmation } from "@/lib/hooks/useExitConfirmation";
 import { toast } from "sonner";
 import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Star } from "lucide-react";
@@ -47,6 +52,9 @@ export default function MockTestPage() {
   const [searchRole, setSearchRole] = useState(filters.role);
   const [selectedTestType, setSelectedTestType] = useState(TEST_TYPES[0]);
   const [isTestActive, setIsTestActive] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [recentResults, setRecentResults] = useState([]);
+  const [isStartingTest, setIsStartingTest] = useState(false);
 
   useExitConfirmation(loading || isTestActive);
 
@@ -61,7 +69,27 @@ export default function MockTestPage() {
     abortControllerRef.current?.abort();
   }, []);
 
-  const loadQuestions = useCallback(async (activeFilters) => {
+  const refreshResults = useCallback(async () => {
+    try {
+      const response = await fetch(
+        "/api/interview-sessions?mode=mock-test&limit=10",
+        { cache: "no-store" }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to fetch mock test results");
+      setRecentResults(data.sessions.filter((session) => session.status !== "active"));
+    } catch (error) {
+      console.error("Failed to refresh mock test results:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshResults();
+    const intervalId = setInterval(refreshResults, 10000);
+    return () => clearInterval(intervalId);
+  }, [refreshResults]);
+
+  const loadQuestions = useCallback(async (activeFilters, activeRound) => {
     // Cancel any in-flight request before starting a new one
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -83,13 +111,21 @@ export default function MockTestPage() {
           difficulty: activeFilters.difficulty,
           questionType: activeFilters.type,
           count: activeFilters.count,
+          roundId: activeRound.id,
+          roundName: activeRound.name,
         }),
         signal: controller.signal,
       });
 
-      if (!res.ok || !res.body) {
-        throw new Error("Failed to start question stream");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+          toast.warning(errorData.error || "Another interview round is currently active or loading.");
+          return;
+        }
+        throw new Error(errorData.error || "Failed to start question stream");
       }
+      if (!res.body) throw new Error("Question stream returned no response body");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -167,12 +203,12 @@ export default function MockTestPage() {
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
-      loadQuestions(filters);
+      loadQuestions(filters, selectedTestType);
     }, 500);
 
     return () => clearTimeout(debounceTimerRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, selectedTestType]);
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
@@ -190,7 +226,7 @@ export default function MockTestPage() {
     handleFilterChange("role", value);
   };
 
-  const handleStartTest = () => {
+  const handleStartTest = async () => {
     if (questions.length === 0) {
       toast.error("No questions loaded");
       return;
@@ -199,7 +235,59 @@ export default function MockTestPage() {
       toast.error("Please wait for the questions to finish generating");
       return;
     }
-    setIsTestActive(true);
+
+    setIsStartingTest(true);
+    try {
+      const response = await startInterviewModeSessionAction({
+        mode: "mock-test",
+        details: {
+          company: filters.company,
+          role: filters.role,
+          difficulty: filters.difficulty,
+          type: selectedTestType.name,
+          roundId: selectedTestType.id,
+          roundName: selectedTestType.name,
+        },
+      });
+      if (!response.success) {
+        if (response.activeRound) {
+          toast.warning(response.error);
+        } else {
+          toast.error(response.error || "Could not start mock test");
+        }
+        return;
+      }
+      console.info("[Interview session]", {
+        page: "/mock-test",
+        user_id: response.userId,
+        thread_id: response.sessionId,
+        mode: "mock-test",
+      });
+      setActiveSessionId(response.sessionId);
+      setIsTestActive(true);
+    } catch (error) {
+      console.error("Error starting mock test:", error);
+      toast.error(error.message || "Could not start mock test");
+    } finally {
+      setIsStartingTest(false);
+    }
+  };
+
+  const handleCloseTest = async (result = {}) => {
+    if (activeSessionId) {
+      const response = await finishInterviewModeSessionAction({
+        sessionId: activeSessionId,
+        status: "abandoned",
+        result: { ...result, company: filters.company, role: filters.role },
+      });
+      if (!response.success) {
+        toast.error(response.error || "Could not close mock test");
+        return;
+      }
+    }
+    setIsTestActive(false);
+    setActiveSessionId(null);
+    await refreshResults();
   };
 
   const getDifficultyBadge = (diff) => {
@@ -216,13 +304,18 @@ export default function MockTestPage() {
       <MockTestWorkspace
         filters={{ ...filters, type: selectedTestType.name }}
         questions={questions}
-        onClose={() => setIsTestActive(false)}
+        sessionId={activeSessionId}
+        onClose={handleCloseTest}
+        onSessionComplete={refreshResults}
       />
     );
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <div className="max-w-7xl mx-auto px-8 pt-6">
+        <ActiveInterviewSessions />
+      </div>
       {/* HERO SECTION */}
       <section className="relative pt-12 pb-8 px-8 border-b border-border">
         <div className="max-w-7xl mx-auto">
@@ -249,11 +342,15 @@ export default function MockTestPage() {
                 <div className="flex flex-wrap gap-4">
                   <Button
                     onClick={handleStartTest}
+                    disabled={isStartingTest}
                     className="btn-primary flex items-center gap-2 px-6 py-2.5"
                   >
-                    <Play size={16} /> Quick Start Test
+                    <Play size={16} /> {isStartingTest ? "Starting..." : "Quick Start Test"}
                   </Button>
-                  <Button className="btn-secondary flex items-center gap-2 px-6 py-2.5">
+                  <Button
+                    className="btn-secondary flex items-center gap-2 px-6 py-2.5"
+                    onClick={() => document.getElementById("mock-test-results")?.scrollIntoView({ behavior: "smooth" })}
+                  >
                     View Results
                   </Button>
                 </div>
@@ -275,6 +372,42 @@ export default function MockTestPage() {
         </div>
       </section>
 
+      <section id="mock-test-results" className="max-w-7xl mx-auto px-8 pt-8">
+        <h2 className="text-xl font-bold mb-4">Recent Mock Test Results</h2>
+        {recentResults.length ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            {recentResults.map((session) => (
+              <article key={session.id} className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold">
+                      {session.details?.company || session.result?.company || "Mock Test"} ·{" "}
+                      {session.details?.role || session.result?.role || "Interview"}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {session.status === "completed" ? "Completed" : "Ended early"} ·{" "}
+                      {session.completedAt ? new Date(session.completedAt).toLocaleString() : ""}
+                    </p>
+                  </div>
+                  {typeof session.result?.evaluation?.score === "number" && (
+                    <span className="text-lg font-bold text-primary">
+                      {session.result.evaluation.score}/100
+                    </span>
+                  )}
+                </div>
+                {session.result?.evaluation?.detailedReview && (
+                  <p className="mt-3 text-sm text-muted-foreground line-clamp-3">
+                    {session.result.evaluation.detailedReview}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Completed tests will appear here on all your signed-in devices.</p>
+        )}
+      </section>
+
       {/* MAIN CONTENT */}
       <section className="max-w-7xl mx-auto px-8 py-12">
         {/* TEST TYPE SELECTION */}
@@ -287,6 +420,11 @@ export default function MockTestPage() {
               <div
                 key={type.id}
                 onClick={() => {
+                  if (type.id === selectedTestType.id) return;
+                  if (loading) {
+                    toast.warning(`Questions for ${selectedTestType.name} are still loading.`);
+                    return;
+                  }
                   setSelectedTestType(type);
                   const typeMapping = {
                     technical: "Technical",

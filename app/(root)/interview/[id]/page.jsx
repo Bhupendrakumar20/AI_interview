@@ -15,7 +15,7 @@ export default async function InterviewDetails({ params }) {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
 
-  const interview = await getInterviewById(id);
+  const interview = await getInterviewById(id, user.id);
   if (!interview) redirect("/");
 
   const feedback = await getFeedbackByInterviewId({

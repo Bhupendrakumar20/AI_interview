@@ -3,18 +3,23 @@
  * Get user's interview buddy statistics
  */
 import { NextResponse } from "next/server";
-import * as admin from "firebase-admin";
 import { db } from "@/firebase/admin";
+import { getCurrentUser } from "@/lib/actions/auth.action";
 
 export async function GET(request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.id === "dummy-user-id") {
+      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
 
-    if (!userId) {
+    if (!userId || userId !== currentUser.id) {
       return NextResponse.json(
-        { error: "User ID is required" },
-        { status: 400 }
+        { error: userId ? "User ID mismatch" : "User ID is required" },
+        { status: userId ? 403 : 400 }
       );
     }
 

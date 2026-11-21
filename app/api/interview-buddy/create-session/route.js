@@ -9,6 +9,10 @@ import { generateSecureSessionCode } from "@/lib/security/token-generator";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { getClientIp } from "@/lib/security/endpoint-security";
 import { logAuditEvent } from "@/lib/security/audit-logging";
+import {
+  finishInterviewModeSession,
+  startInterviewModeSession,
+} from "@/lib/modules/interview-session.service";
 
 /**
  * Note: UUID v4 tokens are cryptographically unique with negligible collision probability.
@@ -17,10 +21,13 @@ import { logAuditEvent } from "@/lib/security/audit-logging";
  */
 
 export async function POST(request) {
+  let currentUser = null;
+  let modeSessionStarted = false;
+  let modeSessionId = null;
   try {
     // ✅ FIX #1.4: Verify user authentication before processing
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
+    currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.id === "dummy-user-id") {
       return NextResponse.json(
         { error: "User not authenticated" },
         { status: 401 }
@@ -71,6 +78,25 @@ export async function POST(request) {
     // ✅ FIX #1: Generate cryptographically secure session code (128-bit entropy)
     const sessionCode = mode === "human" ? generateSecureSessionCode() : null;
 
+    const sessionRef = db
+      .collection("users")
+      .doc(userId)
+      .collection("interview_buddy_sessions")
+      .doc();
+    const sessionId = sessionRef.id;
+
+    if (mode === "ai") {
+      modeSessionId = sessionId;
+      await startInterviewModeSession({
+        userId,
+        mode: "ai-buddy-mode",
+        sessionId: modeSessionId,
+        resourceId: sessionRef.path,
+        details: { persona, topics, difficulty, duration },
+      });
+      modeSessionStarted = true;
+    }
+
     const sessionDocData = {
       createdBy: userId,
       mode,
@@ -81,9 +107,10 @@ export async function POST(request) {
       jobDescription,
       sessionCode,
       status: "created",
-      startTime: new Date(),
+      startTime: mode === "ai" ? new Date() : null,
       endTime: null,
       participants: [userId],
+      modeSessionId,
       score: null,
       feedback: null,
       recordingUrl: null,
@@ -92,18 +119,16 @@ export async function POST(request) {
       updatedAt: new Date(),
     };
 
-    const sessionRef = await db.collection("interview_buddy_sessions").add(sessionDocData);
+    await sessionRef.set(sessionDocData);
 
-    // Also persist under user profile in Firebase: users/{userId}/interview_buddy_sessions/{sessionId}
+    // Also persist under shared collection in Firebase for invite links and backwards compatibility
     try {
       await db
-        .collection("users")
-        .doc(userId)
         .collection("interview_buddy_sessions")
-        .doc(sessionRef.id)
+        .doc(sessionId)
         .set(sessionDocData);
-    } catch (userSubErr) {
-      console.warn("Could not save to user profile subcollection:", userSubErr.message);
+    } catch (sharedErr) {
+      console.warn("Could not save to shared collection:", sharedErr.message);
     }
 
     // 🔗 Generate invite link for sharing
@@ -131,17 +156,31 @@ export async function POST(request) {
       { status: 201 }
     );
   } catch (error) {
+    if (modeSessionStarted && currentUser?.id && modeSessionId) {
+      try {
+        await finishInterviewModeSession({
+          userId: currentUser.id,
+          sessionId: modeSessionId,
+          status: "abandoned",
+        });
+      } catch (cleanupError) {
+        console.error("Failed to release AI Buddy session after creation failure:", cleanupError);
+      }
+    }
     await logAuditEvent({
       userId: currentUser?.uid || "unknown",
       eventType: "interview_session_creation_failed",
-      severity: "error",
+      severity: error.name === "ActiveInterviewModeError" ? "warning" : "error",
       description: `Failed to create interview session: ${error.message}`,
       ip: getClientIp(request),
     });
 
     return NextResponse.json(
-      { error: error.message || "Failed to create session" },
-      { status: 500 }
+      {
+        error: error.message || "Failed to create session",
+        activeMode: error.activeMode,
+      },
+      { status: error.name === "ActiveInterviewModeError" ? 409 : 500 }
     );
   }
 }

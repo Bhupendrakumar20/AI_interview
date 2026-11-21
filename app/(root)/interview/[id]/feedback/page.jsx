@@ -36,7 +36,7 @@ export default async function Feedback({ params }) {
   const { id } = await params;
   const user = await getCurrentUser();
 
-  const interview = await getInterviewById(id);
+  const interview = await getInterviewById(id, user?.id);
   if (!interview) redirect("/");
 
   const feedback = await getFeedbackByInterviewId({

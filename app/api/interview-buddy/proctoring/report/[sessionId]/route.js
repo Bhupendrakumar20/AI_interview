@@ -16,7 +16,7 @@ export async function GET(request, { params }) {
   try {
     // ✅ Verify user authentication
     const currentUser = await getCurrentUser();
-    if (!currentUser) {
+    if (!currentUser || currentUser.id === "dummy-user-id") {
       return NextResponse.json(
         { error: "User not authenticated" },
         { status: 401 }
@@ -34,7 +34,15 @@ export async function GET(request, { params }) {
     }
 
     // ✅ Verify user is session creator or admin
-    const sessionRef = db.collection("interview_buddy_sessions").doc(sessionId);
+    const userSessionRef = db
+      .collection("users")
+      .doc(currentUser.id)
+      .collection("interview_buddy_sessions")
+      .doc(sessionId);
+    const userSessionDoc = await userSessionRef.get();
+    const sessionRef = userSessionDoc.exists
+      ? userSessionRef
+      : db.collection("interview_buddy_sessions").doc(sessionId);
     const sessionDoc = await sessionRef.get();
 
     if (!sessionDoc.exists) {

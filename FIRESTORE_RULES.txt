@@ -32,7 +32,7 @@ service cloud.firestore {
       match /interview_buddy_sessions/{sessionId} {
         allow create: if isUser(userId) && request.resource.data.mode in ['human', 'ai'] && request.resource.data.status == 'created';
         allow read: if isUser(userId) || (isAuth() && request.auth.uid in resource.data.participants) || isAdmin();
-        allow update: if isUser(userId) && (request.resource.data.status in ['in-progress', 'completed', 'paused'] || request.resource.data == resource.data);
+        allow update: if isUser(userId) && (request.resource.data.status in ['in-progress', 'completed', 'paused', 'abandoned'] || request.resource.data == resource.data);
         allow delete: if isUser(userId);
 
         // Nested Proctoring Validations
@@ -53,6 +53,17 @@ service cloud.firestore {
       match /interviews/{interviewId} {
         allow read: if isUser(userId) || isAdmin();
         allow create, update, delete: if isUser(userId) || isAdmin();
+      }
+
+      // Session threads/results are written by trusted server actions.
+      match /interview_sessions/{sessionId} {
+        allow read: if isUser(userId) || isAdmin();
+        allow write: if false;
+      }
+
+      match /interview_control/{controlId} {
+        allow read: if isUser(userId) || isAdmin();
+        allow write: if false;
       }
       
       // ✅ 4. Applications (Subcollection)

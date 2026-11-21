@@ -7,11 +7,13 @@ import { startAdaptiveSession, submitAdaptiveAnswer, endAdaptiveSessionEarly } f
 import CodeEditorPanel from '@/components/CodeEditorPanel';
 
 const AiBuddyInterviewSession = ({
+  sessionId,
   interviewId,
   persona = 'Hiring Manager',
   selectedTopics = [],
   duration = 30,
   onSessionEnd,
+  onSessionClosed,
   onClose,
 }) => {
   const [adaptiveSessionId, setAdaptiveSessionId] = useState(null);
@@ -33,6 +35,7 @@ const AiBuddyInterviewSession = ({
 
   const performanceHistoryRef = useRef([]);
   const hasInitialized = useRef(false); // blocks React StrictMode's duplicate mount-time effect run
+  const hasHandledSessionClose = useRef(false);
   const isMountedRef = useRef(false);
   const speechTimeoutRef = useRef(null);
 
@@ -83,6 +86,41 @@ const AiBuddyInterviewSession = ({
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    let active = true;
+
+    const checkSessionStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/interview-sessions?sessionId=${encodeURIComponent(sessionId)}`,
+          { cache: 'no-store' }
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch session status');
+        if (!active) return;
+
+        if (
+          data.session &&
+          data.session.status !== "active" &&
+          !hasHandledSessionClose.current
+        ) {
+          hasHandledSessionClose.current = true;
+          onSessionClosed?.(data.session);
+        }
+      } catch (error) {
+        if (active) console.error('Failed to check AI Buddy session status:', error);
+      }
+    };
+
+    checkSessionStatus();
+    const intervalId = setInterval(checkSessionStatus, 10000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [sessionId, onSessionClosed]);
 
   useEffect(() => {
     setAnswerMode(isDSAQuestion ? 'code' : 'text');
@@ -296,24 +334,22 @@ const AiBuddyInterviewSession = ({
       onSessionEnd?.(buildResultsFromReport(result.report));
     } catch (err) {
       console.error('[Adaptive Interview] Early end failed:', err);
-      const fallbackReport = {
-        score_progression: performanceHistoryRef.current.map(p => p.score),
-        performance_history: performanceHistoryRef.current,
-        avg_by_topic: {},
-        top_weak_areas: [],
-      };
-      onSessionEnd?.(buildResultsFromReport(fallbackReport));
+      onSessionEnd?.({
+        totalQuestions: maxQuestions,
+        answeredQuestions: performanceHistoryRef.current.length,
+        performanceHistory: performanceHistoryRef.current,
+      });
     }
   };
 
   const buildResultsFromReport = (report) => {
-    const perfHistory = (report?.performance_history && report.performance_history.length > 0)
+    const perfHistory = (Array.isArray(report?.performance_history) && report.performance_history.length > 0)
       ? report.performance_history
       : performanceHistoryRef.current;
 
-    const progression = (report?.score_progression && report.score_progression.length > 0)
+    const progression = (Array.isArray(report?.score_progression) && report.score_progression.length > 0)
       ? report.score_progression
-      : perfHistory.map(p => p.score);
+      : perfHistory.map(p => (typeof p.score === "number" ? p.score : 0));
 
     const overallScore = progression.length > 0
       ? Math.round((progression.reduce((a, b) => a + b, 0) / progression.length) * 10)
@@ -326,7 +362,7 @@ const AiBuddyInterviewSession = ({
       perfHistory.forEach(item => {
         const top = item.topic || 'General';
         topicBuckets[top] = topicBuckets[top] || [];
-        topicBuckets[top].push(item.score);
+        topicBuckets[top].push(typeof item.score === "number" ? item.score : 0);
       });
       Object.entries(topicBuckets).forEach(([top, scores]) => {
         avgByTopic[top] = Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1));

@@ -18,6 +18,7 @@ import {
 import { useExitConfirmation } from "@/lib/hooks/useExitConfirmation";
 import { toast } from "sonner";
 import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Star } from "lucide-react";
+import { DotsGridWave } from "@/components/ui/LoadingAnimations";
 
 const TEST_TYPES = [
   { id: "technical", name: "Technical Round", icon: Laptop, desc: "Core technical concepts", color: "from-purple-500 to-indigo-600" },
@@ -645,7 +646,7 @@ export default function MockTestPage() {
 
           {loading && questions.length === 0 ? (
             <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+              <DotsGridWave size="md" color="indigo" label="Synthesizing interview questions..." />
             </div>
           ) : questions.length === 0 ? (
             <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">

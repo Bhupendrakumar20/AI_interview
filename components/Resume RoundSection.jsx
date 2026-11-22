@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { FileText, Briefcase, User, Clock, CheckCircle, Upload, Shield, AlertTriangle, ArrowRight, Loader2, Sparkles, RefreshCw, Users, Rocket, Zap } from "lucide-react";
+import FileUploadDropzone from "@/components/ui/FileUploadDropzone";
 import {
   finishInterviewModeSessionAction,
   startInterviewModeSessionAction,
@@ -36,6 +37,8 @@ export default function ResumeRoundSection() {
   const [selectedDuration, setSelectedDuration] = useState("30");
   
   const [file, setFile] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const [lastAction, setLastAction] = useState(null); // "ats" | "round"
   const [jobDescription, setJobDescription] = useState("");
   
   // Loading & Flow states
@@ -59,7 +62,6 @@ export default function ResumeRoundSection() {
   const [answers, setAnswers] = useState([]);
   const [targetQuestionCount, setTargetQuestionCount] = useState(0);
 
-  const fileInputRef = useRef(null);
   const resumeSessionIdRef = useRef(null);
 
   const focusOptions = ["Projects", "Experience", "Skills", "Gaps", "Leadership", "Metrics"];
@@ -92,17 +94,6 @@ export default function ResumeRoundSection() {
   ];
 
   const durationOptions = ["15", "30", "45", "60"];
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-    }
-  };
-
-  const triggerFileSelect = () => {
-    fileInputRef.current?.click();
-  };
 
   const streamFeedback = async (response) => {
     if (!response.ok || !response.body) {
@@ -138,30 +129,29 @@ export default function ResumeRoundSection() {
     }
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile) {
-      setFile(droppedFile);
+  const handleRetryAction = () => {
+    setUploadError(null);
+    if (lastAction === "round") {
+      startResumeRound();
+    } else {
+      checkAtsScoreDirectly();
     }
   };
 
   const checkAtsScoreDirectly = async () => {
     if (!file) {
-      alert("Please upload a resume first.");
+      toast.error("Please upload a resume first.");
       return;
     }
     if (!jobDescription.trim()) {
-      alert("Please enter a target Job Description.");
+      toast.error("Please enter a target Job Description.");
       return;
     }
 
     setIsAtsProcessing(true);
     setProcessingStage("parsing");
+    setUploadError(null);
+    setLastAction("ats");
 
     try {
       const uploadFormData = new FormData();
@@ -202,7 +192,8 @@ export default function ResumeRoundSection() {
       setAnswers([]);
     } catch (err) {
       console.error(err);
-      alert(err.message || "An error occurred during ATS score calculation.");
+      setUploadError(err.message || "An error occurred during ATS score calculation.");
+      toast.error(err.message || "An error occurred during ATS score calculation.");
     } finally {
       setIsAtsProcessing(false);
       setProcessingStage("");
@@ -258,16 +249,18 @@ export default function ResumeRoundSection() {
 
   const startResumeRound = async () => {
     if (!file) {
-      alert("Please upload a resume first.");
+      toast.error("Please upload a resume first.");
       return;
     }
     if (!jobDescription.trim()) {
-      alert("Please enter a target Job Description.");
+      toast.error("Please enter a target Job Description.");
       return;
     }
 
     setIsProcessing(true);
     setProcessingStage("parsing");
+    setUploadError(null);
+    setLastAction("round");
 
     try {
       const sessionResponse = await startInterviewModeSessionAction({
@@ -321,7 +314,8 @@ export default function ResumeRoundSection() {
       }
     } catch (err) {
       console.error(err);
-      alert(err.message || "An error occurred during resume processing.");
+      setUploadError(err.message || "An error occurred during resume processing.");
+      toast.error(err.message || "An error occurred during resume processing.");
       if (resumeSessionIdRef.current) {
         const sessionId = resumeSessionIdRef.current;
         const result = await finishInterviewModeSessionAction({
@@ -528,39 +522,35 @@ export default function ResumeRoundSection() {
             
             {/* Upload Zone & JD */}
             <div className="flex flex-col gap-6">
-              <div 
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={triggerFileSelect}
-                className={`upload-zone border-2 border-dashed border-cyan-500/40 rounded-xl p-8 text-center hover:border-cyan-500/60 transition-all duration-300 bg-cyan-500/5 hover:bg-cyan-500/10 cursor-pointer ${file ? "border-cyan-500 bg-cyan-500/10" : ""}`}
-              >
-                <div className="flex flex-col items-center">
-                  <Upload className="w-12 h-12 text-cyan-500 dark:text-cyan-400 mb-4" />
-                  <p className="text-slate-900 dark:text-white font-bold mb-2">
-                    {file ? file.name : "Drop your resume here"}
-                  </p>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
-                    {file ? `${(file.size / 1024).toFixed(1)} KB` : "or click to browse from your device"}
-                  </p>
-                  <input 
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept=".pdf,.txt"
-                    className="hidden"
-                  />
-                  <div className="flex gap-2 justify-center flex-wrap">
-                    {["PDF", "TXT"].map((type) => (
-                      <span
-                        key={type}
-                        className="px-3 py-1 bg-slate-50 border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700 rounded text-xs text-slate-600 dark:text-slate-300"
-                      >
-                        {type}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <FileUploadDropzone
+                file={file}
+                onFileSelect={(selectedFile) => {
+                  setFile(selectedFile);
+                  setUploadError(null);
+                }}
+                onFileRemove={() => {
+                  setFile(null);
+                  setUploadError(null);
+                  setParsedResume(null);
+                }}
+                accept=".pdf,.txt,.png,.jpg,.jpeg"
+                acceptedBadges={["PDF", "TXT", "PNG", "JPG"]}
+                maxSizeMB={15}
+                isUploading={isProcessing || isAtsProcessing}
+                uploadStage={
+                  processingStage === "parsing"
+                    ? "Parsing resume..."
+                    : processingStage === "ats"
+                      ? "ATS score calculated successfully"
+                      : processingStage === "feedback"
+                        ? "Generating feedback..."
+                        : ""
+                }
+                error={uploadError}
+                onRetry={handleRetryAction}
+                title="Drop your resume here"
+                subtitle="Supports PDF, TXT, PNG, or JPG (Up to 15MB)"
+              />
 
               {/* Job Description Input */}
               <div className="flex flex-col gap-2">

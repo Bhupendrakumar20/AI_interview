@@ -234,13 +234,13 @@ export default async function Feedback({ params }) {
                   }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
                       msg.role === "user"
-                        ? "bg-primary-200 text-dark-100"
-                        : "bg-dark-200 text-light-100"
+                        ? "bg-indigo-600 text-white font-medium"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
                     }`}
                   >
-                    <span className="block text-[10px] opacity-70 mb-1 uppercase">
+                    <span className="block text-[10px] font-bold opacity-75 mb-1 uppercase tracking-wide">
                       {msg.role === "user" ? "You" : "AI Interviewer"}
                     </span>
                     {msg.content}
@@ -253,23 +253,23 @@ export default async function Feedback({ params }) {
       </div>
 
       {/* Buttons */}
-      <div className="buttons">
-        <Button className="btn-secondary flex-1">
+      <div className="buttons flex flex-wrap gap-4 mt-6">
+        <Button className="btn-secondary flex-1 font-bold">
           <Link href="/interview" className="flex w-full justify-center">
-            <p className="text-sm font-semibold text-primary-200 text-center">
+            <span className="text-sm font-bold text-slate-800 dark:text-white text-center">
               Back to Interviews
-            </p>
+            </span>
           </Link>
         </Button>
 
-        <Button className="btn-primary flex-1">
+        <Button className="btn-primary flex-1 font-bold">
           <Link
             href={`/interview/${id}`}
             className="flex w-full justify-center"
           >
-            <p className="text-sm font-semibold text-black text-center">
+            <span className="text-sm font-bold text-white text-center">
               {isCompleted ? "Retake Interview" : "Resume / Retake Interview"}
-            </p>
+            </span>
           </Link>
         </Button>
       </div>

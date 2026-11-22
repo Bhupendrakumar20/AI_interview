@@ -4,29 +4,42 @@ import { cn } from "@/lib/utils";
 
 const Button = React.forwardRef(
   ({ className, variant = "default", size = "default", ...props }, ref) => {
-    const baseStyles = "inline-flex items-center justify-center rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:scale-105 active:scale-95";
-    
+    const baseStyles =
+      "inline-flex items-center justify-center rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:scale-105 active:scale-95 cursor-pointer select-none";
+
     const variants = {
-      default: "btn-primary bg-primary text-primary-foreground hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/20",
-      secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/40 hover:shadow-sm",
-      outline: "border border-border bg-transparent text-foreground hover:bg-secondary hover:text-secondary-foreground hover:shadow-sm",
+      default:
+        "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 font-bold",
+      secondary:
+        "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/60 hover:shadow-sm font-semibold",
+      outline:
+        "border border-border bg-transparent text-foreground hover:bg-secondary hover:text-secondary-foreground hover:shadow-sm",
       ghost: "text-foreground hover:bg-secondary hover:text-foreground",
-      destructive: "bg-destructive text-white hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/20",
+      destructive:
+        "bg-destructive text-white hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/20",
+      // High-End Modern UI Button Variants
+      glass: "btn-glass text-foreground hover:text-foreground",
+      liquidGlass: "btn-liquid-glass text-foreground dark:text-white font-semibold",
+      "liquid-glass": "btn-liquid-glass text-foreground dark:text-white font-semibold",
+      aurora: "btn-aurora text-white font-semibold",
+      auroraGlow: "btn-aurora text-white font-semibold",
+      "aurora-glow": "btn-aurora text-white font-semibold",
     };
 
     const sizes = {
       default: "h-10 px-4 py-2",
-      sm: "h-9 rounded-md px-3",
-      lg: "h-11 rounded-md px-8",
-      icon: "h-10 w-10",
+      sm: "h-9 rounded-md px-3 text-xs",
+      lg: "h-11 rounded-lg px-8 text-base",
+      xl: "h-13 rounded-xl px-10 text-base font-semibold",
+      icon: "h-10 w-10 p-0",
     };
 
     return (
       <button
         className={cn(
           baseStyles,
-          variants[variant],
-          sizes[size],
+          variants[variant] || variants.default,
+          sizes[size] || sizes.default,
           className
         )}
         ref={ref}
@@ -38,4 +51,20 @@ const Button = React.forwardRef(
 
 Button.displayName = "Button";
 
-export { Button };
+// Specialized convenience wrappers
+const GlassButton = React.forwardRef((props, ref) => (
+  <Button variant="glass" ref={ref} {...props} />
+));
+GlassButton.displayName = "GlassButton";
+
+const LiquidGlassButton = React.forwardRef((props, ref) => (
+  <Button variant="liquidGlass" ref={ref} {...props} />
+));
+LiquidGlassButton.displayName = "LiquidGlassButton";
+
+const AuroraButton = React.forwardRef((props, ref) => (
+  <Button variant="aurora" ref={ref} {...props} />
+));
+AuroraButton.displayName = "AuroraButton";
+
+export { Button, GlassButton, LiquidGlassButton, AuroraButton };

@@ -8,11 +8,11 @@ const ChallengeSection = () => {
   const [enrolled, setEnrolled] = useState(false);
 
   return (
-    <section className="blue-gradient-dark rounded-3xl p-8">
+    <section className="bg-card text-card-foreground border border-border shadow-xl backdrop-blur-xl rounded-3xl p-8 transition-colors">
       <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
         <div className="flex-1">
-          <h2 className="text-3xl font-bold mb-4">100 Days to Code Challenge</h2>
-          <p className="text-light-100 mb-6">
+          <h2 className="text-3xl font-extrabold mb-4 text-slate-900 dark:text-white">100 Days to Code Challenge</h2>
+          <p className="text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
             Join thousands of developers in our coding challenge. 
             Build real projects, learn in-demand skills, and land your dream job.
             Complete the challenge and get a verified certificate!
@@ -33,16 +33,16 @@ const ChallengeSection = () => {
         
         <div className="flex gap-6">
           <div className="text-center">
-            <div className="text-4xl font-bold text-primary-200">10,000+</div>
-            <div className="text-light-100 text-sm">Active Participants</div>
+            <div className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400">10,000+</div>
+            <div className="text-slate-600 dark:text-slate-400 text-sm font-medium mt-1">Active Participants</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl font-bold text-success-100">85%</div>
-            <div className="text-light-100 text-sm">Completion Rate</div>
+            <div className="text-4xl font-extrabold text-emerald-600 dark:text-emerald-400">85%</div>
+            <div className="text-slate-600 dark:text-slate-400 text-sm font-medium mt-1">Completion Rate</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl font-bold text-primary-200">500+</div>
-            <div className="text-light-100 text-sm">Got Jobs</div>
+            <div className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400">500+</div>
+            <div className="text-slate-600 dark:text-slate-400 text-sm font-medium mt-1">Got Jobs</div>
           </div>
         </div>
       </div>

@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, Lightbulb } from "lucide-react";
+import { TypingDots, BouncingDots } from "@/components/ui/LoadingAnimations";
+import { ParticleBurst } from "@/components/ui/MicroInteractions";
 
 async function streamMockTestResponse({ responseType, question, company, role, difficulty, signal, onToken, onComplete }) {
   const response = await fetch("/api/mock-test/stream", {
@@ -138,20 +140,23 @@ export default function QuestionCard({ question, index, company, role, isStreami
         <div className="flex flex-wrap gap-3">
           <Button
             size="sm"
+            variant="liquid-glass"
             onClick={handleShowAnswer}
             disabled={loadingAnswer}
-            className="flex items-center gap-2 bg-primary-200 hover:bg-primary-100 text-white"
+            className="flex items-center gap-2 font-semibold text-xs relative overflow-visible"
           >
-            {loadingAnswer ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            <ParticleBurst active={loadingAnswer} count={6} color="#6366f1" />
+            {loadingAnswer ? <BouncingDots size={5} color="#6366f1" /> : <CheckCircle2 size={14} />}
             Expected Answer
           </Button>
           <Button
             size="sm"
+            variant="glass"
             onClick={handleShowTips}
             disabled={loadingTips}
-            className="flex items-center gap-2 bg-light-400 hover:bg-light-300 text-light-900"
+            className="flex items-center gap-2 font-semibold text-xs"
           >
-            {loadingTips ? <Loader2 size={14} className="animate-spin" /> : <Lightbulb size={14} />}
+            {loadingTips ? <BouncingDots size={5} color="#f59e0b" /> : <Lightbulb size={14} className="text-amber-500" />}
             Tips
           </Button>
         </div>
@@ -160,7 +165,12 @@ export default function QuestionCard({ question, index, company, role, isStreami
       {(loadingAnswer || answer || answerError) && (
         <div className="mt-4 pt-4 border-t border-border">
           <p className="text-sm font-semibold text-foreground mb-1">Expected Answer</p>
-          {loadingAnswer && !answer && <p className="text-sm text-muted-foreground">Generating answer…</p>}
+          {loadingAnswer && !answer && (
+            <div className="flex items-center gap-2.5 py-1 text-sm text-muted-foreground">
+              <TypingDots color="#6366f1" />
+              <span>Generating AI answer…</span>
+            </div>
+          )}
           {answerError && <p className="text-sm text-rose-500">Couldn't generate an answer. Try again.</p>}
           {answer && (
             <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{answer}</p>
@@ -173,7 +183,12 @@ export default function QuestionCard({ question, index, company, role, isStreami
           <p className="text-sm font-semibold text-foreground mb-1 flex items-center gap-1.5">
             <Lightbulb size={14} className="text-amber-500" /> Tips
           </p>
-          {loadingTips && !streamingTips && <p className="text-sm text-muted-foreground">Generating tips…</p>}
+          {loadingTips && !streamingTips && (
+            <div className="flex items-center gap-2.5 py-1 text-sm text-muted-foreground">
+              <TypingDots color="#f59e0b" />
+              <span>Generating AI tips…</span>
+            </div>
+          )}
           {tipsError && <p className="text-sm text-rose-500">Couldn't generate tips. Try again.</p>}
           {streamingTips && (
             <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{streamingTips}</p>

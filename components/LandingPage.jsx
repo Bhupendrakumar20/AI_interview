@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -124,12 +125,27 @@ export default function LandingPage() {
         dangerouslySetInnerHTML={{
           __html: `
             :root {
-              --bg: #07070a;
-              --surface: #111116;
-              --surface-2: #191922;
-              --border: #26262f;
-              --violet: #8b5cf6;
-              --indigo: #6366f1;
+              --bg: #EEF2FF;
+              --bg-gradient: linear-gradient(135deg, #EEF2FF 0%, #EEF2FF 40%, #C7D2FE 75%, #818CF8 100%);
+              --surface: rgba(255, 255, 255, 0.88);
+              --surface-2: rgba(238, 242, 255, 0.95);
+              --border: rgba(199, 210, 254, 0.65);
+              --violet: #818CF8;
+              --indigo: #4F46E5;
+              --mint: #10B981;
+              --gold: #F59E0B;
+              --text: #0F172A;
+              --text-dim: #475569;
+              --text-faint: #64748B;
+            }
+            .dark {
+              --bg: #0F172A;
+              --bg-gradient: linear-gradient(135deg, #0F172A 0%, #0F172A 40%, #312E81 75%, #818CF8 100%);
+              --surface: rgba(15, 23, 42, 0.85);
+              --surface-2: rgba(30, 27, 75, 0.5);
+              --border: rgba(99, 102, 241, 0.25);
+              --violet: #818CF8;
+              --indigo: #6366F1;
               --mint: #7CFFC4;
               --gold: #fbbf6a;
               --text: #f4f3f9;
@@ -137,12 +153,17 @@ export default function LandingPage() {
               --text-faint: #5c5a6e;
             }
             .landing-body {
-              background: var(--bg);
+              background-color: var(--bg);
+              background-image: var(--bg-gradient);
+              background-attachment: fixed;
+              background-size: cover;
+              background-repeat: no-repeat;
               color: var(--text);
               font-family: inherit;
               overflow-x: hidden;
               position: relative;
               min-height: 100vh;
+              transition: background 0.4s ease, color 0.3s ease;
             }
             .landing-body::before {
               content: "";
@@ -845,6 +866,7 @@ export default function LandingPage() {
             <a href="#pricing">Pricing</a>
           </div>
           <div className="nav-actions">
+            <ThemeToggle />
             <Link href="/sign-in" className="btn-text">
               Log in
             </Link>

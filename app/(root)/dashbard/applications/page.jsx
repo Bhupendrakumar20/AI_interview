@@ -121,19 +121,19 @@ export default function ApplicationsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        <button className="px-4 py-2 bg-primary-200 text-dark-100 rounded-full font-semibold">
+        <button className="px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-full font-bold shadow-sm shadow-indigo-500/25 cursor-pointer">
           All ({stats.total})
         </button>
-        <button className="px-4 py-2 bg-dark-200 text-light-100 rounded-full hover:bg-dark-300">
+        <button className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 font-medium transition cursor-pointer">
           Active ({stats.active})
         </button>
-        <button className="px-4 py-2 bg-dark-200 text-light-100 rounded-full hover:bg-dark-300">
+        <button className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 font-medium transition cursor-pointer">
           Interviews ({stats.interviews})
         </button>
-        <button className="px-4 py-2 bg-dark-200 text-light-100 rounded-full hover:bg-dark-300">
+        <button className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 font-medium transition cursor-pointer">
           Offers ({stats.offers})
         </button>
-        <button className="px-4 py-2 bg-dark-200 text-light-100 rounded-full hover:bg-dark-300">
+        <button className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 font-medium transition cursor-pointer">
           Rejected ({stats.rejected})
         </button>
       </div>

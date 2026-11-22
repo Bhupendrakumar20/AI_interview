@@ -4,10 +4,13 @@
 
 import { useState, useEffect } from "react";
 import InternshipCard from "@/components/InternshipCard";
-import { getSavedInternships } from "@/lib/actions/saved-internships.action";
+import { getSavedInternships, unsaveInternship } from "@/lib/actions/saved-internships.action";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { toast } from "sonner";
+import { SwipeToDelete } from "@/components/ui/MicroInteractions";
+import { BouncingBalls } from "@/components/ui/LoadingAnimations";
 
 export default function SavedInternshipsPage() {
   const [savedInternships, setSavedInternships] = useState([]);
@@ -70,7 +73,7 @@ export default function SavedInternshipsPage() {
 
       {loading ? (
         <div className="flex justify-center items-center py-16">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-100"></div>
+          <BouncingBalls size="lg" label="Loading your saved internships..." />
         </div>
       ) : savedInternships.length === 0 ? (
         <div className="card-border">
@@ -87,13 +90,28 @@ export default function SavedInternshipsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {savedInternships.map((internship) => (
-            <InternshipCard
+            <SwipeToDelete
               key={internship.internshipId}
-              internship={{
-                ...internship,
-                id: internship.internshipId,
+              onDelete={async () => {
+                const id = internship.internshipId || internship.id;
+                try {
+                  const res = await unsaveInternship({ internshipId: id });
+                  if (res.success) {
+                    setSavedInternships((prev) => prev.filter((item) => (item.internshipId || item.id) !== id));
+                    toast.success(`Removed "${internship.title}" from saved list`);
+                  }
+                } catch {
+                  toast.error("Failed to remove internship");
+                }
               }}
-            />
+            >
+              <InternshipCard
+                internship={{
+                  ...internship,
+                  id: internship.internshipId,
+                }}
+              />
+            </SwipeToDelete>
           ))}
         </div>
       )}

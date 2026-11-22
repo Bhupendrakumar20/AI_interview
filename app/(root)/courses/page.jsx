@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { BookOpen, ChevronDown, ExternalLink, Check, Award, X, Loader2, Sparkles, BrainCircuit, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BouncingBalls } from '@/components/ui/LoadingAnimations';
 import {
   getCourses,
   getUserProgress,
@@ -203,7 +204,7 @@ export default function CoursesPage() {
                   setActiveModal('suggest');
                   setSuggestTopic(null);
                 }}
-                className="px-3 sm:px-4 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap flex items-center gap-2"
+                className="px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-500/25 transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
                 Suggest a Course
@@ -214,25 +215,24 @@ export default function CoursesPage() {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-          <Loader2 className="w-8 h-8 text-primary-100 animate-spin" />
-          <p className="text-light-400 text-sm">Loading course curriculum...</p>
+        <div className="flex flex-col items-center justify-center min-h-[420px] py-16">
+          <BouncingBalls size="lg" label="Loading course curriculum..." />
         </div>
       ) : (
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           {/* Hero Section */}
-          <div className="mt-8 border-b border-dark-300 pb-12">
-            <div className="bg-gradient-to-br from-dark-200 to-dark-300 border border-dark-300 rounded-2xl p-4 sm:p-6 md:p-8">
+          <div className="mt-8 border-b border-indigo-100 dark:border-indigo-900/40 pb-12">
+            <div className="bg-white/80 dark:bg-[#0F172A]/80 border border-indigo-200/70 dark:border-indigo-500/30 rounded-3xl p-4 sm:p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 sm:gap-4 mb-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg bg-primary-200/20 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-5 sm:w-6 h-5 sm:h-6 text-primary-100" />
+                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-5 sm:w-6 h-5 sm:h-6 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <div className="inline-block bg-primary-200/20 border border-primary-200/40 rounded-full px-2 sm:px-3 py-1">
-                  <span className="text-primary-100 text-xs font-bold uppercase tracking-wide">Complete Curriculum</span>
+                <div className="inline-block bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/60 rounded-full px-2 sm:px-3 py-1">
+                  <span className="text-indigo-700 dark:text-indigo-300 text-xs font-bold uppercase tracking-wide">Complete Curriculum</span>
                 </div>
               </div>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-light-50 mb-3">Master Coding Interviews</h2>
-              <p className="text-light-300 text-sm sm:text-base md:text-lg mb-6 max-w-2xl">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mb-3">Master Coding Interviews</h2>
+              <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base md:text-lg mb-6 max-w-2xl">
                 Structured paths with curated resources from the best teachers and platforms. Learn at your pace and master the fundamentals.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
@@ -240,7 +240,7 @@ export default function CoursesPage() {
                   onClick={() => {
                     if (courses.length > 0) toggleCourse(courses[0].id);
                   }}
-                  className="px-4 sm:px-5 py-2 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 font-bold transition-colors text-sm sm:text-base"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold transition-all text-sm sm:text-base shadow-md shadow-indigo-500/25 cursor-pointer"
                 >
                   Get Started Now
                 </button>
@@ -586,7 +586,7 @@ export default function CoursesPage() {
                       setActiveFilter(suggestTopic);
                       setActiveModal(null);
                     }}
-                    className="w-full mt-2 py-2 px-4 rounded-lg bg-primary-200 hover:bg-primary-300 text-dark-100 text-xs font-bold transition-all"
+                    className="w-full mt-2 py-2 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold transition-all shadow-md shadow-indigo-500/25 cursor-pointer"
                   >
                     View Curriculum
                   </button>

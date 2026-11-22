@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { saveInternship, unsaveInternship, isInternshipSaved } from "@/lib/actions/saved-internships.action";
+import { BookmarkSave, ParticleBurst } from "@/components/ui/MicroInteractions";
 
 const InternshipCard = ({ internship }) => {
   const [applying, setApplying] = useState(false);
@@ -78,66 +79,64 @@ const InternshipCard = ({ internship }) => {
   return (
     <div 
       className={cn(
-        "card-border group hover:border-primary-200/30 hover:shadow-lg hover:shadow-primary-200/20 transition-all duration-300 hover:-translate-y-1",
+        "premium-card-glass p-6 sm:p-7 flex flex-col justify-between h-full group",
         applicationStatus.status !== "closed" && internship.applyLink && "cursor-pointer"
       )}
       onClick={handleCardClick}
     >
-      <div className="card p-5 h-full flex flex-col">
+      <div>
         {/* Header */}
-        <div className="flex justify-between items-start mb-3">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold line-clamp-1 hover:text-primary-100 transition-colors">
+        <div className="flex justify-between items-start mb-3.5">
+          <div className="flex-1 pr-2">
+            <h3 className="text-xl font-bold line-clamp-1 text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">
               {internship.title}
             </h3>
-            <p className="text-primary-200 font-medium">{internship.company}</p>
+            <p className="text-indigo-600 dark:text-[#C7D2FE] font-semibold text-sm mt-0.5">{internship.company}</p>
           </div>
           {internship.badge && (
-            <span className="bg-success-100 text-dark-100 text-xs px-3 py-1 rounded-full font-semibold whitespace-nowrap">
+            <span className="premium-pill-badge text-xs px-3 py-1 font-semibold whitespace-nowrap">
               {internship.badge}
             </span>
           )}
         </div>
 
-        {/* Details */}
-        <div className="space-y-3 mb-4 flex-1">
-          <div className="flex items-center gap-4 text-sm">
+        {/* Details Inset Tile */}
+        <div className="premium-inset-tile p-4 space-y-3 mb-4">
+          <div className="flex items-center gap-4 text-xs sm:text-sm">
             <div className="flex items-center gap-1">
-              <span className="text-slate-400">Location:</span>
-              <span className={cn("line-clamp-1",
-                internship.isRemote && "text-success-100 font-medium"
+              <span className="text-slate-500 dark:text-slate-400">Location:</span>
+              <span className={cn("line-clamp-1 font-semibold text-slate-800 dark:text-slate-200",
+                internship.isRemote && "text-emerald-600 dark:text-emerald-400"
               )}>
                 {internship.location}
                 {internship.isRemote && " (Remote)"}
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-slate-400">Duration:</span>
-              <span>{internship.duration}</span>
+              <span className="text-slate-500 dark:text-slate-400">Duration:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">{internship.duration}</span>
             </div>
           </div>
 
-          <div className="text-lg font-bold text-primary-200">
+          <div className="text-lg font-black text-slate-900 dark:text-white">
             {internship.stipend}
           </div>
 
-          <div className="text-sm text-light-100">
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                "px-2 py-1 rounded text-xs transition-all duration-300",
-                applicationStatus.status === "closed" && "bg-red-500/20 text-red-500",
-                applicationStatus.status === "urgent" && "bg-yellow-500/20 text-yellow-500",
-                applicationStatus.status === "open" && "bg-green-500/20 text-green-500"
-              )}>
-                {applicationStatus.text}
-              </span>
-            </div>
+          <div className="text-xs">
+            <span className={cn(
+              "px-2.5 py-1 rounded-full font-bold inline-block",
+              applicationStatus.status === "closed" && "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30",
+              applicationStatus.status === "urgent" && "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30",
+              applicationStatus.status === "open" && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+            )}>
+              {applicationStatus.text}
+            </span>
           </div>
 
-          {/* Description (collapsed by default) */}
+          {/* Description */}
           {internship.description && (
-            <div className="mt-2">
-              <p className="text-sm text-light-100 line-clamp-2">
+            <div className="mt-1 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+              <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
                 {internship.description}
               </p>
             </div>
@@ -145,56 +144,56 @@ const InternshipCard = ({ internship }) => {
         </div>
 
         {/* Skills */}
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-2">
+        <div className="mb-5">
+          <div className="flex flex-wrap gap-1.5">
             {internship.skills?.slice(0, 5).map((skill, index) => (
               <span
                 key={index}
-                className="px-2 py-1 bg-dark-200 text-xs rounded-full hover:bg-dark-100 transition-colors"
+                className="px-2.5 py-1 bg-indigo-50/80 dark:bg-slate-800/80 text-indigo-700 dark:text-indigo-200 border border-indigo-100 dark:border-slate-700/60 text-xs rounded-full font-medium"
                 title={skill}
               >
                 {skill.length > 15 ? `${skill.substring(0, 15)}...` : skill}
               </span>
             ))}
             {internship.skills?.length > 5 && (
-              <span className="px-2 py-1 bg-dark-200 text-xs rounded-full">
+              <span className="px-2.5 py-1 bg-indigo-50/80 dark:bg-slate-800/80 text-indigo-700 dark:text-indigo-200 border border-indigo-100 dark:border-slate-700/60 text-xs rounded-full font-medium">
                 +{internship.skills.length - 5} more
               </span>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Action Buttons */}
-        <div className="space-y-2">
-          <Button
-            className={cn(
-              "btn-primary w-full",
-              applicationStatus.status === "closed" && "opacity-50 cursor-not-allowed"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (applicationStatus.status !== "closed") {
-                handleApply();
-              } else {
-                toast.error("Applications for this internship are closed");
-              }
-            }}
-            disabled={applying || applicationStatus.status === "closed"}
-          >
-            {applying ? "Applying..." : applicationStatus.text}
-          </Button>
+      {/* Action Buttons */}
+      <div className="space-y-2.5 mt-auto pt-2">
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (applicationStatus.status !== "closed") {
+              handleApply();
+            } else {
+              toast.error("Applications for this internship are closed");
+            }
+          }}
+          disabled={applying || applicationStatus.status === "closed"}
+          className={cn(
+            "btn-theme-action w-full py-2.5 text-sm font-bold relative overflow-visible shadow-md",
+            applicationStatus.status === "closed" && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          <ParticleBurst active={applying} count={8} color="#6366f1" />
+          {applying ? "Applying..." : applicationStatus.text}
+        </Button>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1 text-sm"
-              onClick={(e) => {
-                e.stopPropagation();
+        <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center justify-center border border-slate-300 dark:border-slate-700 rounded-2xl bg-white/70 dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors py-1">
+            <BookmarkSave
+              active={isSaved}
+              onToggle={(nextState) => {
                 setIsSaving(true);
                 (async () => {
                   try {
-                    if (isSaved) {
-                      // Unsave
+                    if (!nextState) {
                       const result = await unsaveInternship({ internshipId: internship.id });
                       if (result.success) {
                         setIsSaved(false);
@@ -203,7 +202,6 @@ const InternshipCard = ({ internship }) => {
                         toast.error(result.error || "Failed to unsave");
                       }
                     } else {
-                      // Save
                       const result = await saveInternship({
                         internshipId: internship.id,
                         internshipData: internship,
@@ -223,13 +221,14 @@ const InternshipCard = ({ internship }) => {
                   }
                 })();
               }}
-              disabled={isSaving}
-            >
-              {isSaving ? "Saving..." : isSaved ? "✓ Saved" : "Save"}
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1 text-sm"
+            />
+            <span className="text-xs font-semibold pr-3 text-slate-600 dark:text-slate-300 select-none">
+              {isSaved ? "Saved" : "Save"}
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            className="flex-1 text-xs sm:text-sm rounded-2xl border-slate-300 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200"
               onClick={(e) => {
                 e.stopPropagation();
                 (async () => {
@@ -295,8 +294,7 @@ const InternshipCard = ({ internship }) => {
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 export default InternshipCard;

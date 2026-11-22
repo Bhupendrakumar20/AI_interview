@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import ResumeRoundSection from "@/components/Resume RoundSection";
+import { SquareMorphs } from "@/components/ui/LoadingAnimations";
+import FileUploadDropzone from "@/components/ui/FileUploadDropzone";
 
 export default function ResumePage() {
   const [activeTab, setActiveTab] = useState("ats-match"); // "ats-match" | "builder"
@@ -36,6 +38,7 @@ export default function ResumePage() {
   const [email, setEmail] = useState("");
   const [description, setDescription] = useState("");
   const [docFile, setDocFile] = useState(null);
+  const [docError, setDocError] = useState(null);
   
   // States for generation results
   const [isGenerating, setIsGenerating] = useState(false);
@@ -44,15 +47,6 @@ export default function ResumePage() {
   const [isCopied, setIsCopied] = useState(false);
   const [outputTab, setOutputTab] = useState("latex"); // "latex" | "preview"
   const [isCompilingPdf, setIsCompilingPdf] = useState(false);
-  
-  const docFileInputRef = useRef(null);
-
-  const handleDocFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setDocFile(file);
-    }
-  };
 
   const handleCopyLatex = () => {
     if (!generatedLatex) return;
@@ -155,6 +149,7 @@ export default function ResumePage() {
     setIsGenerating(true);
     setGeneratedJson(null);
     setGeneratedLatex("");
+    setDocError(null);
 
     try {
       let sourceText = description;
@@ -195,10 +190,12 @@ export default function ResumePage() {
 
       setGeneratedJson(data.resumeJson);
       setGeneratedLatex(data.latexCode);
+      setDocError(null);
       toast.success("Resume LaTeX template generated successfully!");
 
     } catch (error) {
       console.error(error);
+      setDocError(error.message || "An error occurred during resume generation.");
       toast.error(error.message || "An error occurred during resume generation.");
     } finally {
       setIsGenerating(false);
@@ -210,6 +207,7 @@ export default function ResumePage() {
     setEmail("");
     setDescription("");
     setDocFile(null);
+    setDocError(null);
     setGeneratedJson(null);
     setGeneratedLatex("");
     setOutputTab("latex");
@@ -343,29 +341,29 @@ export default function ResumePage() {
                 <label className="text-xs font-bold text-slate-600 dark:text-slate-400">
                   Upload Current / Draft Document
                 </label>
-                <div 
-                  onClick={() => docFileInputRef.current?.click()}
-                  className={`border-2 border-dashed border-cyan-500/20 dark:border-cyan-500/30 rounded-xl p-8 text-center hover:border-cyan-500/60 transition-all duration-300 bg-cyan-500/5 hover:bg-cyan-500/10 cursor-pointer ${
-                    docFile ? "border-cyan-500 bg-cyan-500/10" : ""
-                  }`}
-                >
-                  <div className="flex flex-col items-center">
-                    <Upload className="w-10 h-10 text-cyan-500 dark:text-cyan-400 mb-3" />
-                    <p className="text-slate-950 dark:text-white font-bold text-sm mb-1">
-                      {docFile ? docFile.name : "Drop document here"}
-                    </p>
-                    <p className="text-slate-500 dark:text-slate-400 text-xs">
-                      {docFile ? `${(docFile.size / 1024).toFixed(1)} KB` : "Click to select a draft resume (PDF or TXT)"}
-                    </p>
-                    <input 
-                      type="file"
-                      ref={docFileInputRef}
-                      onChange={handleDocFileChange}
-                      accept=".pdf,.txt"
-                      className="hidden"
-                    />
-                  </div>
-                </div>
+                <FileUploadDropzone
+                  file={docFile}
+                  onFileSelect={(selectedFile) => {
+                    setDocFile(selectedFile);
+                    setDocError(null);
+                  }}
+                  onFileRemove={() => {
+                    setDocFile(null);
+                    setDocError(null);
+                  }}
+                  accept=".pdf,.txt,.png,.jpg,.jpeg"
+                  acceptedBadges={["PDF", "TXT", "PNG", "JPG"]}
+                  maxSizeMB={15}
+                  isUploading={isGenerating}
+                  uploadStage="Extracting document details & compiling..."
+                  error={docError}
+                  onRetry={() => {
+                    setDocError(null);
+                    handleGenerateResume();
+                  }}
+                  title="Drop your draft resume or document here"
+                  subtitle="Supports PDF, TXT, PNG, or JPG drafts"
+                />
               </div>
             )}
 
@@ -412,10 +410,10 @@ export default function ResumePage() {
             )}
 
             {isGenerating && (
-              <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[460px]">
-                <Loader2 className="w-12 h-12 text-cyan-500 animate-spin mb-4" />
+              <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[460px] gap-4">
+                <SquareMorphs size="lg" color="cyan" />
                 <h3 className="font-bold text-slate-700 dark:text-slate-300 text-lg">Formatting Resume Structures</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
                   Gemini is normalizing coordinates, optimizing summaries, formatting skills lists, and building LaTeX packages...
                 </p>
               </div>

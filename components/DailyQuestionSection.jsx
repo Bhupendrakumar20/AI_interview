@@ -120,22 +120,22 @@ export default function DailyQuestionSection() {
     <div className="mb-8">
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-2">
-          <Zap className="w-5 h-5 text-yellow-500" />
-          <h2 className="text-xl font-bold text-white">Today's Challenge</h2>
+          <Zap className="w-5 h-5 text-amber-500" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Today&apos;s Challenge</h2>
         </div>
-        <p className="text-light-400 text-sm">
+        <p className="text-slate-600 dark:text-slate-400 text-sm">
           Complete the daily LeetCode challenge to improve your skills
         </p>
       </div>
 
-      <div className="bg-gradient-to-br from-dark-200/50 to-dark-250/50 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-primary-200/30 transition-all duration-300">
+      <div className="bg-white/85 dark:bg-[#0F172A]/85 backdrop-blur-md border border-indigo-200/70 dark:border-indigo-500/30 rounded-3xl p-6 hover:shadow-xl transition-all duration-300">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-6 border-b border-indigo-100/70 dark:border-indigo-900/40">
           <div className="flex-1">
-            <h3 className="text-2xl font-bold text-white mb-2">
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
               {question.title}
             </h3>
-            <div className="flex items-center gap-2 text-light-400 text-sm">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
               <Calendar className="w-4 h-4" />
               <span>{formattedDate}</span>
             </div>
@@ -143,7 +143,7 @@ export default function DailyQuestionSection() {
 
           <div className="flex items-center gap-3">
             <div
-              className={`px-4 py-2 rounded-lg font-semibold text-sm ${difficultyColors.bg} ${difficultyColors.text} border ${difficultyColors.border}`}
+              className={`px-4 py-2 rounded-xl font-bold text-sm ${difficultyColors.bg} ${difficultyColors.text} border ${difficultyColors.border}`}
             >
               {question.difficulty}
             </div>
@@ -153,14 +153,14 @@ export default function DailyQuestionSection() {
         {/* Topics */}
         {question.topics && question.topics.length > 0 && (
           <div className="mb-6">
-            <h4 className="text-sm font-semibold text-light-200 mb-2">
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">
               Topics
             </h4>
             <div className="flex flex-wrap gap-2">
               {question.topics.map((topic) => (
                 <span
                   key={topic.slug}
-                  className="px-3 py-1 bg-primary-200/20 text-primary-200 rounded-full text-xs font-medium"
+                  className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800/60 rounded-full text-xs font-semibold"
                 >
                   {topic.name}
                 </span>
@@ -175,41 +175,41 @@ export default function DailyQuestionSection() {
             href={question.leetcodeUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 bg-gradient-to-r from-primary-200 to-primary-300 text-dark-100 hover:from-primary-100 hover:to-primary-200 font-bold py-3 px-6 rounded-full transition-all duration-300 text-center hover:scale-105 active:scale-95"
+            className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 text-center shadow-md shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98]"
           >
             Solve on LeetCode →
           </Link>
 
           <button
             onClick={() => window.open(question.leetcodeUrl, "_blank")}
-            className="bg-dark-300 text-primary-200 hover:bg-dark-250 font-bold py-3 px-6 rounded-full transition-all duration-300 border border-primary-200/20 hover:scale-105 active:scale-95"
+            className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 font-bold py-3 px-6 rounded-xl transition-all duration-300 border border-slate-300 dark:border-slate-700 shadow-sm cursor-pointer"
           >
             View Details
           </button>
         </div>
 
         {/* Footer Stats */}
-        <div className="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="mt-6 pt-6 border-t border-indigo-100/70 dark:border-indigo-900/40 grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="text-center">
-            <TrendingUp className="w-5 h-5 text-primary-200 mx-auto mb-2" />
-            <p className="text-xs text-light-400">Daily Challenge</p>
-            <p className="text-sm font-semibold text-white">
+            <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
+            <p className="text-xs text-slate-500 dark:text-slate-400">Daily Challenge</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">
               Complete for reward
             </p>
           </div>
 
           <div className="text-center">
-            <Users className="w-5 h-5 text-primary-200 mx-auto mb-2" />
-            <p className="text-xs text-light-400">Community</p>
-            <p className="text-sm font-semibold text-white">
+            <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
+            <p className="text-xs text-slate-500 dark:text-slate-400">Community</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">
               Join thousands
             </p>
           </div>
 
           <div className="text-center md:col-span-1">
-            <Zap className="w-5 h-5 text-yellow-500 mx-auto mb-2" />
-            <p className="text-xs text-light-400">Streak</p>
-            <p className="text-sm font-semibold text-white">
+            <Zap className="w-5 h-5 text-amber-500 mx-auto mb-2" />
+            <p className="text-xs text-slate-500 dark:text-slate-400">Streak</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">
               Build your streak
             </p>
           </div>

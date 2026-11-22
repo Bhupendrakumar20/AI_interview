@@ -152,13 +152,13 @@ export default function HomeClient({ latestInterviews = [], userInterviews = [],
     }}>
       <style>{inlineStyles}</style>
 
-      {/* Hero Section - Inspired by Noomo/Framer */}
-      <section className="relative flex flex-col items-center justify-center text-center pt-10 pb-8 min-h-[50vh] overflow-hidden rounded-3xl bg-slate-950 border border-slate-900 shadow-2xl">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-35" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary rounded-full blur-[120px] hero-glow pointer-events-none -z-10" />
+      {/* Hero Section */}
+      <section className="relative flex flex-col items-center justify-center text-center pt-10 pb-8 min-h-[50vh] overflow-hidden rounded-3xl bg-white/80 dark:bg-slate-950/80 border border-indigo-200/60 dark:border-indigo-950/60 shadow-2xl backdrop-blur-xl">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#818cf8_1px,transparent_1px),linear-gradient(to_bottom,#818cf8_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-20 dark:opacity-35" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/30 rounded-full blur-[120px] hero-glow pointer-events-none -z-10" />
 
         <div className="relative z-10 space-y-6 px-4 max-w-4xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-indigo-400 font-bold uppercase tracking-widest shadow-md">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50/90 dark:bg-slate-900 border border-indigo-200 dark:border-slate-800 text-[11px] text-indigo-700 dark:text-indigo-400 font-bold uppercase tracking-widest shadow-xs">
             <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
@@ -166,20 +166,20 @@ export default function HomeClient({ latestInterviews = [], userInterviews = [],
             PrepWise Engine v2.0 Online
           </div>
 
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white leading-tight">
-            Design Your <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">Career Path</span>
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+            Design Your <span className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 dark:from-indigo-400 dark:via-violet-400 dark:to-purple-400 bg-clip-text text-transparent">Career Path</span>
           </h1>
 
-          <p className="text-slate-400 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Unleash interactive coding simulations, practice structured voice interviews, optimize resumes, and track live analytical progression on our next-gen candidate platform.
           </p>
 
           <div className="flex flex-wrap justify-center gap-4 pt-4">
-            <Link href="/interview" className="inline-flex items-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-bold py-3.5 px-6 rounded-xl shadow-lg hover:shadow-indigo-500/10 hover:translate-y-[-2px] transition-all cursor-pointer">
+            <Link href="/interview" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-950 font-bold py-3.5 px-6 rounded-xl shadow-lg hover:shadow-indigo-500/20 hover:translate-y-[-2px] transition-all cursor-pointer">
               Launch Simulator <ArrowRight size={16} />
             </Link>
-            <Link href="/100-days-of-code" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-850 text-white font-bold py-3.5 px-6 rounded-xl border border-slate-800 hover:border-slate-700 transition-all cursor-pointer">
-              Start Coding Challenge <Zap size={16} className="text-amber-400" />
+            <Link href="/100-days-of-code" className="inline-flex items-center gap-2 bg-white/90 hover:bg-white text-slate-900 dark:bg-slate-900 dark:hover:bg-slate-850 dark:text-white font-bold py-3.5 px-6 rounded-xl border border-indigo-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-slate-700 transition-all cursor-pointer">
+              Start Coding Challenge <Zap size={16} className="text-amber-500 dark:text-amber-400" />
             </Link>
           </div>
         </div>

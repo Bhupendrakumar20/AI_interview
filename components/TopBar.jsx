@@ -100,8 +100,8 @@ export default function TopBar({ user, onToggleMobileSidebar }) {
   const isSettingsPage = pathname === "/settings" || pathname.startsWith("/settings/");
 
   return (
-    <nav className="sticky top-0 z-50 bg-card border-b border-border backdrop-blur-md">
-      <div className="flex items-center justify-between px-4 sm:px-6 py-3 h-16">
+    <nav className="sticky top-0 z-50 bg-card/90 border-b border-border backdrop-blur-md w-full min-w-0">
+      <div className="flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3 h-14 sm:h-16 w-full min-w-0">
         {/* Left Section - Hamburger Menu Button on Mobile */}
         <div className="flex items-center gap-2">
           <button
@@ -117,7 +117,7 @@ export default function TopBar({ user, onToggleMobileSidebar }) {
         </div>
 
         {/* Right Section - Actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap shrink-0">
           {/* Theme Toggle */}
           <ThemeToggle />
           

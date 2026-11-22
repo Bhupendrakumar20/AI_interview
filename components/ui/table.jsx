@@ -37,7 +37,7 @@ TableFooter.displayName = "TableFooter";
 const TableRow = forwardRef(({ className = "", ...props }, ref) => (
   <tr
     ref={ref}
-    className={`border-b border-dark-300 transition-colors hover:bg-dark-300 data-[state=selected]:bg-dark-300 ${className}`}
+    className={`border-b border-slate-200 dark:border-slate-800 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${className}`}
     {...props}
   />
 ));
@@ -46,7 +46,7 @@ TableRow.displayName = "TableRow";
 const TableHead = forwardRef(({ className = "", ...props }, ref) => (
   <th
     ref={ref}
-    className={`h-12 px-4 text-left align-middle font-medium text-light-100 [&:has([role=checkbox])]:pr-0 ${className}`}
+    className={`h-12 px-4 text-left align-middle font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 [&:has([role=checkbox])]:pr-0 ${className}`}
     {...props}
   />
 ));
@@ -55,7 +55,7 @@ TableHead.displayName = "TableHead";
 const TableCell = forwardRef(({ className = "", ...props }, ref) => (
   <td
     ref={ref}
-    className={`px-4 py-3 align-middle text-light-100 [&:has([role=checkbox])]:pr-0 ${className}`}
+    className={`px-4 py-3 align-middle text-slate-700 dark:text-slate-300 [&:has([role=checkbox])]:pr-0 ${className}`}
     {...props}
   />
 ));

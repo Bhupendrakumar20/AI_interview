@@ -9,21 +9,21 @@ const CompanyListingCard = ({ company }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="card-border overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="card p-6">
+    <div className="premium-card-glass p-6 overflow-hidden flex flex-col justify-between group transition-all duration-300">
+      <div>
         {/* Company Header */}
         <div className="flex items-start gap-4 mb-4">
           {/* Company Logo */}
-          <div className="w-16 h-16 bg-light-400 rounded-lg flex items-center justify-center shrink-0">
-            <div className="w-12 h-12 bg-linear-to-br from-primary-200 to-primary-100 rounded flex items-center justify-center text-white font-bold text-lg">
+          <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-2xl flex items-center justify-center shrink-0 shadow-xs">
+            <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-extrabold text-base shadow-sm">
               {company.name.charAt(0)}
             </div>
           </div>
 
           {/* Company Info */}
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-light-900">{company.name}</h3>
-            <p className="text-sm text-light-100">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">{company.name}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
               {company.positions.length} interview{company.positions.length !== 1 ? "s" : ""} available
             </p>
           </div>
@@ -32,10 +32,10 @@ const CompanyListingCard = ({ company }) => {
         {/* Positions */}
         <div className="space-y-2 mb-4">
           {company.positions.slice(0, isExpanded ? company.positions.length : 2).map((position, idx) => (
-            <div key={idx} className="flex items-center justify-between p-2 bg-light-300 rounded">
+            <div key={idx} className="premium-inset-tile flex items-center justify-between p-3">
               <div>
-                <p className="text-sm font-medium text-light-900">{position.title}</p>
-                <p className="text-xs text-light-100">{position.level} Level</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{position.title}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{position.level} Level</p>
               </div>
             </div>
           ))}
@@ -45,27 +45,27 @@ const CompanyListingCard = ({ company }) => {
         {company.positions.length > 2 && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full flex items-center justify-center gap-1 text-primary-200 hover:text-primary-100 text-sm py-2 transition-colors"
+            className="w-full flex items-center justify-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold hover:text-indigo-500 text-xs py-1.5 transition-colors cursor-pointer"
           >
             {isExpanded ? (
               <>
-                Show Less <ChevronUp size={16} />
+                Show Less <ChevronUp size={14} />
               </>
             ) : (
               <>
-                Show More <ChevronDown size={16} />
+                Show More <ChevronDown size={14} />
               </>
             )}
           </button>
         )}
-
-        {/* Start Interview Button */}
-        <Link href={`/mock-test/practice?company=${company.name}`}>
-          <Button className="w-full mt-4 bg-primary-200 hover:bg-primary-100 text-white transition-colors">
-            Start Interview
-          </Button>
-        </Link>
       </div>
+
+      {/* Start Interview Button */}
+      <Link href={`/mock-test/practice?company=${company.name}`}>
+        <Button className="btn-theme-action w-full mt-4 py-2.5 text-xs sm:text-sm font-bold shadow-md">
+          Start Interview
+        </Button>
+      </Link>
     </div>
   );
 };

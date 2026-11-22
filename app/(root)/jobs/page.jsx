@@ -7,6 +7,7 @@ import FilterBar from "@/components/FilterBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchJobs } from "@/lib/actions/jobs.action";
+import { BouncingBalls } from "@/components/ui/LoadingAnimations";
 
 const QUICK_FILTERS = [
   { label: "All Jobs", value: "all" },
@@ -369,8 +370,8 @@ export default function JobsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-200"></div>
+        <div className="flex items-center justify-center py-16">
+          <BouncingBalls size="lg" label="Loading career opportunities..." />
         </div>
       ) : error ? (
         <div className="bg-red-500/10 border border-red-500 text-red-300 p-4 rounded-lg">

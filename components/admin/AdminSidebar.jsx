@@ -35,7 +35,22 @@ const formatDate = (dateString) => {
 
 const AdminSidebar = ({ user }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [skewState, setSkewState] = useState(null);
   const pathname = usePathname();
+
+  const triggerSkewAnimation = (direction) => {
+    setSkewState(direction);
+    setTimeout(() => {
+      setSkewState(null);
+    }, 400);
+  };
+
+  const handleAdminNavClick = () => {
+    // Only auto-collapse on mobile for admin panel
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setCollapsed(true);
+    }
+  };
 
   const menuItems = [
     {
@@ -105,20 +120,17 @@ const AdminSidebar = ({ user }) => {
     },
   ];
 
-  // ✅ Convert stats to plain numbers (replace later with real stats)
-  const stats = {
-    totalUsers: 1250,
-    activeUsers: 850,
-    pendingApprovals: 23,
-    totalContent: 456,
-  };
-
   return (
     <>
       {/* ✅ Mobile Menu Button */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-primary-200 rounded-lg"
+        onClick={() => {
+          const next = !collapsed;
+          triggerSkewAnimation(next ? "collapsing" : "expanding");
+          setCollapsed(next);
+        }}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-primary-200 rounded-lg cursor-pointer speed-skew-nav-item"
+        aria-label="Toggle Navigation"
       >
         {collapsed ? <X size={24} /> : <Menu size={24} />}
       </button>
@@ -126,27 +138,36 @@ const AdminSidebar = ({ user }) => {
       {/* ✅ Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static top-0 left-0 h-screen bg-slate-900/90 dark:bg-slate-950/70 backdrop-blur-md border-r border-slate-200 dark:border-slate-800/80 transition-all duration-300 z-40",
-          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "w-64"
+          "fixed lg:static top-0 left-0 h-screen bg-slate-900/90 dark:bg-slate-950/70 backdrop-blur-md border-r border-slate-200 dark:border-slate-800/80 transition-all duration-300 z-40 origin-left",
+          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "w-64",
+          skewState === "collapsing" && "animate-speed-skew-collapse",
+          skewState === "expanding" && "animate-speed-skew-expand"
         )}
+        style={{
+          transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
       >
         <div className="flex flex-col h-full">
           {/* ✅ Logo */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-800/80">
-            <div className="flex items-center gap-2.5">
-              <div className="bg-slate-800/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 flex items-center justify-center">
+            <Link
+              href="/admin"
+              onClick={handleAdminNavClick}
+              className="flex items-center gap-2.5 speed-skew-nav-item py-1 px-1 rounded-lg group"
+            >
+              <div className="bg-slate-800/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 flex items-center justify-center transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
                 <img src="/logo_icon.png" alt="PrepWise" className="h-6 w-6 object-contain shrink-0" />
               </div>
 
               {!collapsed && (
                 <div>
-                  <h2 className="font-bold text-lg text-slate-800 dark:text-white">PrepWise Admin</h2>
+                  <h2 className="font-bold text-lg text-slate-800 dark:text-white group-hover:text-cyan-400 transition-colors">PrepWise Admin</h2>
                   <p className="text-xs text-slate-400">
                     Super Admin Panel
                   </p>
                 </div>
               )}
-            </div>
+            </Link>
           </div>
 
           {/* ✅ Admin Info */}
@@ -176,7 +197,7 @@ const AdminSidebar = ({ user }) => {
           {/* ✅ Navigation */}
           <nav className="flex-1 overflow-y-auto p-2">
             <ul className="space-y-1">
-              {menuItems.map((item) => {
+              {menuItems.map((item, idx) => {
                 const isActive =
                   pathname === item.href || pathname.startsWith(`${item.href}/`);
                 const Icon = item.icon;
@@ -185,14 +206,20 @@ const AdminSidebar = ({ user }) => {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={handleAdminNavClick}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-[13px] font-medium",
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium speed-skew-nav-item cursor-pointer",
                         isActive
                           ? "bg-gradient-to-r from-cyan-500/15 to-transparent border-l-4 border-cyan-500 text-cyan-500 dark:text-cyan-400 font-semibold"
-                          : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/60 hover:text-slate-800 dark:hover:text-slate-200"
+                          : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/60 hover:text-slate-800 dark:hover:text-slate-200",
+                        skewState === "collapsing" && "animate-item-speed-skew-collapse",
+                        skewState === "expanding" && "animate-item-speed-skew-expand"
                       )}
+                      style={{
+                        animationDelay: skewState ? `${idx * 16}ms` : undefined,
+                      }}
                     >
-                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <Icon className="h-5 w-5 flex-shrink-0 transition-transform duration-200 hover:scale-110" />
                       {!collapsed && <span>{item.title}</span>}
                     </Link>
                   </li>
@@ -201,8 +228,6 @@ const AdminSidebar = ({ user }) => {
             </ul>
           </nav>
 
-
-
           {/* ✅ Logout Button */}
           <div className="p-4 border-t border-slate-200 dark:border-slate-800/80">
             <button
@@ -210,7 +235,7 @@ const AdminSidebar = ({ user }) => {
                 await logout();
                 window.location.href = "/";
               }}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors font-semibold"
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors font-semibold speed-skew-nav-item cursor-pointer"
             >
               <LogOut className="h-5 w-5" />
               {!collapsed && <span>Logout</span>}

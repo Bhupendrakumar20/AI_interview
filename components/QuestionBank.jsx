@@ -1,84 +1,106 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QUESTION_BANK, QUESTION_CATEGORIES } from "@/constants/questionBank";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  CheckboxStrike,
+  BookmarkSave,
+  CopyLinkButton,
+  SegmentControl,
+} from "@/components/ui/MicroInteractions";
 
 const QuestionBank = ({ initialCategory = "general" }) => {
   const [activeKey, setActiveKey] = useState(initialCategory);
+  const [solvedQuestions, setSolvedQuestions] = useState({});
+  const [bookmarkedQuestions, setBookmarkedQuestions] = useState({});
+
+  // Persist solved & bookmarked questions locally
+  useEffect(() => {
+    try {
+      const savedSolved = localStorage.getItem("qb_solved");
+      const savedBookmarks = localStorage.getItem("qb_bookmarks");
+      if (savedSolved) setSolvedQuestions(JSON.parse(savedSolved));
+      if (savedBookmarks) setBookmarkedQuestions(JSON.parse(savedBookmarks));
+    } catch {}
+  }, []);
+
+  const toggleSolved = (qKey) => {
+    setSolvedQuestions((prev) => {
+      const updated = { ...prev, [qKey]: !prev[qKey] };
+      try {
+        localStorage.setItem("qb_solved", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const toggleBookmark = (qKey, isSaved) => {
+    setBookmarkedQuestions((prev) => {
+      const updated = { ...prev, [qKey]: isSaved };
+      try {
+        localStorage.setItem("qb_bookmarks", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    if (isSaved) {
+      toast.success("Question bookmarked!");
+    } else {
+      toast.info("Removed from bookmarks");
+    }
+  };
 
   const activeCategory = QUESTION_BANK[activeKey] ?? QUESTION_BANK.general;
   const questions = activeCategory.questions ?? [];
 
-  const handleCopy = async (q) => {
-    try {
-      // Try modern Clipboard API first
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(q);
-          console.log("Copied:", q);
-          return;
-        } catch (clipboardError) {
-          console.error("Clipboard API failed:", clipboardError);
-          // Fall through to fallback method
-        }
-      }
-
-      // Fallback: Use deprecated method
-      const textarea = document.createElement("textarea");
-      textarea.value = q;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      
-      const successful = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      
-      if (successful) {
-        console.log("Copied (fallback):", q);
-      }
-    } catch (err) {
-      console.error("Copy failed", err);
-    }
-  };
-
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       {/* Left: Category list */}
-      <aside className="w-full lg:w-72 shrink-0">
+      <aside className="w-full lg:w-80 shrink-0">
         <div className="card-border w-full">
           <div className="card p-4 flex flex-col gap-3">
-            <h3 className="text-xl font-semibold mb-1">Categories</h3>
-            <p className="text-xs text-light-100 mb-2">
-              Choose a job area to view the most frequently asked interview
-              questions.
-            </p>
+            <div>
+              <h3 className="text-xl font-bold mb-1 text-foreground">Categories</h3>
+              <p className="text-xs text-muted-foreground">
+                Choose a job track to view curated interview questions.
+              </p>
+            </div>
 
-            <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1">
-              {QUESTION_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.key}
-                  type="button"
-                  onClick={() => setActiveKey(cat.key)}
-                  className={cn(
-                    "w-full text-left text-sm px-3 py-2 rounded-xl border transition-all",
-                    activeKey === cat.key
-                      ? "bg-primary-200 text-dark-100 border-primary-200 font-semibold"
-                      : "bg-dark-200 border-input hover:bg-dark-200/80"
-                  )}
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <span>{cat.title}</span>
-                    {cat.description && (
-                      <span className="text-[11px] text-light-100 line-clamp-2">
-                        {cat.description}
-                      </span>
+            <div className="flex flex-col gap-2 max-h-[580px] overflow-y-auto pr-1">
+              {QUESTION_CATEGORIES.map((cat) => {
+                const isActive = activeKey === cat.key;
+                const questionCount = QUESTION_BANK[cat.key]?.questions?.length || 0;
+
+                return (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => setActiveKey(cat.key)}
+                    className={cn(
+                      "w-full text-left px-3.5 py-3 rounded-xl border transition-all duration-200 cursor-pointer flex items-center justify-between gap-2",
+                      isActive
+                        ? "bg-primary text-primary-foreground border-primary font-bold shadow-sm shadow-primary/20 scale-[1.01]"
+                        : "bg-secondary/40 border-border/70 hover:bg-secondary/80 text-foreground hover:border-primary/40"
                     )}
-                  </div>
-                </button>
-              ))}
+                  >
+                    <span className="text-sm font-medium leading-snug truncate">
+                      {cat.title}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[11px] font-semibold px-2 py-0.5 rounded-md shrink-0",
+                        isActive
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-secondary text-muted-foreground"
+                      )}
+                    >
+                      {questionCount} Qs
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -89,55 +111,84 @@ const QuestionBank = ({ initialCategory = "general" }) => {
         <div className="card-border w-full">
           <div className="card p-5 flex flex-col gap-4">
             <div className="flex flex-col gap-1">
-              <h3 className="text-2xl font-semibold">
+              <h3 className="text-2xl font-semibold text-foreground">
                 {activeCategory.title}
               </h3>
               {activeCategory.description && (
-                <p className="text-sm text-light-100">
+                <p className="text-sm text-muted-foreground">
                   {activeCategory.description}
                 </p>
               )}
-              <p className="text-xs text-light-100 mt-1">
-                Total questions: {questions.length}
+              <p className="text-xs text-muted-foreground mt-1">
+                Total questions: {questions.length} • Solved:{" "}
+                {questions.filter((_, idx) => solvedQuestions[`${activeKey}-${idx}`]).length}
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 max-h-[540px] overflow-y-auto pr-1">
-              {questions.map((q, index) => (
-                <div
-                  key={`${activeKey}-${index}`}
-                  className="rounded-xl border border-input bg-dark-200 px-4 py-3 flex items-start justify-between gap-3"
-                >
-                  <div className="flex-1">
-                    <p className="text-sm leading-relaxed">
-                      <span className="text-primary-200 mr-1">
-                        {index + 1}.
-                      </span>
-                      {q}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs min-w-[60px]"
-                    onClick={() => handleCopy(q)}
+            <div className="flex flex-col gap-3 max-h-[580px] overflow-y-auto pr-1">
+              {questions.map((q, index) => {
+                const qKey = `${activeKey}-${index}`;
+                const isSolved = !!solvedQuestions[qKey];
+                const isBookmarked = !!bookmarkedQuestions[qKey];
+
+                return (
+                  <div
+                    key={qKey}
+                    className={cn(
+                      "rounded-xl border p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-200",
+                      isSolved
+                        ? "bg-muted/30 border-border/40 opacity-75"
+                        : "bg-card border-border/70 hover:border-primary/40 shadow-xs"
+                    )}
                   >
-                    Copy
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <CheckboxStrike
+                        checked={isSolved}
+                        onChange={() => toggleSolved(qKey)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={cn(
+                            "text-sm leading-relaxed transition-all duration-200",
+                            isSolved
+                              ? "line-through text-muted-foreground"
+                              : "text-foreground font-medium"
+                          )}
+                        >
+                          <span className="text-primary font-bold mr-1.5">
+                            {index + 1}.
+                          </span>
+                          {q}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Micro-Interaction Actions */}
+                    <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                      <BookmarkSave
+                        active={isBookmarked}
+                        onToggle={(state) => toggleBookmark(qKey, state)}
+                      />
+                      <CopyLinkButton
+                        text={q}
+                        label="Copy"
+                        className="py-1 px-2.5"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
 
               {questions.length === 0 && (
-                <p className="text-sm text-light-100">
+                <p className="text-sm text-muted-foreground">
                   No questions added yet for this category.
                 </p>
               )}
             </div>
 
-            <p className="text-[11px] text-light-100 mt-1">
-              Tip: These questions can also be mixed into your AI-generated
-              interviews based on the selected role/track.
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Tip: Check the box to track practiced questions. Bookmarked items stay saved in your browser.
             </p>
           </div>
         </div>

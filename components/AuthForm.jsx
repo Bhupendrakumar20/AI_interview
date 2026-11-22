@@ -12,6 +12,8 @@ import { useState, useEffect } from "react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import FormField from "./FormField";
+import { BouncingDots } from "@/components/ui/LoadingAnimations";
+import { ParticleBurst } from "@/components/ui/MicroInteractions";
 
 import { signIn, signUp, sendEmailOTP } from "@/lib/actions/auth.action";
 
@@ -228,14 +230,25 @@ const AuthForm = ({ type }) => {
             )}
 
             <div className="flex flex-col gap-3">
-              <Button className="btn cursor-pointer w-full" type="submit" disabled={isSendingOtp}>
-                {isSendingOtp 
-                  ? "Sending OTP..." 
-                  : isSignIn 
-                    ? (showOtp ? "Verify and Sign In" : "Sign In") 
-                    : showOtp 
-                      ? "Verify and Register" 
-                      : "Send OTP and Register"}
+              <Button
+                variant="liquid-glass"
+                className="w-full relative overflow-visible font-bold text-sm py-2.5 shadow-md"
+                type="submit"
+                disabled={isSendingOtp}
+              >
+                <ParticleBurst active={isSendingOtp} count={8} color="#6366f1" />
+                {isSendingOtp ? (
+                  <div className="flex items-center gap-2">
+                    <BouncingDots size={5} color="#ffffff" />
+                    <span>Sending OTP...</span>
+                  </div>
+                ) : isSignIn ? (
+                  showOtp ? "Verify and Sign In" : "Sign In"
+                ) : showOtp ? (
+                  "Verify and Register"
+                ) : (
+                  "Send OTP and Register"
+                )}
               </Button>
 
               <div className="flex items-center my-2">

@@ -14,6 +14,7 @@ import { searchInternships } from "@/lib/actions/general.action";
 import { searchInternshipsJSearch } from "@/lib/actions/jsearch.action";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { toast } from "sonner";
+import { BouncingBalls } from "@/components/ui/LoadingAnimations";
 
 const INTERNSHIP_CACHE_KEY = "prepwise:internships:v2";
 const CATEGORY_PATTERNS = {
@@ -638,7 +639,9 @@ export default function InternshipsPage() {
             </div>
 
             {loading ? (
-              <div className="text-center py-10">Loading featured internships...</div>
+              <div className="flex items-center justify-center py-12">
+                <BouncingBalls size="md" label="Loading featured internships..." />
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {featuredInternships.map((internship) => (
@@ -680,7 +683,9 @@ export default function InternshipsPage() {
           </div>
 
           {loading ? (
-            <div className="text-center py-20">Loading internships...</div>
+            <div className="flex items-center justify-center py-20">
+              <BouncingBalls size="lg" label="Loading curated internships..." />
+            </div>
           ) : internships.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {internships.map((internship) => (

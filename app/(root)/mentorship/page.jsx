@@ -52,8 +52,8 @@ export default function MentorshipPage() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Find Your Mentor</h1>
-        <p className="text-light-100 max-w-2xl mx-auto">
+        <h1 className="text-4xl font-extrabold mb-3 text-slate-900 dark:text-white tracking-tight">Find Your Mentor</h1>
+        <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed text-sm sm:text-base">
           Connect with experienced professionals who can guide you through your 
           career journey, interview preparation, and skill development
         </p>

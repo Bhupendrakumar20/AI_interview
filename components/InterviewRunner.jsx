@@ -17,6 +17,9 @@ import {
   abandonInterviewSession,
   createFeedback,
 } from "@/lib/actions/general.action";
+import { EqualizerBars, BouncingDots } from "@/components/ui/LoadingAnimations";
+import { SegmentBar } from "@/components/ui/ProgressSteps";
+import { ParticleBurst } from "@/components/ui/MicroInteractions";
 
 const InterviewRunner = ({ interview, user, existingFeedback }) => {
   const router = useRouter();
@@ -511,6 +514,9 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
             <p className="text-sm text-light-100">
               Question {currentIndex + 1} of {questions.length || 1}
             </p>
+            <div className="w-full max-w-xs mt-2">
+              <SegmentBar totalSegments={questions.length || 1} currentSegment={currentIndex + 1} />
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -546,9 +552,16 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                 <button
                   type="button"
                   onClick={speakQuestion}
-                  className="rounded-full border border-input px-3 py-1 text-sm flex items-center gap-1 hover:bg-dark-200"
+                  className="rounded-full border border-input px-3.5 py-1.5 text-xs flex items-center gap-2 hover:bg-dark-200 transition-all font-semibold cursor-pointer"
                 >
-                  {isSpeaking ? "Playing..." : "Read aloud"}
+                  {isSpeaking ? (
+                    <>
+                      <EqualizerBars bars={4} height={14} color="#6366f1" />
+                      <span className="text-primary font-bold">Speaking...</span>
+                    </>
+                  ) : (
+                    <span>Read aloud</span>
+                  )}
                 </button>
               </div>
               <p className="text-light-100 text-sm md:text-base leading-relaxed">
@@ -578,10 +591,18 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
               <div className="flex flex-wrap items-center justify-between gap-3 mt-2">
                 <Button
                   type="button"
-                  className="btn-secondary flex items-center gap-2"
+                  variant={isRecordingVoice ? "destructive" : "secondary"}
+                  className="flex items-center gap-2.5 font-bold transition-all shadow-sm"
                   onClick={toggleVoiceToText}
                 >
-                  {isRecordingVoice ? "Stop Recording" : "Start Recording"}
+                  {isRecordingVoice ? (
+                    <>
+                      <EqualizerBars bars={4} height={14} color="#ffffff" />
+                      <span>Recording... (Stop)</span>
+                    </>
+                  ) : (
+                    <span>Start Recording</span>
+                  )}
                 </Button>
 
                 <div className="flex gap-2">
@@ -620,13 +641,20 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
                   ) : (
                     <Button
                       type="button"
-                      className="btn-primary"
+                      variant="aurora"
+                      className="font-bold relative overflow-visible shadow-md"
                       onClick={() => handleFinish(false)}
                       disabled={isSubmitting}
                     >
-                      {isSubmitting
-                        ? "Finishing & Generating Feedback..."
-                        : "Finish Interview"}
+                      <ParticleBurst active={isSubmitting} count={8} color="#6366f1" />
+                      {isSubmitting ? (
+                        <div className="flex items-center gap-2">
+                          <BouncingDots size={5} color="#ffffff" />
+                          <span>Generating Feedback...</span>
+                        </div>
+                      ) : (
+                        "Finish Interview"
+                      )}
                     </Button>
                   )}
                 </div>

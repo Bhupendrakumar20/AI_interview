@@ -49,6 +49,9 @@ import { getQuestionAnswer, getQuestionTips } from "@/lib/actions/mock-test.acti
 import {
   finishInterviewModeSessionAction,
 } from "@/lib/actions/interview-session.action";
+import { SegmentBar } from "@/components/ui/ProgressSteps";
+import { TypingDots, DotsGridWave, BouncingDots } from "@/components/ui/LoadingAnimations";
+import { ParticleBurst } from "@/components/ui/MicroInteractions";
 
 const INITIAL_CODE_TEMPLATES = {
   javascript: `// Write your JavaScript solution here\nfunction solve(input) {\n  console.log("Hello PrepWise JS");\n  return true;\n}\n\nsolve();`,
@@ -771,11 +774,14 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
           <Button
             onClick={handleSubmitTest}
             disabled={isSubmitting}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold flex items-center gap-1.5 px-4"
+            variant="aurora"
+            className="text-white font-bold flex items-center gap-1.5 px-4 relative overflow-visible shadow-lg"
           >
+            <ParticleBurst active={isSubmitting} count={8} color="#6366f1" />
             {isSubmitting ? (
               <>
-                <Sparkles size={16} className="animate-spin" /> Evaluating...
+                <BouncingDots size={5} color="#ffffff" />
+                <span className="ml-1.5">Evaluating...</span>
               </>
             ) : (
               <>
@@ -824,6 +830,14 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
                   <ChevronRight size={16} />
                 </Button>
               </div>
+            </div>
+
+            {/* Segment Progress Bar */}
+            <div className="my-1">
+              <SegmentBar
+                totalSegments={questions.length || 1}
+                currentSegment={currentQuestionIndex + 1}
+              />
             </div>
 
             <h3 className="text-base font-bold text-slate-100 leading-snug">

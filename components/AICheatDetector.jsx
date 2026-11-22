@@ -80,7 +80,7 @@ export default function AICheatDetector() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+    <div className="max-w-4xl mx-auto p-6 bg-card text-card-foreground border border-border rounded-xl shadow-lg backdrop-blur-md">
       <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
         <TrendingUp className="w-6 h-6" />
         AI Usage Detection System

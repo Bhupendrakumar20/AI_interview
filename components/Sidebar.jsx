@@ -1,7 +1,7 @@
 // components/Sidebar.jsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -33,6 +33,56 @@ const Icon = ({ name, className = "w-5 h-5" }) => {
 const Sidebar = ({ user, onCloseMobile }) => {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [skewState, setSkewState] = useState(null); // 'collapsing' | 'expanding' | null
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Monitor screen width to cleanly distinguish mobile vs web users
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Trigger dynamic speed-skew transition effect on desktop/web
+  const triggerSkewAnimation = (direction) => {
+    setSkewState(direction);
+    setTimeout(() => {
+      setSkewState(null);
+    }, 400);
+  };
+
+  /**
+   * Feature section click handler:
+   * Whenever a user clicks ANY feature section, it automatically collapses
+   * the side navigation bar ONLY for mobile viewers and users, NOT for web users!
+   */
+  const handleFeatureClick = () => {
+    const isMobileDevice = isMobile || (typeof window !== "undefined" && window.innerWidth < 768);
+    if (isMobileDevice && onCloseMobile) {
+      onCloseMobile();
+    }
+  };
+
+  /**
+   * Collapse button toggle:
+   * On mobile: collapses the mobile drawer
+   * On web: collapses/expands the sidebar with the speed-skew animation
+   */
+  const handleCollapseToggle = () => {
+    const isMobileDevice = isMobile || (typeof window !== "undefined" && window.innerWidth < 768);
+    if (isMobileDevice) {
+      if (onCloseMobile) {
+        onCloseMobile();
+      }
+    } else {
+      const nextCollapsed = !collapsed;
+      triggerSkewAnimation(nextCollapsed ? "collapsing" : "expanding");
+      setCollapsed(nextCollapsed);
+    }
+  };
 
   const mainMenu = [
     { label: "Home", href: "/", icon: "home" },
@@ -66,19 +116,46 @@ const Sidebar = ({ user, onCloseMobile }) => {
     { label: "Saved Internships", href: "/saved-internships" },
   ];
 
+  const checkIsActive = (href) => {
+    if (href === "/") {
+      return pathname === "/";
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
   return (
-    <aside className={cn(
-      "sticky top-0 h-screen border-r border-border bg-card transition-all duration-300 z-40 shadow-md",
-      collapsed ? "w-20" : "w-64"
-    )}>
-      <div className="flex flex-col h-full">
+    <aside
+      className={cn(
+        "sticky top-0 h-smart h-screen max-h-smart border-r border-border bg-card/90 backdrop-blur-xl z-40 shadow-md origin-left select-none overflow-hidden",
+        "transition-[width] duration-300 ease-out",
+        collapsed ? "w-20" : "w-64",
+        skewState === "collapsing" && "animate-speed-skew-collapse",
+        skewState === "expanding" && "animate-speed-skew-expand"
+      )}
+      style={{
+        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+      }}
+    >
+      <div className="flex flex-col h-full max-h-full min-h-0">
         {/* Logo */}
-        <div className="p-4 border-b border-border bg-background/50 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <Image src="/logo_icon.png" alt="logo" width={32} height={32} className="object-contain" />
+        <div className="p-4 border-b border-border bg-card/50 flex items-center justify-between">
+          <Link
+            href="/"
+            onClick={handleFeatureClick}
+            className="flex items-center gap-3 speed-skew-nav-item py-1 px-1.5 rounded-lg group"
+          >
+            <Image
+              src="/logo_icon.png"
+              alt="logo"
+              width={32}
+              height={32}
+              className="object-contain transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-6"
+            />
             {!collapsed && (
               <div>
-                <h2 className="text-foreground font-bold text-lg leading-tight tracking-tight">PrepWise</h2>
+                <h2 className="text-foreground font-bold text-lg leading-tight tracking-tight group-hover:text-primary transition-colors">
+                  PrepWise
+                </h2>
                 <p className="text-xs text-muted-foreground">Career Platform</p>
               </div>
             )}
@@ -99,54 +176,69 @@ const Sidebar = ({ user, onCloseMobile }) => {
 
         {/* User Profile */}
         <div className="px-3 py-3 border-b border-border">
-          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/30 border border-border/50 hover:bg-secondary/50 transition-colors">
-            <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-lg size-10 flex items-center justify-center shadow-sm shrink-0">
+          <Link
+            href="/profile"
+            onClick={handleFeatureClick}
+            className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/30 border border-border/50 hover:bg-secondary/50 speed-skew-nav-item transition-all group"
+          >
+            <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-lg size-10 flex items-center justify-center shadow-sm shrink-0 transition-transform duration-200 group-hover:scale-105 group-hover:-rotate-3">
               <span className="font-bold text-sm">
                 {user?.name?.charAt(0) || "U"}
               </span>
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground truncate text-sm">{user?.name || "User"}</p>
+                <p className="font-semibold text-foreground truncate text-sm group-hover:text-primary transition-colors">
+                  {user?.name || "User"}
+                </p>
                 <p className="text-xs text-muted-foreground truncate">{user?.email || "No Email"}</p>
               </div>
             )}
-          </div>
+          </Link>
         </div>
 
         {/* Main Menu */}
         <div className="flex-1 overflow-y-auto p-3">
           <div className="space-y-1">
-            {mainMenu.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            {mainMenu.map((item, idx) => {
+              const isActive = checkIsActive(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={onCloseMobile}
+                  onClick={handleFeatureClick}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg relative transition-all group overflow-hidden",
-                    "transition-[transform,background-color] duration-200 ease-out",
+                    "flex items-center gap-3 px-4 py-3 rounded-lg relative overflow-hidden speed-skew-nav-item group cursor-pointer",
                     isActive
-                      ? "bg-primary/8 text-primary font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-primary/4 hover:translate-x-0.5"
+                      ? "bg-primary/10 text-primary font-semibold shadow-xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-primary/5",
+                    skewState === "collapsing" && "animate-item-speed-skew-collapse",
+                    skewState === "expanding" && "animate-item-speed-skew-expand"
                   )}
                   style={{
-                    transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease"
+                    animationDelay: skewState ? `${idx * 16}ms` : undefined,
                   }}
                 >
                   {/* Left Pill Indicator */}
                   {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-6 bg-primary rounded-r-full speed-skew-indicator shadow-[0_0_10px_rgba(99,102,241,0.6)]" />
                   )}
 
-                  <div className={cn(
-                    "shrink-0 transition-transform duration-200 ease-out",
-                    isActive ? "text-primary" : "text-muted-foreground group-hover:translate-x-[2px] group-hover:text-foreground"
-                  )}>
+                  <div
+                    className={cn(
+                      "shrink-0 transition-all duration-200 ease-out",
+                      isActive
+                        ? "text-primary scale-105"
+                        : "text-muted-foreground group-hover:scale-110 group-hover:-rotate-3 group-hover:text-primary"
+                    )}
+                  >
                     <Icon name={item.icon} className="w-5 h-5" />
                   </div>
-                  {!collapsed && <span className="truncate text-sm font-medium">{item.label}</span>}
+                  {!collapsed && (
+                    <span className="truncate text-sm font-medium transition-transform duration-200 group-hover:translate-x-0.5">
+                      {item.label}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -159,25 +251,32 @@ const Sidebar = ({ user, onCloseMobile }) => {
                 <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Your Dashboards</h3>
               </div>
               <div className="space-y-1 px-2">
-                {dashboardItems.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                {dashboardItems.map((item, idx) => {
+                  const isActive = checkIsActive(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={onCloseMobile}
+                      onClick={handleFeatureClick}
                       className={cn(
-                        "flex items-center gap-2 px-4 py-2 text-sm rounded-lg relative transition-all duration-200 group",
+                        "flex items-center gap-2 px-4 py-2 text-sm rounded-lg relative speed-skew-nav-item group cursor-pointer",
                         isActive
-                          ? "bg-primary/8 text-primary font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-primary/4 hover:translate-x-0.5"
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-primary/5",
+                        skewState === "collapsing" && "animate-item-speed-skew-collapse",
+                        skewState === "expanding" && "animate-item-speed-skew-expand"
                       )}
+                      style={{
+                        animationDelay: skewState ? `${(mainMenu.length + idx) * 16}ms` : undefined,
+                      }}
                     >
                       {/* Left Pill Indicator */}
                       {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-primary rounded-r-full" />
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-primary rounded-r-full speed-skew-indicator shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
                       )}
-                      <span className="text-xs opacity-60 group-hover:translate-x-[2px] transition-transform">›</span>
+                      <span className="text-xs opacity-60 group-hover:translate-x-1 group-hover:text-primary transition-all">
+                        ›
+                      </span>
                       <span className="truncate">{item.label}</span>
                     </Link>
                   );
@@ -188,13 +287,21 @@ const Sidebar = ({ user, onCloseMobile }) => {
         </div>
 
         {/* Collapse Button */}
-        <div className="p-3 border-t border-border bg-background/50">
+        <div className="p-3 border-t border-border bg-card/50">
           <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="w-full p-2 rounded-lg bg-secondary hover:bg-primary/8 text-muted-foreground hover:text-primary transition-all duration-200 flex items-center justify-center font-semibold text-sm cursor-pointer"
+            onClick={handleCollapseToggle}
+            type="button"
+            className="w-full p-2.5 rounded-lg bg-secondary hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all duration-200 flex items-center justify-center font-semibold text-sm cursor-pointer speed-skew-nav-item group"
+            title={isMobile ? "Collapse navigation menu" : (collapsed ? "Expand sidebar" : "Collapse sidebar")}
           >
-            {collapsed ? "»" : "«"}
-            {!collapsed && <span className="ml-2 text-xs">Collapse</span>}
+            <span className="text-base transition-transform duration-200 group-hover:scale-125">
+              {isMobile ? "«" : (collapsed ? "»" : "«")}
+            </span>
+            {(!collapsed || isMobile) && (
+              <span className="ml-2 text-xs font-medium">
+                {isMobile ? "Collapse" : "Collapse"}
+              </span>
+            )}
           </button>
         </div>
       </div>

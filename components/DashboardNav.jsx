@@ -18,10 +18,10 @@ const DashboardNav = ({ items }) => {
               key={item.href}
               href={item.href}
               className={cn(
-                "px-4 py-2 text-sm font-medium rounded-full transition-colors whitespace-nowrap",
+                "px-4 py-2 text-sm font-semibold rounded-full transition-all whitespace-nowrap",
                 isActive
-                  ? "bg-primary-200 text-dark-100"
-                  : "text-light-100 hover:bg-dark-200"
+                  ? "bg-indigo-600 dark:bg-indigo-500 text-white shadow-sm shadow-indigo-500/25"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
               )}
             >
               {item.label}

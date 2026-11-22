@@ -48,14 +48,14 @@ export default function ApplicationModal({ internship, userId, userEmail, onClos
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-dark-300 rounded-lg max-w-md w-full p-6">
-        <h2 className="text-2xl font-bold mb-2">Apply for {internship.title}</h2>
-        <p className="text-light-100 mb-6">at {internship.company}</p>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-card text-card-foreground border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl backdrop-blur-xl">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Apply for {internship.title}</h2>
+        <p className="text-sm text-indigo-600 dark:text-indigo-300 mb-6 font-medium">at {internship.company}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
               Resume URL *
             </label>
             <Input
@@ -65,13 +65,13 @@ export default function ApplicationModal({ internship, userId, userEmail, onClos
               placeholder="https://drive.google.com/your-resume"
               required
             />
-            <p className="text-xs text-light-100 mt-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Provide a link to your resume (Google Drive, Dropbox, etc.)
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
               Cover Letter
             </label>
             <Textarea

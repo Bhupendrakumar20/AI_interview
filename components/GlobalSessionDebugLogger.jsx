@@ -8,6 +8,8 @@ export default function GlobalSessionDebugLogger() {
   const lastLogSignatureRef = useRef("");
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return undefined;
+
     let active = true;
 
     const logSessionContext = async () => {
@@ -43,11 +45,8 @@ export default function GlobalSessionDebugLogger() {
     };
 
     logSessionContext();
-    const intervalId = setInterval(logSessionContext, 10000);
-
     return () => {
       active = false;
-      clearInterval(intervalId);
     };
   }, [pathname]);
 

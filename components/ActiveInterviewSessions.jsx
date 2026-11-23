@@ -35,9 +35,16 @@ export default function ActiveInterviewSessions() {
 
   useEffect(() => {
     refreshSessions();
-    const intervalId = setInterval(refreshSessions, 10000);
-    return () => clearInterval(intervalId);
   }, [refreshSessions]);
+
+  useEffect(() => {
+    if (!sessions.length) return undefined;
+
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") refreshSessions();
+    }, 60000);
+    return () => clearInterval(intervalId);
+  }, [refreshSessions, sessions.length]);
 
   const handleEndSession = async (sessionId) => {
     setEndingSessionId(sessionId);

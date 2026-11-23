@@ -4,7 +4,6 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ThemeProvider } from "@/lib/theme-context";
 import { Analytics } from "@vercel/analytics/next";
-import GlobalSessionDebugLogger from "@/components/GlobalSessionDebugLogger";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,7 +21,6 @@ export default function RootLayout({ children }) {
       <body className={`${inter.className} bg-background text-foreground`}>
         <ThemeProvider>
           {children}
-          <GlobalSessionDebugLogger />
           <ToastProvider />
         </ThemeProvider>
         <Analytics />

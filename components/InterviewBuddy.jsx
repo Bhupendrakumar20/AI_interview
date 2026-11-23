@@ -93,8 +93,6 @@ const InterviewBuddy = ({ userId }) => {
   useEffect(() => {
     if (!userId) return undefined;
     fetchStats();
-    const intervalId = setInterval(fetchStats, 10000);
-    return () => clearInterval(intervalId);
   }, [fetchStats, userId]);
 
   const handleCreateSession = async () => {

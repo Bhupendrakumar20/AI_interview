@@ -390,10 +390,11 @@ const AiBuddyInterviewSession = ({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-950">
+      <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-slate-200">Starting your adaptive interview...</p>
+          <p className="text-slate-700 dark:text-slate-200">Starting your adaptive interview...</p>
+
         </div>
       </div>
     );
@@ -401,9 +402,9 @@ const AiBuddyInterviewSession = ({
 
   if (!currentQuestion) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-950">
+      <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
         <div className="text-center">
-          <p className="text-slate-200 mb-4">No question available</p>
+          <p className="text-slate-700 dark:text-slate-200 mb-4">No question available</p>
           <button onClick={onClose} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white">
             Close
           </button>
@@ -417,12 +418,12 @@ const AiBuddyInterviewSession = ({
   const difficultyLabel = difficulty <= 3 ? 'Easy' : difficulty <= 7 ? 'Medium' : 'Hard';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 overflow-y-auto">
-      <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-4 z-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-y-auto transition-colors duration-300">
+      <div className="sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-4 z-50">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Adaptive AI Interview</h1>
-            <p className="text-slate-400 text-sm">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Adaptive AI Interview</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">
               Question {questionNumber} of {maxQuestions} · Difficulty {difficulty.toFixed(1)}/10
             </p>
           </div>
@@ -430,7 +431,7 @@ const AiBuddyInterviewSession = ({
             <div className="text-3xl font-bold font-mono">
               {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
             </div>
-            <p className="text-xs text-slate-400">Time Remaining</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Time Remaining</p>
           </div>
         </div>
 
@@ -440,7 +441,7 @@ const AiBuddyInterviewSession = ({
           </div>
         )}
 
-        <div className="w-full bg-slate-800 rounded-full h-2">
+        <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
           <div
             className="bg-linear-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
             style={{ width: `${(questionNumber / maxQuestions) * 100}%` }}
@@ -449,64 +450,60 @@ const AiBuddyInterviewSession = ({
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-8">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-8 mb-8 shadow-xs">
           <div className="flex items-center gap-3 mb-6">
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              difficultyLabel === 'Easy' ? 'bg-green-900/30 text-green-300' :
-              difficultyLabel === 'Medium' ? 'bg-yellow-900/30 text-yellow-300' :
-              'bg-red-900/30 text-red-300'
-            }`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${difficultyLabel === 'Easy' ? 'bg-emerald-100 dark:bg-green-900/30 text-emerald-800 dark:text-green-300 border border-emerald-300 dark:border-transparent' :
+                difficultyLabel === 'Medium' ? 'bg-amber-100 dark:bg-yellow-900/30 text-amber-800 dark:text-yellow-300 border border-amber-300 dark:border-transparent' :
+                  'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border border-red-300 dark:border-transparent'
+              }`}>
               {difficultyLabel}
             </span>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 capitalize">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 capitalize">
               {currentQuestion.topic}
             </span>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-500">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
               {currentQuestion.source === 'leetcode' ? 'LeetCode' : 'AI-generated'}
             </span>
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-4">{currentQuestion.title}</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">{currentQuestion.title}</h2>
 
           <button
             onClick={() => readCurrentQuestion()}
             disabled={isSpeaking}
-            className={`mb-6 px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-              isSpeaking ? 'bg-purple-600/50 text-purple-200 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 text-white'
-            }`}
+            className={`mb-6 px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${isSpeaking ? 'bg-purple-600/50 text-purple-200 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 text-white'
+              }`}
           >
             {isSpeaking ? 'Reading...' : '♪ Read Question Aloud'}
           </button>
 
-          <p className="text-slate-300 text-lg leading-relaxed">{currentQuestion.description}</p>
+          <p className="text-slate-600 dark:text-slate-300 text-lg leading-relaxed">{currentQuestion.description}</p>
         </div>
 
         {lastEvaluation && (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-4 mb-8 text-sm">
-            <span className="text-slate-400">Previous answer: </span>
-            <span className="font-semibold text-blue-300">{lastEvaluation.score}/10</span>
-            <span className="text-slate-400"> — {lastEvaluation.feedback}</span>
+          <div className="bg-blue-50/70 dark:bg-slate-900/60 border border-blue-200 dark:border-slate-800 rounded-lg p-4 mb-8 text-sm text-slate-700 dark:text-slate-300">
+            <span className="text-slate-500 dark:text-slate-400">Previous answer: </span>
+            <span className="font-semibold text-blue-600 dark:text-blue-300">{lastEvaluation.score}/10</span>
+            <span className="text-slate-600 dark:text-slate-400"> — {lastEvaluation.feedback}</span>
           </div>
         )}
 
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 mb-8">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-8 mb-8 shadow-xs">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-white">Your Answer</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Your Answer</h3>
             {isDSAQuestion && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setAnswerMode('text')}
-                  className={`px-3 py-1 text-sm font-medium rounded-lg transition ${
-                    answerMode === 'text' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
+                  className={`px-3 py-1 text-sm font-medium rounded-lg transition ${answerMode === 'text' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                    }`}
                 >
                   Text Answer
                 </button>
                 <button
                   onClick={() => setAnswerMode('code')}
-                  className={`px-3 py-1 text-sm font-medium rounded-lg transition ${
-                    answerMode === 'code' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
+                  className={`px-3 py-1 text-sm font-medium rounded-lg transition ${answerMode === 'code' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                    }`}
                 >
                   Code Solution
                 </button>
@@ -518,7 +515,7 @@ const AiBuddyInterviewSession = ({
             <div className="space-y-4">
               <textarea
                 placeholder="Type your answer here..."
-                className="w-full h-40 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
+                className="w-full h-40 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
                 value={currentAnswerText}
                 onChange={(e) => handleAnswerChange(e.target.value)}
               />
@@ -554,7 +551,7 @@ const AiBuddyInterviewSession = ({
         <div className="flex justify-center mb-8">
           <button
             onClick={finishEarly}
-            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition-all"
+            className="px-6 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-lg transition-all cursor-pointer"
           >
             End Interview Early
           </button>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import InterviewCard from "@/components/InterviewCard";
@@ -28,19 +29,41 @@ async function InterviewPage() {
       <InterviewHistoryRefresh />
       <ActiveInterviewSessions />
       {/* Interview Buddy CTA */}
-      <section className="relative overflow-hidden bg-linear-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-8">
+      <section className="relative overflow-hidden bg-linear-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-indigo-500/30 rounded-2xl p-6 sm:p-8 backdrop-blur-md">
         <div className="absolute inset-0 bg-linear-to-r from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
-        <div className="relative flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold mb-2">Interview Buddy</h3>
-            <p className="text-light-100 mb-4 max-w-md">
+        <div className="relative flex flex-col-reverse sm:flex-row items-start sm:items-center justify-between gap-6">
+          <div className="flex-1">
+            <div className="flex items-center gap-2.5 mb-2">
+              <Image
+                src="/interview-buddy-illustration.png"
+                alt="Interview Buddy"
+                width={32}
+                height={32}
+                className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-sm select-none"
+              />
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Interview Buddy</h3>
+            </div>
+            <p className="text-slate-600 dark:text-slate-300 mb-5 max-w-md text-sm sm:text-base leading-relaxed">
               Practice with a human partner or AI interviewer. Get real-time coaching, adaptive questions, and detailed performance reports.
             </p>
-            <Link href="/interview/buddy" className="inline-flex items-center gap-2 px-6 py-2.5 bg-linear-to-r from-blue-500 to-blue-600 hover:shadow-lg hover:shadow-blue-500/30 rounded-lg font-medium transition">
+            <Link
+              href="/interview/buddy"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-linear-to-r from-blue-500 via-indigo-500 to-blue-600 hover:from-blue-600 hover:to-indigo-600 text-white hover:shadow-lg hover:shadow-blue-500/30 rounded-xl font-semibold transition-all duration-200 cursor-pointer active:scale-95 shadow-md"
+            >
               ✦ Try Interview Buddy
             </Link>
           </div>
-          <div className="text-6xl">▲</div>
+          <div className="relative shrink-0 flex items-center justify-center self-center sm:self-auto">
+            <div className="absolute inset-0 bg-indigo-500/25 rounded-full blur-2xl -z-10" />
+            <Image
+              src="/interview-buddy-illustration.png"
+              alt="Interview Buddy Avatar"
+              width={140}
+              height={140}
+              className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 object-contain drop-shadow-xl select-none hover:scale-105 transition-transform duration-300"
+              priority
+            />
+          </div>
         </div>
       </section>
       

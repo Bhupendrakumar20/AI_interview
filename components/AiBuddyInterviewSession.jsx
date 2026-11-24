@@ -90,8 +90,13 @@ const AiBuddyInterviewSession = ({
   useEffect(() => {
     if (!sessionId) return undefined;
     let active = true;
+    let sessionActive = true;
+    let checking = false;
+    let intervalId;
 
     const checkSessionStatus = async () => {
+      if (!active || !sessionActive || checking) return;
+      checking = true;
       try {
         const response = await fetch(
           `/api/interview-sessions?sessionId=${encodeURIComponent(sessionId)}`,
@@ -101,21 +106,25 @@ const AiBuddyInterviewSession = ({
         if (!response.ok) throw new Error(data.error || 'Failed to fetch session status');
         if (!active) return;
 
-        if (
-          data.session &&
-          data.session.status !== "active" &&
-          !hasHandledSessionClose.current
-        ) {
-          hasHandledSessionClose.current = true;
-          onSessionClosed?.(data.session);
+        if (data.session && data.session.status !== "active") {
+          sessionActive = false;
+          clearInterval(intervalId);
+          if (!hasHandledSessionClose.current) {
+            hasHandledSessionClose.current = true;
+            onSessionClosed?.(data.session);
+          }
         }
       } catch (error) {
         if (active) console.error('Failed to check AI Buddy session status:', error);
+      } finally {
+        checking = false;
       }
     };
 
     checkSessionStatus();
-    const intervalId = setInterval(checkSessionStatus, 10000);
+    intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") checkSessionStatus();
+    }, 60000);
     return () => {
       active = false;
       clearInterval(intervalId);

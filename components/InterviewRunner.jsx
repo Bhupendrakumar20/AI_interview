@@ -54,8 +54,13 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
   useEffect(() => {
     if (!interview.threadId) return undefined;
     let active = true;
+    let sessionActive = true;
+    let checking = false;
+    let intervalId;
 
     const checkSessionStatus = async () => {
+      if (!active || !sessionActive || checking) return;
+      checking = true;
       try {
         const response = await fetch(
           `/api/interview-sessions?sessionId=${encodeURIComponent(interview.threadId)}`,
@@ -66,6 +71,8 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
         if (!active) return;
 
         if (data.session && data.session.status !== "active") {
+          sessionActive = false;
+          clearInterval(intervalId);
           toast.info(
             data.session.status === "completed"
               ? "This interview ended on another device. Your results are saved."
@@ -75,11 +82,15 @@ const InterviewRunner = ({ interview, user, existingFeedback }) => {
         }
       } catch (error) {
         if (active) console.error("Failed to check interview session status:", error);
+      } finally {
+        checking = false;
       }
     };
 
     checkSessionStatus();
-    const intervalId = setInterval(checkSessionStatus, 10000);
+    intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") checkSessionStatus();
+    }, 60000);
     return () => {
       active = false;
       clearInterval(intervalId);

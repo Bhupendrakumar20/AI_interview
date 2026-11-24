@@ -135,10 +135,15 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   }, [onClose]);
 
   useEffect(() => {
-    if (!sessionId) return undefined;
+    if (!sessionId || evaluation) return undefined;
     let active = true;
+    let sessionActive = true;
+    let checking = false;
+    let intervalId;
 
     const checkSessionStatus = async () => {
+      if (!active || !sessionActive || checking) return;
+      checking = true;
       try {
         const response = await fetch(
           `/api/interview-sessions?sessionId=${encodeURIComponent(sessionId)}`,
@@ -148,28 +153,36 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
         if (!response.ok) throw new Error(data.error || "Failed to fetch session status");
         if (!active) return;
 
-        if (
-          data.session?.status === "abandoned" &&
-          !hasHandledRemoteCloseRef.current
-        ) {
-          hasHandledRemoteCloseRef.current = true;
-          toast.warning("This mock test was ended from another device.");
-          await onCloseRef.current?.();
-        } else if (
-          data.session?.status === "completed" &&
-          !evaluation &&
-          data.session.result?.evaluation
-        ) {
-          setEvaluation(data.session.result.evaluation);
-          setIsTimerRunning(false);
+        if (data.session && data.session.status !== "active") {
+          sessionActive = false;
+          clearInterval(intervalId);
+
+          if (
+            data.session.status === "abandoned" &&
+            !hasHandledRemoteCloseRef.current
+          ) {
+            hasHandledRemoteCloseRef.current = true;
+            toast.warning("This mock test was ended from another device.");
+            await onCloseRef.current?.();
+          } else if (
+            data.session.status === "completed" &&
+            data.session.result?.evaluation
+          ) {
+            setEvaluation(data.session.result.evaluation);
+            setIsTimerRunning(false);
+          }
         }
       } catch (error) {
         if (active) console.error("Failed to check mock test session status:", error);
+      } finally {
+        checking = false;
       }
     };
 
     checkSessionStatus();
-    const intervalId = setInterval(checkSessionStatus, 10000);
+    intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") checkSessionStatus();
+    }, 60000);
     return () => {
       active = false;
       clearInterval(intervalId);

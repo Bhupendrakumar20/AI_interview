@@ -73,12 +73,12 @@ export default function MockTestPage() {
   const refreshResults = useCallback(async () => {
     try {
       const response = await fetch(
-        "/api/interview-sessions?mode=mock-test&limit=10",
+        "/api/interview-sessions?mode=mock-test&limit=10&excludeActive=true",
         { cache: "no-store" }
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to fetch mock test results");
-      setRecentResults(data.sessions.filter((session) => session.status !== "active"));
+      setRecentResults(data.sessions);
     } catch (error) {
       console.error("Failed to refresh mock test results:", error);
     }
@@ -86,8 +86,6 @@ export default function MockTestPage() {
 
   useEffect(() => {
     refreshResults();
-    const intervalId = setInterval(refreshResults, 10000);
-    return () => clearInterval(intervalId);
   }, [refreshResults]);
 
   const loadQuestions = useCallback(async (activeFilters, activeRound) => {

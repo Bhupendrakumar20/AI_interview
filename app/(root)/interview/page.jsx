@@ -4,7 +4,6 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import InterviewCard from "@/components/InterviewCard";
 import ActiveInterviewSessions from "@/components/ActiveInterviewSessions";
-import InterviewHistoryRefresh from "@/components/InterviewHistoryRefresh";
 import InterviewSetup from "@/components/InterviewSetup";
 
 import { getCurrentUser } from "@/lib/actions/auth.action";
@@ -26,7 +25,6 @@ async function InterviewPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <InterviewHistoryRefresh />
       <ActiveInterviewSessions />
       {/* Interview Buddy CTA */}
       <section className="relative overflow-hidden bg-linear-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-indigo-500/30 rounded-2xl p-6 sm:p-8 backdrop-blur-md">

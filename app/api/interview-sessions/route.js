@@ -49,6 +49,7 @@ export async function GET(request) {
       userId: user.id,
       mode: searchParams.get("mode") || undefined,
       limit: requestedLimit,
+      excludeActive: searchParams.get("excludeActive") === "true",
     });
     return NextResponse.json({ sessions });
   } catch (error) {

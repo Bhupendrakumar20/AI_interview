@@ -581,13 +581,13 @@ const InterviewBuddy = ({ userId }) => {
           onClose={handleAbandonSession}
         />
       ) : (
-        <div className="min-h-screen bg-slate-950 text-slate-100">
+        <div className="min-h-screen bg-background text-foreground">
       {/* HEADER */}
       <div className="relative px-10 pt-9 overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-linear-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -z-10"></div>
         <div className="absolute top-0 left-48 w-72 h-48 bg-linear-to-br from-purple-500/8 to-transparent rounded-full blur-3xl -z-10"></div>
 
-        <div className="text-xs text-slate-400 mb-4 flex items-center gap-2">
+        <div className="text-xs text-muted-foreground mb-4 flex items-center gap-2">
           <span>Practice</span> <span className="opacity-40">›</span> Interview Buddy
         </div>
 
@@ -599,14 +599,14 @@ const InterviewBuddy = ({ userId }) => {
                 Buddy
               </span>
             </h1>
-            <p className="text-slate-300 text-sm leading-relaxed max-w-md">
+            <p className="text-muted-foreground text-sm leading-relaxed max-w-md">
               Practice with a human partner or an AI interviewer. Get real-time coaching, adaptive questions, and a detailed post-session performance report.
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
             <button 
               onClick={() => setShowPastReports(true)}
-              className="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition hover:shadow-md hover:shadow-slate-700/50">
+              className="px-4 py-2.5 rounded-lg bg-secondary border border-border text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition hover:shadow-md">
               View Past Reports
             </button>
             <button
@@ -622,15 +622,15 @@ const InterviewBuddy = ({ userId }) => {
       {/* STATS */}
       <div className="px-10 pb-6 flex gap-3 overflow-x-auto">
         {displayStats.map((stat, idx) => (
-          <div key={idx} className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-full px-4 py-2 whitespace-nowrap">
+          <div key={idx} className="flex items-center gap-2 bg-card border border-border rounded-full px-4 py-2 whitespace-nowrap">
             <div className={`w-2 h-2 rounded-full ${stat.color}`}></div>
-            <span className="font-bold text-slate-100">{stat.value}</span>
-            <span className="text-xs text-slate-400">{stat.label}</span>
+            <span className="font-bold text-card-foreground">{stat.value}</span>
+            <span className="text-xs text-muted-foreground">{stat.label}</span>
           </div>
         ))}
       </div>
 
-      <div className="h-px bg-slate-800 mx-10 mb-8"></div>
+      <div className="h-px bg-border mx-10 mb-8"></div>
 
       {/* MODE SELECTOR */}
       <div className="px-10 mb-8">
@@ -642,22 +642,22 @@ const InterviewBuddy = ({ userId }) => {
             className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all ${
               currentMode === "human"
                 ? "border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20"
-                : "border-slate-700 bg-slate-900/50 hover:border-slate-600"
+                : "border-border bg-card hover:border-blue-500/50"
             }`}
           >
-            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
+            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-border flex items-center justify-center text-sm font-bold">
               {currentMode === "human" ? "✓" : ""}
             </div>
             <div className="mb-3 text-blue-400">
               <Users size={32} />
             </div>
             <h3 className="text-lg font-bold mb-2">Human Buddy Mode</h3>
-            <p className="text-sm text-slate-300 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Connect with a peer via video call. One plays Interviewer, one plays Candidate. Real pressure, real collaboration, shared notes.
             </p>
             <div className="flex flex-wrap gap-2">
               {["Video Call", "Shared Editor", "Co-Pilot Tools", "Panel Sim"].map((tag) => (
-                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-blue-500/20 text-blue-300">
+                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300">
                   {tag}
                 </span>
               ))}
@@ -671,22 +671,22 @@ const InterviewBuddy = ({ userId }) => {
             className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all ${
               currentMode === "ai"
                 ? "border-purple-500 bg-purple-500/5 shadow-lg shadow-purple-500/20"
-                : "border-slate-700 bg-slate-900/50 hover:border-slate-600"
+                : "border-border bg-card hover:border-purple-500/50"
             }`}
           >
-            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center text-sm font-bold">
+            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-border flex items-center justify-center text-sm font-bold">
               {currentMode === "ai" ? "✓" : ""}
             </div>
             <div className="mb-3 text-purple-400">
               <Cpu size={32} />
             </div>
             <h3 className="text-lg font-bold mb-2">AI Buddy Mode</h3>
-            <p className="text-sm text-slate-300 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Your always-available AI interviewer. Adaptive questions, live sentiment analysis, on-screen coaching, and a granular performance report.
             </p>
             <div className="flex flex-wrap gap-2">
               {["TTS Questions", "Live Coaching", "Adaptive AI", "24/7 Available"].map((tag) => (
-                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-purple-500/20 text-purple-300">
+                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300">
                   {tag}
                 </span>
               ))}
@@ -696,7 +696,7 @@ const InterviewBuddy = ({ userId }) => {
           {/* DSA Room Mode Card */}
           <div
             onClick={() => window.location.href = "/dsa-room"}
-            className="relative p-6 rounded-2xl border border-slate-800 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/50 cursor-pointer transition-all opacity-85 hover:opacity-100"
+            className="relative p-6 rounded-2xl border border-border bg-card hover:border-emerald-500/50 hover:bg-muted/50 cursor-pointer transition-all opacity-85 hover:opacity-100"
           >
             <span className="absolute top-4 right-4 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
               Live Duel
@@ -705,12 +705,12 @@ const InterviewBuddy = ({ userId }) => {
               <Trophy size={32} />
             </div>
             <h3 className="text-lg font-bold mb-2">DSA Room Mode</h3>
-            <p className="text-sm text-slate-300 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Multiplayer competitive coding. Solve problems in real-time, compete on live leaderboards, and earn speed bonuses with up to 10 players.
             </p>
             <div className="flex flex-wrap gap-2">
               {["Multiplayer", "Live Leaderboard", "Speed Bonus", "20+ Languages"].map((tag) => (
-                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300">
+                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                   {tag}
                 </span>
               ))}
@@ -725,8 +725,8 @@ const InterviewBuddy = ({ userId }) => {
         <div className="grid md:grid-cols-2 gap-4">
           {/* AI Persona */}
           {currentMode === "ai" && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">AI Persona</h3>
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">AI Persona</h3>
               <div className="grid grid-cols-2 gap-3">
                 {personas.map((persona) => (
                   <div
@@ -735,12 +735,12 @@ const InterviewBuddy = ({ userId }) => {
                     className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
                       selectedPersona === persona.id
                         ? "border-purple-500 bg-purple-500/10"
-                        : "border-slate-700 bg-slate-800/50 hover:border-slate-600"
+                        : "border-border bg-muted/50 hover:border-purple-500/50"
                     }`}
                   >
                     <div className="text-2xl mb-2">{persona.emoji}</div>
                     <div className="text-sm font-bold">{persona.name}</div>
-                    <div className="text-xs text-slate-400">{persona.style}</div>
+                    <div className="text-xs text-muted-foreground">{persona.style}</div>
                   </div>
                 ))}
               </div>
@@ -749,8 +749,8 @@ const InterviewBuddy = ({ userId }) => {
 
 
           {/* Topics */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Topic Focus</h3>
+          <div className="bg-card border border-border rounded-xl p-6">
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Topic Focus</h3>
             <div className="flex flex-wrap gap-2">
               {topics.map((topic) => (
                 <button
@@ -758,8 +758,8 @@ const InterviewBuddy = ({ userId }) => {
                   onClick={() => toggleTopic(topic)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     selectedTopics.includes(topic)
-                      ? "bg-blue-500/30 border border-blue-500 text-blue-300"
-                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                      ? "bg-blue-500/10 border border-blue-500 text-blue-700 dark:text-blue-300"
+                      : "bg-muted border border-border text-muted-foreground hover:border-blue-500/50"
                   }`}
                 >
                   {topic}
@@ -769,9 +769,9 @@ const InterviewBuddy = ({ userId }) => {
           </div>
 
           {/* Difficulty & Duration */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <div className="bg-card border border-border rounded-xl p-6">
             <div className="mb-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Difficulty</h3>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Difficulty</h3>
               <div className="flex gap-3">
                 {["Easy", "Medium", "Hard"].map((level) => (
                   <button
@@ -780,11 +780,11 @@ const InterviewBuddy = ({ userId }) => {
                     className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                       selectedDifficulty === level.toLowerCase()
                         ? level === "Easy"
-                          ? "bg-emerald-500/30 border border-emerald-500 text-emerald-300"
+                          ? "bg-emerald-500/10 border border-emerald-500 text-emerald-700 dark:text-emerald-300"
                           : level === "Medium"
-                          ? "bg-yellow-500/30 border border-yellow-500 text-yellow-300"
-                          : "bg-red-500/30 border border-red-500 text-red-300"
-                        : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                          ? "bg-yellow-500/10 border border-yellow-500 text-amber-700 dark:text-yellow-300"
+                          : "bg-red-500/10 border border-red-500 text-red-700 dark:text-red-300"
+                        : "bg-muted border border-border text-muted-foreground hover:border-primary/50"
                     }`}
                   >
                     {level}
@@ -794,7 +794,7 @@ const InterviewBuddy = ({ userId }) => {
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">⧖ Session Duration</h3>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">⧖ Session Duration</h3>
               <div className="flex items-center gap-4">
                 <input
                   type="range"
@@ -803,7 +803,7 @@ const InterviewBuddy = ({ userId }) => {
                   step="5"
                   value={sessionDuration}
                   onChange={(e) => setSessionDuration(parseInt(e.target.value))}
-                  className="flex-1 h-1 bg-slate-700 rounded-full appearance-none cursor-pointer accent-blue-500"
+                  className="flex-1 h-1 bg-muted rounded-full appearance-none cursor-pointer accent-blue-500"
                 />
                 <span className="text-sm font-bold text-blue-400 min-w-max">{sessionDuration}m</span>
               </div>
@@ -812,7 +812,7 @@ const InterviewBuddy = ({ userId }) => {
         </div>
       </div>
 
-      <div className="h-px bg-slate-800 mx-10 mb-8"></div>
+      <div className="h-px bg-border mx-10 mb-8"></div>
 
       {/* FEATURES GRID */}
       <div className="px-10 mb-8">
@@ -829,18 +829,18 @@ const InterviewBuddy = ({ userId }) => {
                   : "border-emerald-500/30 bg-emerald-500/5"
               }`}
             >
-              <div className="text-2xl mb-2 text-slate-400">
+              <div className="text-2xl mb-2 text-muted-foreground">
                 <feature.icon size={24} />
               </div>
               <h4 className="font-bold text-sm mb-1">{feature.title}</h4>
-              <p className="text-xs text-slate-400 mb-3 leading-relaxed">{feature.desc}</p>
+              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{feature.desc}</p>
               <span
                 className={`inline-block text-xs px-2 py-1 rounded-full font-medium ${
                   feature.type === "human"
-                    ? "bg-blue-500/20 text-blue-300"
+                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-300"
                     : feature.type === "ai"
-                    ? "bg-purple-500/20 text-purple-300"
-                    : "bg-emerald-500/20 text-emerald-300"
+                    ? "bg-purple-500/10 text-purple-700 dark:text-purple-300"
+                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                 }`}
               >
                 {feature.type === "human" ? "Human Mode" : feature.type === "ai" ? "AI Mode" : "Both Modes"}
@@ -850,7 +850,7 @@ const InterviewBuddy = ({ userId }) => {
         </div>
       </div>
 
-      <div className="h-px bg-slate-800 mx-10 mb-8"></div>
+      <div className="h-px bg-border mx-10 mb-8"></div>
 
       {/* RECENT SESSIONS */}
       <div className="px-10 pb-12">
@@ -870,7 +870,7 @@ const InterviewBuddy = ({ userId }) => {
             <div
               key={idx}
               onClick={() => setSelectedSessionForDetail(stats.recentSessions[idx])}
-              className="p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 cursor-pointer transition-all hover:bg-slate-900/80 hover:shadow-lg hover:shadow-blue-500/20"
+              className="p-4 bg-card border border-border rounded-xl hover:border-blue-500/50 cursor-pointer transition-all hover:bg-muted/50 hover:shadow-lg hover:shadow-blue-500/10"
             >
               <div className="flex items-center gap-3">
                 <div
@@ -887,7 +887,7 @@ const InterviewBuddy = ({ userId }) => {
                     )}
                     {session.title}
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5">{session.meta}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{session.meta}</div>
                 </div>
                 <div className="text-right shrink-0">
                   <div
@@ -897,7 +897,7 @@ const InterviewBuddy = ({ userId }) => {
                   >
                     {session.score}
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5">{session.label}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{session.label}</div>
                 </div>
                 <div className="flex gap-2">
                   <button 
@@ -1424,14 +1424,14 @@ const InterviewBuddy = ({ userId }) => {
       {/* MAIN SESSION MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg mx-4 p-8 relative animate-in fade-in zoom-in-95">
+          <div className="bg-card text-card-foreground border border-border rounded-2xl w-full max-w-lg mx-4 p-8 relative animate-in fade-in zoom-in-95">
             <button
               onClick={() => {
                 setIsModalOpen(false);
                 setModalTab("create");
                 setJoinCode("");
               }}
-              className="absolute top-5 right-5 w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition text-slate-400"
+              className="absolute top-5 right-5 w-7 h-7 flex items-center justify-center rounded-lg bg-muted hover:bg-muted/70 transition text-muted-foreground"
             >
               ✕
             </button>
@@ -1450,8 +1450,8 @@ const InterviewBuddy = ({ userId }) => {
                   }}
                   className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
                     modalTab === "create"
-                      ? "bg-blue-500/30 border border-blue-500 text-blue-300"
-                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                      ? "bg-blue-500/10 border border-blue-500 text-blue-700 dark:text-blue-300"
+                      : "bg-muted border border-border text-muted-foreground hover:border-blue-500/50"
                   }`}
                 >
                   Create Session
@@ -1460,8 +1460,8 @@ const InterviewBuddy = ({ userId }) => {
                   onClick={() => setModalTab("join")}
                   className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
                     modalTab === "join"
-                      ? "bg-purple-500/30 border border-purple-500 text-purple-300"
-                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
+                      ? "bg-purple-500/10 border border-purple-500 text-purple-700 dark:text-purple-300"
+                      : "bg-muted border border-border text-muted-foreground hover:border-purple-500/50"
                   }`}
                 >
                   Join Session
@@ -1469,7 +1469,7 @@ const InterviewBuddy = ({ userId }) => {
               </div>
             )}
 
-            <p className="text-sm text-slate-400 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               {currentMode === "ai"
                 ? "Your AI interviewer is ready. Confirm settings and go live instantly."
                 : modalTab === "create"
@@ -1482,14 +1482,14 @@ const InterviewBuddy = ({ userId }) => {
               <div className="space-y-4">
                 {currentMode === "human" && (
                   <>
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3 mb-2">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           1
                         </div>
                         <div>
                           <div className="text-sm font-bold">🔗 Share this invite link</div>
-                          <div className="text-xs text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Your buddy just needs to click the link - no code to enter!
                           </div>
                         </div>
@@ -1498,7 +1498,7 @@ const InterviewBuddy = ({ userId }) => {
 
                     {/* INVITE LINK */}
                     <div className="flex gap-2">
-                      <div className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-blue-400 break-all overflow-hidden">
+                      <div className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono text-blue-600 dark:text-blue-400 break-all overflow-hidden">
                         {inviteLink || "https://ai-interview.com/interview/buddy/IB-XXXXX"}
                       </div>
                       <button
@@ -1516,10 +1516,10 @@ const InterviewBuddy = ({ userId }) => {
                     </div>
 
                     {/* SESSION CODE (BACKUP) */}
-                    <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-3">
-                      <div className="text-xs text-slate-500 mb-2">Or share the code:</div>
+                    <div className="bg-muted/50 border border-border rounded-lg p-3">
+                      <div className="text-xs text-muted-foreground mb-2">Or share the code:</div>
                       <div className="flex gap-2">
-                        <div className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm font-bold text-blue-400 text-center tracking-widest">
+                        <div className="flex-1 bg-background border border-border rounded px-2 py-1 text-sm font-bold text-blue-600 dark:text-blue-400 text-center tracking-widest">
                           {sessionCode || "IB-XXXXX"}
                         </div>
                         <button
@@ -1530,35 +1530,35 @@ const InterviewBuddy = ({ userId }) => {
                             }
                           }}
                           disabled={!sessionCode}
-                          className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Copy
                         </button>
                       </div>
                     </div>
 
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           2
                         </div>
                         <div>
                           <div className="text-sm font-bold">Assign roles in the Lobby</div>
-                          <div className="text-xs text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Once both join, choose who is Interviewer and who is Candidate.
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           3
                         </div>
                         <div>
                           <div className="text-sm font-bold">Go live</div>
-                          <div className="text-xs text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Video, camera, mic, screen share, and shared notes all activate.
                           </div>
                         </div>
@@ -1569,46 +1569,46 @@ const InterviewBuddy = ({ userId }) => {
 
                 {currentMode === "ai" && (
                   <>
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3 mb-2">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           1
                         </div>
                         <div>
                           <div className="text-sm font-bold">Confirm your persona & topic</div>
-                          <div className="text-xs text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Selected: {personas.find((p) => p.id === selectedPersona)?.name} · {selectedTopics[0]} · {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} · {sessionDuration} min
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3 mb-2">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           2
                         </div>
                         <div>
                           <div className="text-sm font-bold">Optional: Upload a Job Description</div>
-                          <div className="text-xs text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Drop a JD and AI generates tailored questions.
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center text-slate-400 text-sm cursor-pointer hover:border-slate-600 transition">
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center text-muted-foreground text-sm cursor-pointer hover:border-blue-500/50 transition">
                       Drop JD here or <span className="text-blue-400">browse</span> &nbsp;·&nbsp; Optional
                     </div>
 
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           3
                         </div>
                         <div>
                           <div className="text-sm font-bold">Allow microphone access</div>
-                          <div className="text-xs text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Required for speech-to-text analysis.
                           </div>
                         </div>
@@ -1641,7 +1641,7 @@ const InterviewBuddy = ({ userId }) => {
                   placeholder="Paste link (https://...) or code (IB-7X4K9)"
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-center text-sm"
+                  className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500 font-mono text-center text-sm"
                 />
 
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
@@ -1671,7 +1671,7 @@ const InterviewBuddy = ({ userId }) => {
                   setModalTab("create");
                   setJoinCode("");
                 }}
-                className="flex-1 px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-secondary border border-border text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition"
               >
                 Cancel
               </button>

@@ -5,6 +5,8 @@ import { checkGeminiRateLimit } from "@/lib/security/rate-limiters";
 import { NextResponse } from "next/server";
 import { db } from "@/firebase/admin";
 
+export const maxDuration = 300;
+
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GROQ_API_KEY);
 
 export async function POST(request) {
@@ -46,55 +48,60 @@ export async function POST(request) {
     try {
       console.log(`🤖 Attempting Ollama query on model: ${MODEL_NAME} for resume verification...`);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      const timeoutId = setTimeout(() => controller.abort(), 240000);
 
-      const prompt = `
-        You are a technical interviewer verifying a candidate's resume claims.
-        Evaluate their answers to the verification questions and determine if they actually did the projects/work claimed on their resume.
-        
-        Focus Area: ${focusArea || "General"}
-        Resume context:
-        ${JSON.stringify(parsedResume || {})}
-        
-        Interview Q&A:
-        ${answers.map((a, i) => `Question ${i+1}: ${a.question}\nAnswer ${i+1}: ${a.answer}`).join("\n\n")}
-        
-        Return a JSON response with format:
-        {
-          "trustScore": 85,
-          "verdict": "VERIFIED | PARTIALLY_VERIFIED | UNVERIFIED",
-          "feedback": "Provide detailed feedback on how well they verified their claims, their strengths, weaknesses, and whether they showed authentic technical depth."
+      try {
+        const prompt = `
+          You are a technical interviewer verifying a candidate's resume claims.
+          Evaluate their answers to the verification questions and determine if they actually did the projects/work claimed on their resume.
+          
+          Focus Area: ${focusArea || "General"}
+          Resume context:
+          ${JSON.stringify(parsedResume || {})}
+          
+          Interview Q&A:
+          ${answers.map((a, i) => `Question ${i+1}: ${a.question}\nAnswer ${i+1}: ${a.answer}`).join("\n\n")}
+          
+          Return a JSON response with format:
+          {
+            "trustScore": 85,
+            "verdict": "VERIFIED | PARTIALLY_VERIFIED | UNVERIFIED",
+            "feedback": "Provide detailed feedback on how well they verified their claims, their strengths, weaknesses, and whether they showed authentic technical depth."
+          }
+        `;
+
+        const response = await fetch(`${OLLAMA_URL.replace(/\/$/, "")}/api/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authHeader ? { Authorization: authHeader } : {}),
+          },
+          body: JSON.stringify({
+            model: MODEL_NAME,
+            messages: [{ role: "user", content: prompt }],
+            stream: false,
+            format: "json",
+            options: { temperature: 0.3 }
+          }),
+          signal: controller.signal,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const textContent = data.message?.content;
+          if (textContent) {
+            evaluationData = JSON.parse(textContent);
+            console.log("✅ Success evaluating with Ollama!");
+          }
         }
-      `;
-
-      const response = await fetch(`${OLLAMA_URL.replace(/\/$/, "")}/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authHeader ? { Authorization: authHeader } : {}),
-        },
-        body: JSON.stringify({
-          model: MODEL_NAME,
-          messages: [{ role: "user", content: prompt }],
-          stream: false,
-          format: "json",
-          options: { temperature: 0.3 }
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        const textContent = data.message?.content;
-        if (textContent) {
-          evaluationData = JSON.parse(textContent);
-          console.log("✅ Success evaluating with Ollama!");
-        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     } catch (ollamaError) {
-      console.warn("Ollama evaluation failed, falling back to Gemini:", ollamaError.message);
+      const message = ollamaError.name === "AbortError"
+        ? "Ollama evaluation timed out after 240 seconds"
+        : ollamaError.message;
+      console.warn("Ollama evaluation failed, falling back to Gemini:", message);
     }
 
     // Fallback to Gemini if Ollama was not successful

@@ -83,7 +83,7 @@ export const NumberedSteps = ({
                       "h-full transition-all duration-500 ease-out",
                       idx < currentStep
                         ? "w-full bg-gradient-to-r from-green-500 to-primary"
-                        : idx === currentStep
+                        : idx === activeStepIndex
                         ? "w-1/2 bg-primary animate-pulse"
                         : "w-0"
                     )}
@@ -105,12 +105,25 @@ export const NumberedSteps = ({
 export const SegmentBar = ({
   steps = [],
   currentStep = 0,
+  currentSegment,
+  totalSegments,
+  completedSegments,
   onStepClick,
   className = "",
 }) => {
-  const total = steps.length || 3;
-  const activeStep = steps[currentStep] || { title: `Step ${currentStep + 1}` };
-  const percentage = Math.round(((currentStep + 1) / total) * 100);
+  const total = totalSegments || steps.length || 3;
+  const activeStepIndex = Math.min(
+    Math.max(currentSegment === undefined ? currentStep : currentSegment - 1, 0),
+    total - 1
+  );
+  const progressSteps = steps.length
+    ? steps
+    : Array.from({ length: total }, (_, index) => ({ title: `Step ${index + 1}` }));
+  const activeStep = progressSteps[activeStepIndex] || { title: `Step ${activeStepIndex + 1}` };
+  const completedCount = Array.isArray(completedSegments)
+    ? completedSegments.filter(Boolean).length
+    : activeStepIndex + 1;
+  const percentage = Math.round((completedCount / total) * 100);
 
   return (
     <div className={cn("w-full space-y-2.5", className)}>
@@ -118,7 +131,7 @@ export const SegmentBar = ({
       <div className="flex items-center justify-between text-xs sm:text-sm">
         <div className="flex items-center gap-2">
           <span className="font-bold text-foreground">
-            Phase {currentStep + 1} of {total}:
+            Step {activeStepIndex + 1} of {total}:
           </span>
           <span className="text-muted-foreground font-medium truncate">
             {activeStep.title}
@@ -131,9 +144,11 @@ export const SegmentBar = ({
 
       {/* Discrete Segmented Rails */}
       <div className="grid gap-1.5 sm:gap-2" style={{ gridTemplateColumns: `repeat(${total}, 1fr)` }}>
-        {steps.map((step, idx) => {
-          const isCompleted = idx < currentStep;
-          const isActive = idx === currentStep;
+        {progressSteps.map((step, idx) => {
+          const isCompleted = Array.isArray(completedSegments)
+            ? Boolean(completedSegments[idx])
+            : idx < activeStepIndex;
+          const isActive = idx === activeStepIndex;
           const isClickable = Boolean(onStepClick);
 
           return (
@@ -148,8 +163,9 @@ export const SegmentBar = ({
                 isCompleted &&
                   "bg-gradient-to-r from-emerald-500 to-primary shadow-xs shadow-primary/20",
                 isActive &&
+                  !isCompleted &&
                   "bg-gradient-to-r from-primary to-indigo-500 segment-active-pulse shadow-md shadow-primary/30",
-                idx > currentStep && "bg-secondary/60 border border-border/30"
+                idx > activeStepIndex && "bg-secondary/60 border border-border/30"
               )}
               title={step.title}
             />

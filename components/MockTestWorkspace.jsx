@@ -96,6 +96,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   // when navigating between questions and each question fetches independently.
   const [answersByIndex, setAnswersByIndex] = useState({}); // { [index]: string }
   const [candidateAnswersByIndex, setCandidateAnswersByIndex] = useState({});
+  const [submittedAnswersByIndex, setSubmittedAnswersByIndex] = useState({});
   const [codeByIndex, setCodeByIndex] = useState({});
   const [transcriptByIndex, setTranscriptByIndex] = useState({});
   const [whiteboardByIndex, setWhiteboardByIndex] = useState({});
@@ -129,6 +130,8 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
   const currentAnswer = answersByIndex[currentQuestionIndex];
   const currentTips = tipsByIndex[currentQuestionIndex];
+  const submittedAnswerCount = questions.filter((_, index) => submittedAnswersByIndex[index]).length;
+  const allAnswersSubmitted = questions.length > 0 && submittedAnswerCount === questions.length;
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -191,6 +194,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
   const handleLanguageChange = (language) => {
     const starterCode = INITIAL_CODE_TEMPLATES[language] || "";
+    markCurrentAnswerIncomplete();
     setSelectedLanguage(language);
     setLanguageByIndex((previous) => ({
       ...previous,
@@ -255,8 +259,28 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
     };
   });
 
+  const hasAnswerContent = (submission) => {
+    const starterCode = INITIAL_CODE_TEMPLATES[submission.answer.language] || "";
+    return Boolean(
+      submission.answer.text.trim() ||
+      submission.answer.transcript.trim() ||
+      submission.answer.whiteboard.length ||
+      (submission.answer.code.trim() && submission.answer.code.trim() !== starterCode.trim())
+    );
+  };
+
+  const markCurrentAnswerIncomplete = () => {
+    setSubmittedAnswersByIndex((previous) => {
+      if (!previous[currentQuestionIndex]) return previous;
+      const next = { ...previous };
+      delete next[currentQuestionIndex];
+      return next;
+    });
+  };
+
   const handleEditorChange = (value) => {
     const code = value || "";
+    markCurrentAnswerIncomplete();
     setEditorCode(code);
     setCodeByIndex((previous) => ({ ...previous, [currentQuestionIndex]: code }));
   };
@@ -306,6 +330,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
             }
           }
           if (finalTranscript) {
+            markCurrentAnswerIncomplete();
             setTranscript((prev) => prev + finalTranscript);
           }
         };
@@ -348,6 +373,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
       setIsRecording(false);
       toast.success("Stopped voice recording.");
     } else {
+      markCurrentAnswerIncomplete();
       setTranscript("");
       recognitionRef.current.start();
       setIsRecording(true);
@@ -457,6 +483,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
     setIsDrawing(true);
 
     if (whiteboardTool === "pencil") {
+      markCurrentAnswerIncomplete();
       setCurrentShape({
         type: "pencil",
         color: strokeColor,
@@ -469,6 +496,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
         setIsDrawing(false);
         return;
       }
+      markCurrentAnswerIncomplete();
       setShapes((prev) => [
         ...prev,
         {
@@ -483,6 +511,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
       setWhiteboardText("");
       setIsDrawing(false);
     } else {
+      markCurrentAnswerIncomplete();
       setCurrentShape({
         type: whiteboardTool,
         color: strokeColor,
@@ -523,10 +552,12 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   };
 
   const handleUndo = () => {
+    markCurrentAnswerIncomplete();
     setShapes((prev) => prev.slice(0, -1));
   };
 
   const handleClearCanvas = () => {
+    markCurrentAnswerIncomplete();
     setShapes([]);
     toast.success("Canvas cleared.");
   };
@@ -656,33 +687,50 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
     }
   };
 
+  const handleSubmitAnswer = () => {
+    const questionIndex = currentQuestionIndex;
+    if (isSubmitting || submittedAnswersByIndex[questionIndex]) return;
+
+    const submission = buildQuestionsAndAnswers()[questionIndex];
+    if (!hasAnswerContent(submission)) {
+      toast.error("Add an answer, code solution, transcript, or whiteboard work before submitting.");
+      return;
+    }
+
+    setSubmittedAnswersByIndex((previous) => ({ ...previous, [questionIndex]: true }));
+    toast.success(`Answer ${questionIndex + 1} submitted`);
+  };
+
   // ----------------------------------------------------
   // Structured AI Diagnostics Evaluation Submission
   // ----------------------------------------------------
   const handleSubmitTest = async () => {
+    if (!allAnswersSubmitted) {
+      setIsTimerRunning(false);
+      toast.error(`Submit an answer for every question first (${submittedAnswerCount}/${questions.length} submitted).`);
+      return;
+    }
+
     setIsTimerRunning(false);
     setIsSubmitting(true);
     setActiveTab("feedback");
     toast.loading("Analyzing your submission...", { id: "eval-toast" });
 
-    // Generate drawing summary
-    const shapesSummary = shapes.map((s, idx) => `Shape ${idx + 1}: ${s.type} (color: ${s.color})`).join(", ");
-    const whiteboardSummary = shapesSummary || "No whiteboard drawings submitted.";
-
     try {
+      const questionsAndAnswers = buildQuestionsAndAnswers();
       const result = await evaluateMockTest({
-        question: currentQuestion.question,
-        code: editorCode,
-        language: selectedLanguage,
-        transcript: transcript,
-        whiteboardSummary,
+        submissions: questionsAndAnswers.map((submission) => ({
+          ...submission,
+          whiteboardSummary: submission.answer.whiteboard
+            .map((shape, index) => `Shape ${index + 1}: ${shape.type} (color: ${shape.color})`)
+            .join(", ") || "No whiteboard drawings submitted.",
+        })),
         company: filters.company,
-        role: filters.role
+        role: filters.role,
       });
 
       if (result.success) {
         setEvaluation(result.evaluation);
-        const questionsAndAnswers = buildQuestionsAndAnswers();
         const savedSession = await finishInterviewModeSessionAction({
           sessionId,
           result: {
@@ -786,9 +834,10 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
           <Button
             onClick={handleSubmitTest}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !allAnswersSubmitted}
             variant="aurora"
             className="text-white font-bold flex items-center gap-1.5 px-4 relative overflow-visible shadow-lg"
+            title={!allAnswersSubmitted ? "Submit every question's answer first" : "Evaluate all submitted answers"}
           >
             <ParticleBurst active={isSubmitting} count={8} color="#6366f1" />
             {isSubmitting ? (
@@ -798,7 +847,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               </>
             ) : (
               <>
-                <Send size={16} /> Submit Test
+                <Send size={16} /> Submit Test ({submittedAnswerCount}/{questions.length})
               </>
             )}
           </Button>
@@ -823,6 +872,11 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               <span className="text-xs font-bold uppercase tracking-wider text-blue-500">
                 Question {currentQuestionIndex + 1} of {questions.length}
               </span>
+              {submittedAnswersByIndex[currentQuestionIndex] && (
+                <span className="rounded-full border border-emerald-700/60 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                  Submitted
+                </span>
+              )}
               <div className="flex items-center gap-1">
                 <Button
                   size="icon"
@@ -837,7 +891,10 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
                   size="icon"
                   variant="outline"
                   onClick={() => handleQuestionChange(currentQuestionIndex + 1)}
-                  disabled={currentQuestionIndex === questions.length - 1}
+                  disabled={
+                    currentQuestionIndex === questions.length - 1 ||
+                    !submittedAnswersByIndex[currentQuestionIndex]
+                  }
                   className="h-7 w-7 border-slate-800 text-slate-400 hover:text-slate-200"
                 >
                   <ChevronRight size={16} />
@@ -850,6 +907,9 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               <SegmentBar
                 totalSegments={questions.length || 1}
                 currentSegment={currentQuestionIndex + 1}
+                completedSegments={questions.map((_, index) =>
+                  Boolean(submittedAnswersByIndex[index])
+                )}
               />
             </div>
 
@@ -945,6 +1005,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               value={candidateAnswersByIndex[currentQuestionIndex] || ""}
               onChange={(event) => {
                 const answer = event.target.value;
+                markCurrentAnswerIncomplete();
                 setCandidateAnswersByIndex((previous) => ({
                   ...previous,
                   [currentQuestionIndex]: answer,
@@ -953,6 +1014,27 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               placeholder="Write your answer here..."
               className="min-h-24 w-full resize-y rounded-lg border border-slate-800 bg-[#090d16] p-3 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
             />
+            <Button
+              onClick={handleSubmitAnswer}
+              disabled={submittedAnswersByIndex[currentQuestionIndex] || isSubmitting}
+              className="mt-3 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-500"
+            >
+              {submittedAnswersByIndex[currentQuestionIndex]
+                ? <><CheckCircle2 size={14} /> Answer Submitted</>
+                : <><Send size={14} /> Submit Answer</>}
+            </Button>
+            <p className="mt-2 text-xs text-slate-500">
+              Evaluation runs once after every question has been submitted.
+            </p>
+            {submittedAnswersByIndex[currentQuestionIndex] &&
+              currentQuestionIndex < questions.length - 1 && (
+                <Button
+                  onClick={() => handleQuestionChange(currentQuestionIndex + 1)}
+                  className="mt-3 flex w-full items-center justify-center gap-2 bg-emerald-700 text-white hover:bg-emerald-600"
+                >
+                  Next Question <ChevronRight size={16} />
+                </Button>
+              )}
           </div>
 
           {/* continuous voice transcription */}
@@ -1223,7 +1305,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
                   </div>
                   <h3 className="text-lg font-bold">Diagnostics Awaiting Submission</h3>
                   <p className="text-sm text-slate-400 max-w-md mt-2">
-                    Complete your interview mock test and click "Submit Test" to trigger RAG-powered automated evaluation and detailed diagnostics reports.
+                    Submit each answer, then click "Submit Test" for one AI evaluation of the complete interview.
                   </p>
                 </div>
               ) : (
@@ -1235,7 +1317,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
                         <Award className="text-blue-500" /> Evaluation Diagnostics Report
                       </h2>
                       <p className="text-sm text-slate-400 mt-1">
-                        Here is the deep architectural and conceptual diagnostics computed by Gemini.
+                        Here is the deep architectural and conceptual diagnostics computed by AI.
                       </p>
                     </div>
 

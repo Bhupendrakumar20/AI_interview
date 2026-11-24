@@ -61,6 +61,9 @@ export default function ResumeRoundSection() {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [answers, setAnswers] = useState([]);
   const [targetQuestionCount, setTargetQuestionCount] = useState(0);
+  const [answerEvaluation, setAnswerEvaluation] = useState(null);
+  const [isAnswerEvaluating, setIsAnswerEvaluating] = useState(false);
+  const [answerEvaluationError, setAnswerEvaluationError] = useState("");
 
   const resumeSessionIdRef = useRef(null);
 
@@ -190,6 +193,9 @@ export default function ResumeRoundSection() {
       await streamFeedback(feedbackRes);
 
       setAnswers([]);
+      setAnswerEvaluation(null);
+      setIsAnswerEvaluating(false);
+      setAnswerEvaluationError("");
     } catch (err) {
       console.error(err);
       setUploadError(err.message || "An error occurred during ATS score calculation.");
@@ -207,6 +213,8 @@ export default function ResumeRoundSection() {
     setCurrentQuestionIdx(0);
     setCurrentAnswer("");
     setAnswers([]);
+    setAnswerEvaluation(null);
+    setAnswerEvaluationError("");
     setIsGeneratingQuestions(true);
 
     for (let index = 0; index < totalQuestions; index++) {
@@ -340,9 +348,13 @@ export default function ResumeRoundSection() {
 
     setCurrentStep("report");
     setFeedback("");
+    setAnswerEvaluation(null);
+    setAnswerEvaluationError("");
+    setIsAnswerEvaluating(finalAnswers.length > 0);
+    let completedAnswerEvaluation = null;
 
     try {
-      const [feedbackRes, optimizeRes] = await Promise.all([
+      const [feedbackRes, optimizeRes, evaluationRes] = await Promise.all([
         fetch("/api/resume/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -353,6 +365,17 @@ export default function ResumeRoundSection() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ parsedResume, atsResult }),
         }).catch(() => null),
+        finalAnswers.length > 0
+          ? fetch("/api/resume/evaluate-interview", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                answers: finalAnswers,
+                parsedResume,
+                focusArea: selectedFocus,
+              }),
+            }).catch((error) => ({ networkError: error }))
+          : Promise.resolve(null),
       ]);
 
       if (feedbackRes?.ok) {
@@ -363,10 +386,46 @@ export default function ResumeRoundSection() {
         const optimizeData = await optimizeRes.json();
         setOptimizedResume(optimizeData.optimizedResume);
       }
+
+      if (evaluationRes?.networkError) {
+        const message = evaluationRes.networkError.message || "Could not connect to answer evaluation.";
+        setAnswerEvaluationError(message);
+        toast.error(message);
+      } else if (evaluationRes && !evaluationRes.ok) {
+        const message = await getApiErrorMessage(
+          evaluationRes,
+          "Failed to evaluate your Resume Round answers"
+        );
+        setAnswerEvaluationError(message);
+        toast.error(message);
+      } else if (evaluationRes) {
+        try {
+          const evaluationData = await evaluationRes.json();
+          if (!evaluationData.success) {
+            const message = evaluationData.error || "Answer evaluation did not return a result.";
+            setAnswerEvaluationError(message);
+            toast.error(message);
+          } else {
+            completedAnswerEvaluation = {
+              trustScore: evaluationData.trustScore,
+              verdict: evaluationData.verdict,
+              feedback: evaluationData.feedback,
+            };
+            setAnswerEvaluation(completedAnswerEvaluation);
+          }
+        } catch (error) {
+          console.error("Could not read Resume Round answer evaluation:", error);
+          const message = "Could not read the answer evaluation response.";
+          setAnswerEvaluationError(message);
+          toast.error(message);
+        }
+      }
     } catch (err) {
       console.error(err);
-      alert(err.message || "Unable to generate the final resume report.");
+      const message = err.message || "Unable to generate the final resume report.";
+      toast.error(message);
     } finally {
+      setIsAnswerEvaluating(false);
       if (resumeSessionIdRef.current) {
         const sessionId = resumeSessionIdRef.current;
         const result = await finishInterviewModeSessionAction({
@@ -375,6 +434,7 @@ export default function ResumeRoundSection() {
             focusArea: selectedFocus,
             persona: selectedPersona,
             answers: finalAnswers,
+            answerEvaluation: completedAnswerEvaluation,
             atsResult: atsResult
               ? {
                   final_score: atsResult.final_score ?? null,
@@ -438,6 +498,12 @@ export default function ResumeRoundSection() {
     setFeedback("");
     setIsFeedbackStreaming(false);
     setOptimizedResume(null);
+    setCurrentQuestionIdx(0);
+    setCurrentAnswer("");
+    setAnswers([]);
+    setAnswerEvaluation(null);
+    setIsAnswerEvaluating(false);
+    setAnswerEvaluationError("");
     setIsAtsProcessing(false);
     setIsProcessing(false);
     setIsGeneratingQuestions(false);
@@ -822,6 +888,51 @@ export default function ResumeRoundSection() {
               {feedback ? renderFeedbackMarkdown(feedback) : "Calculating feedback details..."}
             </p>
           </div>
+
+          {/* Answer Evaluation */}
+          {answers.length > 0 && (
+            <div className="bg-white border border-slate-200 dark:bg-slate-900/60 dark:border-cyan-500/30 p-8 rounded-2xl">
+              <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
+                <div>
+                  <h4 className="text-xl font-bold flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-cyan-500" />
+                    Answer Evaluation
+                  </h4>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    AI evaluation of your answers across the complete Resume Round.
+                  </p>
+                </div>
+                {answerEvaluation && (
+                  <span className={`rounded-full border px-3 py-1 text-xs font-bold ${getScoreColor(answerEvaluation.trustScore)}`}>
+                    {answerEvaluation.verdict?.replaceAll("_", " ") || "Evaluated"}
+                  </span>
+                )}
+              </div>
+
+              {isAnswerEvaluating && (
+                <div className="flex items-center gap-2 text-sm text-cyan-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Evaluating all interview answers...
+                </div>
+              )}
+              {answerEvaluationError && (
+                <p className="text-sm text-rose-500">{answerEvaluationError}</p>
+              )}
+              {answerEvaluation && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <span className={`text-4xl font-black ${getScoreColor(answerEvaluation.trustScore).split(" ")[0]}`}>
+                      {answerEvaluation.trustScore}
+                    </span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">/100 trust score</span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line">
+                    {answerEvaluation.feedback}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Optimized Resume Tips */}
           {optimizedResume && (

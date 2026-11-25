@@ -34,7 +34,9 @@ import {
   TrendingUp,
   User,
   ExternalLink,
-  Loader2
+  Loader2,
+  Flag,
+  CircleHelp
 } from "lucide-react";
 import {
   Radar,
@@ -60,7 +62,38 @@ const INITIAL_CODE_TEMPLATES = {
   java: `// Write your Java solution here\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello PrepWise Java");\n    }\n}`
 };
 
-export default function MockTestWorkspace({ filters, questions, sessionId, onClose, onSessionComplete }) {
+const WORKSPACE_TOUR_STEPS = [
+  {
+    target: "timer",
+    title: "Keep an eye on time",
+    description: "The 45-minute timer is here. Pause it if you need a short break.",
+  },
+  {
+    target: "review",
+    title: "Mark questions for review",
+    description: "Flag a question to find it quickly when you review your work.",
+  },
+  {
+    target: "navigation",
+    title: "Move through the test",
+    description: "Use the arrows to go back or move forward. Submit your current answer to unlock the next question.",
+  },
+  {
+    target: "palette",
+    title: "Use the whiteboard palette",
+    description: "Choose a drawing tool and color to sketch your approach on the whiteboard.",
+  },
+];
+
+export default function MockTestWorkspace({
+  filters,
+  questions,
+  questionCount = questions.length,
+  isLoadingQuestions = false,
+  sessionId,
+  onClose,
+  onSessionComplete,
+}) {
   const [activeTab, setActiveTab] = useState("code"); // code, whiteboard, feedback, leaderboard
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
@@ -72,6 +105,9 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   // Timer state (45 minutes)
   const [timeLeft, setTimeLeft] = useState(45 * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
+  const [markedForReviewByIndex, setMarkedForReviewByIndex] = useState({});
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
 
   // Web Speech API
   const [isRecording, setIsRecording] = useState(false);
@@ -131,7 +167,53 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   const currentAnswer = answersByIndex[currentQuestionIndex];
   const currentTips = tipsByIndex[currentQuestionIndex];
   const submittedAnswerCount = questions.filter((_, index) => submittedAnswersByIndex[index]).length;
-  const allAnswersSubmitted = questions.length > 0 && submittedAnswerCount === questions.length;
+  const allAnswersSubmitted = !isLoadingQuestions &&
+    questions.length === questionCount &&
+    questionCount > 0 &&
+    submittedAnswerCount === questionCount;
+  const activeTutorialStep = isTutorialOpen ? WORKSPACE_TOUR_STEPS[tutorialStep] : null;
+
+  useEffect(() => {
+    if (window.sessionStorage.getItem("mock-test-workspace-tour-complete") !== "true") {
+      setIsTutorialOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!activeTutorialStep) return undefined;
+    if (activeTutorialStep.target === "palette" && activeTab !== "whiteboard") {
+      setActiveTab("whiteboard");
+      return undefined;
+    }
+
+    const target = document.querySelector(`[data-tour-target="${activeTutorialStep.target}"]`);
+    if (!target) return undefined;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    target.classList.add("outline", "outline-2", "outline-cyan-400", "outline-offset-4");
+    return () => {
+      target.classList.remove("outline", "outline-2", "outline-cyan-400", "outline-offset-4");
+    };
+  }, [activeTutorialStep, activeTab]);
+
+  const closeTutorial = () => {
+    setIsTutorialOpen(false);
+    setActiveTab("code");
+    window.sessionStorage.setItem("mock-test-workspace-tour-complete", "true");
+  };
+
+  const startTutorial = () => {
+    setTutorialStep(0);
+    setIsTutorialOpen(true);
+  };
+
+  const moveTutorialForward = () => {
+    if (tutorialStep === WORKSPACE_TOUR_STEPS.length - 1) {
+      closeTutorial();
+      return;
+    }
+    setTutorialStep((current) => current + 1);
+  };
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -707,7 +789,11 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   const handleSubmitTest = async () => {
     if (!allAnswersSubmitted) {
       setIsTimerRunning(false);
-      toast.error(`Submit an answer for every question first (${submittedAnswerCount}/${questions.length} submitted).`);
+      toast.error(
+        isLoadingQuestions
+          ? "Please wait for all questions to finish loading before submitting."
+          : `Submit an answer for every question first (${submittedAnswerCount}/${questionCount} submitted).`
+      );
       return;
     }
 
@@ -818,7 +904,10 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
         {/* TIMER & QUICK SUBMIT */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5 bg-[#172237] px-4 py-1.5 rounded-lg border border-slate-700 shadow-inner">
+          <div
+            data-tour-target="timer"
+            className="flex items-center gap-2.5 bg-[#172237] px-4 py-1.5 rounded-lg border border-slate-700 shadow-inner"
+          >
             <span className={`w-2.5 h-2.5 rounded-full ${isTimerRunning ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
             <span className="font-mono text-lg font-bold text-slate-200">
               {formatTime(timeLeft)}
@@ -833,11 +922,26 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
           </div>
 
           <Button
+            variant="outline"
+            onClick={startTutorial}
+            className="border-slate-700 text-slate-300 hover:bg-slate-800"
+            title="Take the workspace tour"
+          >
+            <CircleHelp size={15} /> Tour
+          </Button>
+
+          <Button
             onClick={handleSubmitTest}
             disabled={isSubmitting || !allAnswersSubmitted}
             variant="aurora"
             className="text-white font-bold flex items-center gap-1.5 px-4 relative overflow-visible shadow-lg"
-            title={!allAnswersSubmitted ? "Submit every question's answer first" : "Evaluate all submitted answers"}
+            title={
+              isLoadingQuestions
+                ? "Wait for question generation to finish"
+                : !allAnswersSubmitted
+                ? "Submit every question's answer first"
+                : "Evaluate all submitted answers"
+            }
           >
             <ParticleBurst active={isSubmitting} count={8} color="#6366f1" />
             {isSubmitting ? (
@@ -847,7 +951,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               </>
             ) : (
               <>
-                <Send size={16} /> Submit Test ({submittedAnswerCount}/{questions.length})
+                <Send size={16} /> Submit Test ({submittedAnswerCount}/{questionCount})
               </>
             )}
           </Button>
@@ -862,22 +966,48 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
         </div>
       </header>
 
+      {isLoadingQuestions && (
+        <div className="border-b border-blue-900/60 bg-blue-950/50 px-6 py-2 text-center text-xs text-blue-200">
+          More questions are being prepared in the background. You can continue with the questions already loaded.
+        </div>
+      )}
+
       {/* WORKSPACE CONTENT */}
       <main className="flex-1 flex overflow-hidden">
         {/* LEFT COLUMN: QUESTION & AI NUDGES */}
         <section className="w-[32%] border-r border-slate-800 bg-[#0a0e1a] p-5 flex flex-col gap-5 overflow-y-auto">
           {/* Question card */}
           <div className="bg-[#0e1526] border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-500">
-                Question {currentQuestionIndex + 1} of {questions.length}
+                Question {currentQuestionIndex + 1} of {questionCount}
               </span>
-              {submittedAnswersByIndex[currentQuestionIndex] && (
-                <span className="rounded-full border border-emerald-700/60 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
-                  Submitted
-                </span>
-              )}
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {submittedAnswersByIndex[currentQuestionIndex] && (
+                  <span className="rounded-full border border-emerald-700/60 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    Submitted
+                  </span>
+                )}
+                <Button
+                  data-tour-target="review"
+                  size="xs"
+                  variant="outline"
+                  aria-pressed={Boolean(markedForReviewByIndex[currentQuestionIndex])}
+                  onClick={() => setMarkedForReviewByIndex((previous) => ({
+                    ...previous,
+                    [currentQuestionIndex]: !previous[currentQuestionIndex],
+                  }))}
+                  className={`h-7 px-2 text-[10px] ${
+                    markedForReviewByIndex[currentQuestionIndex]
+                      ? "border-amber-500/60 bg-amber-500/10 text-amber-300"
+                      : "border-slate-800 text-slate-400"
+                  }`}
+                >
+                  <Flag size={12} />
+                  {markedForReviewByIndex[currentQuestionIndex] ? "Marked" : "Mark for review"}
+                </Button>
+              </div>
+              <div data-tour-target="navigation" className="flex items-center gap-1">
                 <Button
                   size="icon"
                   variant="outline"
@@ -905,9 +1035,9 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
             {/* Segment Progress Bar */}
             <div className="my-1">
               <SegmentBar
-                totalSegments={questions.length || 1}
+                totalSegments={questionCount || 1}
                 currentSegment={currentQuestionIndex + 1}
-                completedSegments={questions.map((_, index) =>
+                completedSegments={Array.from({ length: questionCount }, (_, index) =>
                   Boolean(submittedAnswersByIndex[index])
                 )}
               />
@@ -1242,7 +1372,10 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
                 {/* Colors & Actions */}
                 <div className="flex items-center gap-2">
-                  <div className="flex gap-1 items-center bg-slate-900 border border-slate-800 rounded p-0.5">
+                  <div
+                    data-tour-target="palette"
+                    className="flex gap-1 items-center bg-slate-900 border border-slate-800 rounded p-0.5"
+                  >
                     {["#3b82f6", "#ef4444", "#10b981", "#eab308", "#ffffff"].map((c) => (
                       <button
                         key={c}
@@ -1491,6 +1624,47 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
           )}
         </section>
       </main>
+
+      {activeTutorialStep && (
+        <div
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="mock-test-tour-title"
+          className="fixed bottom-5 right-5 z-[70] w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl border border-cyan-500/30 bg-[#101a2d] p-5 shadow-2xl shadow-black/40"
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+              Workspace tour · {tutorialStep + 1}/{WORKSPACE_TOUR_STEPS.length}
+            </span>
+            <button
+              type="button"
+              onClick={closeTutorial}
+              className="text-xs font-semibold text-slate-400 hover:text-white"
+            >
+              Skip
+            </button>
+          </div>
+          <h3 id="mock-test-tour-title" className="text-base font-bold text-white">
+            {activeTutorialStep.title}
+          </h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-300">
+            {activeTutorialStep.description}
+          </p>
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex gap-1" aria-hidden="true">
+              {WORKSPACE_TOUR_STEPS.map((step, index) => (
+                <span
+                  key={step.target}
+                  className={`h-1.5 w-5 rounded-full ${index === tutorialStep ? "bg-cyan-400" : "bg-slate-700"}`}
+                />
+              ))}
+            </div>
+            <Button onClick={moveTutorialForward} size="sm" className="bg-cyan-600 text-white hover:bg-cyan-500">
+              {tutorialStep === WORKSPACE_TOUR_STEPS.length - 1 ? "Finish" : "Next"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

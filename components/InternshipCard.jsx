@@ -122,9 +122,11 @@ const InternshipCard = ({ internship, onApply }) => {
             </div>
           </div>
 
-          <div className="text-lg font-black text-slate-900 dark:text-white">
-            {internship.stipend}
-          </div>
+          {internship.stipend && !/^not disclosed$/i.test(String(internship.stipend).trim()) && (
+            <div className="text-lg font-black text-slate-900 dark:text-white">
+              {internship.stipend}
+            </div>
+          )}
 
           <div className="text-xs">
             <span className={cn(

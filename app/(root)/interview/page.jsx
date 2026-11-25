@@ -1,10 +1,13 @@
 import Link from "next/link";
-import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import InterviewCard from "@/components/InterviewCard";
 import ActiveInterviewSessions from "@/components/ActiveInterviewSessions";
 import InterviewSetup from "@/components/InterviewSetup";
+import {
+  InterviewBuddyTitleIcon,
+  InterviewBuddyScene,
+} from "@/components/InterviewBuddyVisuals";
 
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import {
@@ -31,15 +34,11 @@ async function InterviewPage() {
         <div className="absolute inset-0 bg-linear-to-r from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
         <div className="relative flex flex-col-reverse sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="flex-1">
-            <div className="flex items-center gap-2.5 mb-2">
-              <Image
-                src="/interview-buddy-illustration.png"
-                alt="Interview Buddy"
-                width={32}
-                height={32}
-                className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-sm select-none"
-              />
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Interview Buddy</h3>
+            <div className="flex items-center gap-3 mb-2.5">
+              <InterviewBuddyTitleIcon />
+              <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                Interview Buddy
+              </h3>
             </div>
             <p className="text-slate-600 dark:text-slate-300 mb-5 max-w-md text-sm sm:text-base leading-relaxed">
               Practice with a human partner or AI interviewer. Get real-time coaching, adaptive questions, and detailed performance reports.
@@ -52,15 +51,8 @@ async function InterviewPage() {
             </Link>
           </div>
           <div className="relative shrink-0 flex items-center justify-center self-center sm:self-auto">
-            <div className="absolute inset-0 bg-indigo-500/25 rounded-full blur-2xl -z-10" />
-            <Image
-              src="/interview-buddy-illustration.png"
-              alt="Interview Buddy Avatar"
-              width={140}
-              height={140}
-              className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 object-contain drop-shadow-xl select-none hover:scale-105 transition-transform duration-300"
-              priority
-            />
+            <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-3xl -z-10" />
+            <InterviewBuddyScene />
           </div>
         </div>
       </section>

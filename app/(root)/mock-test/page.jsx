@@ -22,22 +22,13 @@ import {
   saveMockTestPreparation,
 } from "@/lib/mock-test-preparation-storage";
 import { toast } from "sonner";
-import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Star, Wind } from "lucide-react";
+import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Wind } from "lucide-react";
 
 const TEST_TYPES = [
   { id: "technical", name: "Technical Round", icon: Laptop, desc: "Core technical concepts", color: "from-purple-500 to-indigo-600" },
   { id: "behavioral", name: "Behavioral Round", icon: Mic, desc: "Leadership & teamwork", color: "from-cyan-500 to-blue-600" },
   { id: "system-design", name: "System Design", icon: Layers, desc: "Architecture & design", color: "from-amber-500 to-orange-600" },
   { id: "coding", name: "Coding Challenge", icon: Zap, desc: "Problem-solving skills", color: "from-red-500 to-pink-600" },
-];
-
-const CURATED_PACKS = [
-  { id: 1, company: "Google", level: "Easy", questions: 15, rating: 4.8, trend: "up" },
-  { id: 2, company: "Meta", level: "Medium", questions: 20, rating: 4.7, trend: "up" },
-  { id: 3, company: "Amazon", level: "Hard", questions: 25, rating: 4.9, trend: "down" },
-  { id: 4, company: "Apple", level: "Medium", questions: 18, rating: 4.6, trend: "up" },
-  { id: 5, company: "Microsoft", level: "Hard", questions: 22, rating: 4.8, trend: "up" },
-  { id: 6, company: "Netflix", level: "Medium", questions: 17, rating: 4.7, trend: "flat" },
 ];
 
 const PREPARATION_TIPS = [
@@ -944,50 +935,6 @@ export default function MockTestPage() {
                 <p className="text-xs text-muted-foreground flex items-center gap-1.5">✓ You can review</p>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* CURATED PACKS */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-foreground" style={{ letterSpacing: "-0.02em" }}>Curated Packs</h2>
-              <p className="text-muted-foreground text-sm">Popular test collections by community</p>
-            </div>
-            <Button className="text-primary hover:text-primary/80">
-              View All
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {CURATED_PACKS.map((pack) => (
-              <div key={pack.id} className="rounded-lg border border-border bg-card p-4 hover:border-primary/50 transition-all cursor-pointer group shadow-sm">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">{pack.company}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">{pack.questions} questions</p>
-                  </div>
-                  <span className={`text-xs font-bold px-2 py-1 rounded border ${
-                    pack.level === "Easy"
-                      ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                      : pack.level === "Medium"
-                      ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                      : "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30"
-                  }`}>
-                    {pack.level}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-amber-500">
-                    <Star size={14} className="fill-amber-500" />
-                    <span className="text-sm font-bold text-foreground">{pack.rating}</span>
-                  </div>
-                  <span className={`text-sm font-bold capitalize ${pack.trend === "up" ? "text-emerald-500" : pack.trend === "down" ? "text-rose-500" : "text-muted-foreground"}`}>
-                    {pack.trend}
-                  </span>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
 

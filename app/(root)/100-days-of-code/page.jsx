@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import {
   getCodingChallengeProgress,
   markCodingChallengeDayComplete,
+  unmarkCodingChallengeDayComplete,
 } from "@/lib/actions/profile-achievements.action";
 
 export default function HundredDaysOfCodePage() {
@@ -103,6 +104,20 @@ export default function HundredDaysOfCodePage() {
       result.newlyUnlocked.forEach((milestone) => {
         toast.success(`${milestone}-day coding challenge reward unlocked!`);
       });
+    } else {
+      setProgressError(result.error);
+      toast.error(result.error);
+    }
+    setUpdatingDay(null);
+  };
+
+  const handleUndoDayComplete = async (dayNumber) => {
+    setUpdatingDay(dayNumber);
+    const result = await unmarkCodingChallengeDayComplete(dayNumber);
+    if (result.success) {
+      setCompletedDays(result.completedDays);
+      setProgressError("");
+      toast.info(`Day ${dayNumber} completion reverted.`);
     } else {
       setProgressError(result.error);
       toast.error(result.error);
@@ -288,6 +303,7 @@ export default function HundredDaysOfCodePage() {
                 isUpdating={updatingDay === day.day}
                 canTrackProgress={progressLoaded && !progressError}
                 onMarkComplete={() => handleMarkDayComplete(day.day)}
+                onUndoComplete={() => handleUndoDayComplete(day.day)}
               />
             ))
           )}

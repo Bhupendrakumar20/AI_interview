@@ -164,15 +164,6 @@ export default function InternshipsPage() {
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [selectedInternship, setSelectedInternship] = useState(null);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  
-  const activeAdvancedCount = [
-    filters.domain !== "all",
-    Boolean(filters.stipendMin || filters.stipendMax),
-    filters.duration !== "all",
-    filters.workMode !== "all",
-    filters.datePosted !== "all",
-    Boolean(filters.skills),
-  ].filter(Boolean).length;
 
   const [filters, setFilters] = useState(() => {
     return {
@@ -189,6 +180,15 @@ export default function InternshipsPage() {
       sort: searchParams.get("sort") || "deadline",
     };
   });
+
+  const activeAdvancedCount = [
+    filters.domain !== "all",
+    Boolean(filters.stipendMin || filters.stipendMax),
+    filters.duration !== "all",
+    filters.workMode !== "all",
+    filters.datePosted !== "all",
+    Boolean(filters.skills),
+  ].filter(Boolean).length;
 
   // Sync filters with URL params on back/forward navigation
   useEffect(() => {

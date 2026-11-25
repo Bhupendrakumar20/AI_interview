@@ -16,6 +16,11 @@ import {
   startInterviewModeSessionAction,
 } from "@/lib/actions/interview-session.action";
 import { useExitConfirmation } from "@/lib/hooks/useExitConfirmation";
+import {
+  clearMockTestPreparation,
+  loadMockTestPreparation,
+  saveMockTestPreparation,
+} from "@/lib/mock-test-preparation-storage";
 import { toast } from "sonner";
 import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Star, Wind } from "lucide-react";
 
@@ -58,7 +63,10 @@ export default function MockTestPage() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchRole, setSearchRole] = useState(filters.role);
-  const [selectedTestType, setSelectedTestType] = useState(TEST_TYPES[0]);
+  const initialTestType = TEST_TYPES.find((type) =>
+    type.name.toLowerCase().startsWith(filters.type.toLowerCase())
+  ) || TEST_TYPES[0];
+  const [selectedTestType, setSelectedTestType] = useState(initialTestType);
   const [isTestActive, setIsTestActive] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [recentResults, setRecentResults] = useState([]);
@@ -69,6 +77,7 @@ export default function MockTestPage() {
   const [breathingSeconds, setBreathingSeconds] = useState(30);
   const [isBreathing, setIsBreathing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isCheckingSavedPreparation, setIsCheckingSavedPreparation] = useState(true);
 
   useExitConfirmation(loading || isTestActive);
 
@@ -77,6 +86,15 @@ export default function MockTestPage() {
   const abortControllerRef = useRef(null);
   const preparationConfigRef = useRef(null);
   const preparationStartedAtRef = useRef(null);
+  const estimateStartedAtRef = useRef(null);
+  const estimateStartingQuestionCountRef = useRef(0);
+  const testStartedRef = useRef(false);
+  const storageWarningShownRef = useRef(false);
+  const notificationPermissionRequestRef = useRef(null);
+  const initialConfigRef = useRef({
+    filters: { ...filters },
+    round: selectedTestType,
+  });
 
   const loadedQuestionCount = questions.filter(
     (question) => !question.isStreaming && question.question?.trim()
@@ -87,10 +105,14 @@ export default function MockTestPage() {
   const questionProgress = targetQuestionCount > 0
     ? Math.min(100, Math.round((loadedQuestionCount / targetQuestionCount) * 100))
     : 0;
-  const estimatedSecondsRemaining = loadedQuestionCount > 0
+  const questionsCompletedThisRun = Math.max(
+    0,
+    loadedQuestionCount - estimateStartingQuestionCountRef.current
+  );
+  const estimatedSecondsRemaining = loading && questionsCompletedThisRun > 0
     ? Math.max(
         0,
-        Math.ceil((Math.max(elapsedSeconds, 1) / loadedQuestionCount) * (targetQuestionCount - loadedQuestionCount))
+        Math.ceil((Math.max(elapsedSeconds, 1) / questionsCompletedThisRun) * (targetQuestionCount - loadedQuestionCount))
       )
     : null;
   const remainingTimeLabel = estimatedSecondsRemaining === null
@@ -98,7 +120,9 @@ export default function MockTestPage() {
     : estimatedSecondsRemaining < 60
     ? "Under a minute left"
     : `About ${Math.ceil(estimatedSecondsRemaining / 60)} min left`;
-  const preparationStage = !loading
+  const preparationStage = !loading && loadedQuestionCount < targetQuestionCount
+    ? "Ready to continue"
+    : !loading
     ? "Almost ready!"
     : loadedQuestionCount === 0
     ? "Selecting questions…"
@@ -131,9 +155,9 @@ export default function MockTestPage() {
   }, [loading]);
 
   useEffect(() => {
-    if (!loading || !preparationStartedAtRef.current) return undefined;
+    if (!loading || !estimateStartedAtRef.current) return undefined;
     const elapsedInterval = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - preparationStartedAtRef.current) / 1000));
+      setElapsedSeconds(Math.floor((Date.now() - estimateStartedAtRef.current) / 1000));
     }, 1000);
     return () => clearInterval(elapsedInterval);
   }, [loading]);
@@ -176,7 +200,52 @@ export default function MockTestPage() {
     refreshResults();
   }, [refreshResults]);
 
-  const loadQuestions = useCallback(async (activeFilters, activeRound) => {
+  const persistPreparationSnapshot = useCallback(async (preparation) => {
+    if (testStartedRef.current) return;
+    try {
+      await saveMockTestPreparation(preparation);
+    } catch (error) {
+      console.error("Could not save mock-test preparation progress:", error);
+      if (!storageWarningShownRef.current) {
+        storageWarningShownRef.current = true;
+        toast.warning("Question progress could not be saved on this browser.");
+      }
+    }
+  }, []);
+
+  const requestReadyNotificationPermission = async () => {
+    if (!window.isSecureContext || !("Notification" in window)) return false;
+    if (Notification.permission === "granted") return true;
+    if (Notification.permission !== "default") return false;
+    try {
+      return (await Notification.requestPermission()) === "granted";
+    } catch (error) {
+      console.warn("Could not request test-ready notification permission:", error);
+      return false;
+    }
+  };
+
+  const notifyMockTestReady = (activeFilters) => {
+    if (!window.isSecureContext || !("Notification" in window) || Notification.permission !== "granted") {
+      return false;
+    }
+    try {
+      const notification = new Notification("Your mock test is ready", {
+        body: `${activeFilters.count} questions for ${activeFilters.role} are ready.`,
+      });
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+      return true;
+    } catch (error) {
+      console.warn("Could not show the mock-test ready notification:", error);
+      toast.warning("Could not display a browser notification. The test is ready in this tab.");
+      return false;
+    }
+  };
+
+  const loadQuestions = useCallback(async (activeFilters, activeRound, savedQuestions = []) => {
     // Cancel any in-flight request before starting a new one
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -186,11 +255,15 @@ export default function MockTestPage() {
 
     const myRequestId = ++requestIdRef.current;
 
-    preparationStartedAtRef.current = Date.now();
+    if (!savedQuestions.length) {
+      preparationStartedAtRef.current = Date.now();
+    }
+    estimateStartedAtRef.current = Date.now();
+    estimateStartingQuestionCountRef.current = savedQuestions.length;
     setElapsedSeconds(0);
     setLoading(true);
-    setQuestions([]);
-    let loadedQuestions = [];
+    setQuestions(savedQuestions);
+    let loadedQuestions = [...savedQuestions];
     try {
       const res = await fetch("/api/mock-test/stream", {
         method: "POST",
@@ -203,6 +276,8 @@ export default function MockTestPage() {
           count: activeFilters.count,
           roundId: activeRound.id,
           roundName: activeRound.name,
+          startIndex: loadedQuestions.length,
+          previousQuestions: loadedQuestions.map((item) => item.question),
         }),
         signal: controller.signal,
       });
@@ -221,7 +296,7 @@ export default function MockTestPage() {
       const decoder = new TextDecoder();
       let buffer = "";
 
-      const processLine = (line) => {
+      const processLine = async (line) => {
         if (!line.trim()) return;
         const event = JSON.parse(line);
         if (event.error) throw new Error(event.error);
@@ -278,6 +353,15 @@ export default function MockTestPage() {
           if (loadedQuestions.filter((question) => !question.isStreaming).length === 1) {
             toast.info("Your first question is ready. You can start now while the rest load.");
           }
+          await persistPreparationSnapshot({
+            filters: activeFilters,
+            roundId: activeRound.id,
+            roundName: activeRound.name,
+            questions: loadedQuestions
+              .filter((question) => !question.isStreaming && question.question?.trim())
+              .map(({ question, difficulty }) => ({ question, difficulty })),
+            startedAt: preparationStartedAtRef.current,
+          });
         }
       };
 
@@ -287,7 +371,7 @@ export default function MockTestPage() {
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
 
-        for (const line of lines) processLine(line);
+        for (const line of lines) await processLine(line);
         if (done) break;
 
         // If a newer request has started, stop applying this one's results
@@ -296,13 +380,24 @@ export default function MockTestPage() {
           return;
         }
       }
-      if (buffer.trim()) processLine(buffer);
+      if (buffer.trim()) await processLine(buffer);
 
       if (myRequestId === requestIdRef.current) {
-        if (loadedQuestions.length === 0 || loadedQuestions.some((question) => question.isStreaming)) {
+        if (
+          loadedQuestions.length !== Number(activeFilters.count) ||
+          loadedQuestions.some((question) => question.isStreaming)
+        ) {
           throw new Error("Question generation finished before all questions were ready.");
         }
         toast.success(`Loaded questions for ${activeFilters.company}`);
+        const permissionRequest = notificationPermissionRequestRef.current;
+        if (permissionRequest) {
+          permissionRequest.then((granted) => {
+            if (granted) notifyMockTestReady(activeFilters);
+          });
+        } else {
+          notifyMockTestReady(activeFilters);
+        }
         return loadedQuestions;
       }
       return null;
@@ -310,11 +405,81 @@ export default function MockTestPage() {
       if (error.name === "AbortError") return null; // expected when superseded — not a real error
       console.error("Error loading questions:", error);
       toast.error("Failed to load mock test questions");
-      if (myRequestId === requestIdRef.current) setQuestions([]);
+      if (myRequestId === requestIdRef.current) {
+        const completedQuestions = loadedQuestions
+          .filter((question) => !question.isStreaming && question.question?.trim())
+          .map(({ question, difficulty }) => ({ question, difficulty }));
+        setQuestions(completedQuestions);
+        await persistPreparationSnapshot({
+          filters: activeFilters,
+          roundId: activeRound.id,
+          roundName: activeRound.name,
+          questions: completedQuestions,
+          startedAt: preparationStartedAtRef.current,
+        });
+      }
       return null;
     } finally {
       if (myRequestId === requestIdRef.current) setLoading(false);
     }
+  }, [persistPreparationSnapshot]);
+
+  useEffect(() => {
+    let active = true;
+
+    const restorePreparation = async () => {
+      try {
+        const saved = await loadMockTestPreparation();
+        if (!active || !saved) return;
+
+        const { filters: savedFilters, roundId, questions: savedQuestions } = saved;
+        const initialConfig = initialConfigRef.current;
+        const matchesCurrentConfig = savedFilters &&
+          ["company", "role", "difficulty", "type", "count"].every(
+            (key) => savedFilters[key] === initialConfig.filters[key]
+          ) &&
+          roundId === initialConfig.round.id;
+
+        if (!matchesCurrentConfig || !Array.isArray(savedQuestions)) {
+          await clearMockTestPreparation();
+          return;
+        }
+
+        const validQuestions = savedQuestions
+          .filter((item) =>
+            item &&
+            typeof item.question === "string" &&
+            item.question.trim() &&
+            !item.isStreaming
+          )
+          .slice(0, Number(savedFilters.count));
+        if (!validQuestions.length) {
+          await clearMockTestPreparation();
+          return;
+        }
+
+        const startedAt = Number.isFinite(saved.startedAt) ? saved.startedAt : saved.savedAt;
+        preparationConfigRef.current = {
+          filters: savedFilters,
+          round: initialConfig.round,
+        };
+        preparationStartedAtRef.current = Number.isFinite(startedAt) ? startedAt : Date.now();
+        estimateStartedAtRef.current = null;
+        estimateStartingQuestionCountRef.current = validQuestions.length;
+        setElapsedSeconds(0);
+        setQuestions(validQuestions);
+      } catch (error) {
+        console.error("Could not restore mock-test preparation:", error);
+        toast.warning("Saved mock-test progress could not be restored.");
+      } finally {
+        if (active) setIsCheckingSavedPreparation(false);
+      }
+    };
+
+    restorePreparation();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleFilterChange = (key, value) => {
@@ -322,6 +487,9 @@ export default function MockTestPage() {
     setFilters(newFilters);
     setQuestions([]);
     preparationConfigRef.current = null;
+    clearMockTestPreparation().catch((error) => {
+      console.error("Could not clear previous mock-test preparation:", error);
+    });
 
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
@@ -336,18 +504,29 @@ export default function MockTestPage() {
   };
 
   const handleStartTest = async () => {
-    if (isStartingTest) return;
+    if (isStartingTest || isCheckingSavedPreparation) return;
 
     if (!isPreparingTest) {
       const activeFilters = { ...filters };
       const activeRound = selectedTestType;
+      testStartedRef.current = false;
       preparationConfigRef.current = { filters: activeFilters, round: activeRound };
+      notificationPermissionRequestRef.current = requestReadyNotificationPermission();
+      notificationPermissionRequestRef.current.then((granted) => {
+        if (!granted) {
+          toast.info("Browser notifications are unavailable or blocked. You'll still see an in-app alert when the test is ready.");
+        }
+      });
       await loadQuestions(activeFilters, activeRound);
       return;
     }
 
     if (!canStartTest) return;
 
+    const shouldResumeQuestionLoading = !loading && loadedQuestionCount < targetQuestionCount;
+    const savedQuestions = questions.filter(
+      (question) => !question.isStreaming && question.question?.trim()
+    );
     setIsStartingTest(true);
     try {
       const activeFilters = preparationConfigRef.current?.filters || { ...filters };
@@ -371,6 +550,13 @@ export default function MockTestPage() {
         }
         return;
       }
+      testStartedRef.current = true;
+      clearMockTestPreparation().catch((error) => {
+        console.error("Could not clear prepared questions after test start:", error);
+      });
+      if (shouldResumeQuestionLoading && savedQuestions.length > 0) {
+        void loadQuestions(activeFilters, activeRound, savedQuestions);
+      }
       console.info("[Interview session]", {
         page: "/mock-test",
         user_id: response.userId,
@@ -385,6 +571,24 @@ export default function MockTestPage() {
     } finally {
       setIsStartingTest(false);
     }
+  };
+
+  const handleResumeQuestionLoad = async () => {
+    if (loading || isStartingTest || isCheckingSavedPreparation) return;
+    const savedConfig = preparationConfigRef.current;
+    if (!savedConfig) return;
+
+    notificationPermissionRequestRef.current = requestReadyNotificationPermission();
+    notificationPermissionRequestRef.current.then((granted) => {
+      if (!granted) {
+        toast.info("Browser notifications are unavailable or blocked. You'll still see an in-app alert when the test is ready.");
+      }
+    });
+    await loadQuestions(
+      savedConfig.filters,
+      savedConfig.round,
+      questions.filter((question) => !question.isStreaming && question.question?.trim())
+    );
   };
 
   const handleCloseTest = async (result = {}) => {
@@ -421,6 +625,7 @@ export default function MockTestPage() {
         questionCount={Number(preparationConfigRef.current?.filters.count || filters.count)}
         isLoadingQuestions={loading}
         sessionId={activeSessionId}
+        onResumeQuestions={handleResumeQuestionLoad}
         onClose={handleCloseTest}
         onSessionComplete={refreshResults}
       />
@@ -458,11 +663,13 @@ export default function MockTestPage() {
                 <div className="flex flex-wrap gap-4">
                   <Button
                     onClick={handleStartTest}
-                    disabled={isStartingTest || (isPreparingTest && !canStartTest)}
+                    disabled={isCheckingSavedPreparation || isStartingTest || (isPreparingTest && !canStartTest)}
                     className="btn-primary flex items-center gap-2 px-6 py-2.5"
                   >
                     <Play size={16} />
-                    {isStartingTest
+                    {isCheckingSavedPreparation
+                      ? "Checking saved progress..."
+                      : isStartingTest
                       ? "Starting..."
                       : loading && !canStartTest
                       ? "Preparing Test..."
@@ -605,7 +812,7 @@ export default function MockTestPage() {
                 </div>
               </div>
 
-              <fieldset disabled={loading || isStartingTest} className="p-6 space-y-5 disabled:opacity-70">
+              <fieldset disabled={loading || isStartingTest || isCheckingSavedPreparation} className="p-6 space-y-5 disabled:opacity-70">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
@@ -680,11 +887,13 @@ export default function MockTestPage() {
 
                 <button
                   onClick={handleStartTest}
-                  disabled={isStartingTest || (isPreparingTest && !canStartTest)}
+                  disabled={isCheckingSavedPreparation || isStartingTest || (isPreparingTest && !canStartTest)}
                   className="w-full btn-primary flex items-center justify-center gap-2 py-3 px-4 mt-4 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Play size={16} />
-                  {isStartingTest
+                  {isCheckingSavedPreparation
+                    ? "Checking saved progress..."
+                    : isStartingTest
                     ? "Starting..."
                     : loading && !canStartTest
                     ? "Preparing Test..."
@@ -804,13 +1013,25 @@ export default function MockTestPage() {
                       : loadedQuestionCount < targetQuestionCount
                       ? `Your test is being prepared. You can start with the ${loadedQuestionCount} ready ${loadedQuestionCount === 1 ? "question" : "questions"} or wait for the full set.`
                       : "All questions are ready. Finishing the test setup."
+                    : loadedQuestionCount < targetQuestionCount
+                    ? "Saved progress restored. Resume question loading or start with the questions already ready."
                     : "Questions are ready. Start when you feel prepared."}
                 </p>
               </div>
+              {!loading && loadedQuestionCount < targetQuestionCount && (
+                <Button
+                  onClick={handleResumeQuestionLoad}
+                  disabled={isStartingTest || isCheckingSavedPreparation}
+                  variant="outline"
+                  className="shrink-0"
+                >
+                  Resume question loading
+                </Button>
+              )}
               {canStartTest && (
                 <Button
                   onClick={handleStartTest}
-                  disabled={isStartingTest}
+                  disabled={isStartingTest || isCheckingSavedPreparation}
                   className="btn-primary shrink-0"
                 >
                   <Play size={16} />
@@ -939,7 +1160,7 @@ export default function MockTestPage() {
             {loadedQuestionCount} of {targetQuestionCount} questions loaded for {filters.company} - {filters.role} ({filters.difficulty})
           </p>
 
-          {loading ? (
+          {isPreparingTest && loadedQuestionCount < targetQuestionCount ? (
             <div
               className="grid animate-pulse grid-cols-1 gap-4 py-4 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)]"
               aria-label="Test workspace loading"

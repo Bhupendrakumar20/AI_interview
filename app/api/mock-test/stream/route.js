@@ -224,7 +224,12 @@ export async function POST(req) {
     roundId,
     responseType,
     question,
+    startIndex = 0,
+    previousQuestions: requestedPreviousQuestions = [],
   } = body;
+  const previousQuestions = Array.isArray(requestedPreviousQuestions)
+    ? requestedPreviousQuestions
+    : [];
   let userId = requestUserId;
   let questionLoadUserId = null;
   let questionLoadRequestId = null;
@@ -236,6 +241,20 @@ export async function POST(req) {
 
   if (responseType && (typeof question !== "string" || !question.trim())) {
     return Response.json({ error: "A question is required" }, { status: 400 });
+  }
+
+  if (
+    !responseType &&
+    (!Number.isInteger(count) ||
+      count < 1 ||
+      count > 20 ||
+      !Number.isInteger(startIndex) ||
+      startIndex < 0 ||
+      startIndex > count ||
+      previousQuestions.length !== startIndex ||
+      previousQuestions.some((item) => typeof item !== "string" || !item.trim()))
+  ) {
+    return Response.json({ error: "Invalid question-resume state" }, { status: 400 });
   }
 
   if (!responseType && roundId) {
@@ -290,7 +309,7 @@ export async function POST(req) {
   };
 
   const cacheKey = generateCacheKey("mocktest-list-v2", { company, role, difficulty, questionType, count });
-  const cached = getCachedData(cacheKey);
+  const cached = startIndex === 0 ? getCachedData(cacheKey) : null;
 
   const encoder = new TextEncoder();
   let streamClosed = false;
@@ -425,8 +444,11 @@ Return only the tips, with one tip per line. Do not use numbering, bullets, mark
           return;
         }
 
-        const questions = [];
-        for (let i = 0; i < count; i++) {
+        const questions = previousQuestions.map((question) => ({
+          question,
+          difficulty: DIFFICULTY_LEVELS.includes(difficulty) ? difficulty : "Medium",
+        }));
+        for (let i = startIndex; i < count; i++) {
           if (streamClosed) return;
           safeEnqueue(controller, encoder.encode(JSON.stringify({
             type: "question_start",

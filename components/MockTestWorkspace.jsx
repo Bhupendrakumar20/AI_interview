@@ -91,6 +91,7 @@ export default function MockTestWorkspace({
   questionCount = questions.length,
   isLoadingQuestions = false,
   sessionId,
+  onResumeQuestions,
   onClose,
   onSessionComplete,
 }) {
@@ -966,11 +967,18 @@ export default function MockTestWorkspace({
         </div>
       </header>
 
-      {isLoadingQuestions && (
+      {isLoadingQuestions ? (
         <div className="border-b border-blue-900/60 bg-blue-950/50 px-6 py-2 text-center text-xs text-blue-200">
           More questions are being prepared in the background. You can continue with the questions already loaded.
         </div>
-      )}
+      ) : questions.length < questionCount ? (
+        <div className="flex items-center justify-center gap-3 border-b border-amber-900/60 bg-amber-950/40 px-6 py-2 text-xs text-amber-200">
+          Question loading paused. Resume it to unlock the rest of the test.
+          <Button size="xs" onClick={onResumeQuestions} className="bg-amber-700 text-white hover:bg-amber-600">
+            Resume question loading
+          </Button>
+        </div>
+      ) : null}
 
       {/* WORKSPACE CONTENT */}
       <main className="flex-1 flex overflow-hidden">

@@ -4,9 +4,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { io } from 'socket.io-client';
 import { toast } from 'sonner';
-import { ArrowLeft, Play, Send, Trophy, Users, Zap, CheckCircle2, XCircle, AlertCircle, Timer, Crown } from 'lucide-react';
+import { ArrowLeft, Play, Send, Trophy, Users, Zap, CheckCircle2, XCircle, AlertCircle, Timer, Crown, Save, Award } from 'lucide-react';
 import { auth } from '@/firebase/client';
 import CodeEditorPanel from '@/components/CodeEditorPanel';
+import DSARoomResultsBoard from '@/components/DSARoomResultsBoard';
+import {
+  computeDsaRoomResult,
+  formatDsaDuration,
+  getRoomTimeLimitMinutes,
+} from '@/lib/dsa-room-results';
 
 // Robust language code snippet extractor
 const getSnippetForLanguage = (codeSnippets, targetLang) => {
@@ -71,6 +77,12 @@ export default function DSALiveRoomPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null); // 'passed', 'failed', null
   const [testResults, setTestResults] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState('');
+  const [savedRoomResults, setSavedRoomResults] = useState([]);
+  const [savingFinalResult, setSavingFinalResult] = useState(false);
+  const [hasSubmittedFinalResult, setHasSubmittedFinalResult] = useState(false);
+  const [myFinalResult, setMyFinalResult] = useState(null);
+  const [showFinalResultModal, setShowFinalResultModal] = useState(false);
 
   const socketRef = useRef(null);
 
@@ -83,10 +95,7 @@ export default function DSALiveRoomPage() {
         const timePassed = Math.floor((Date.now() - roomState.startTime) / 1000);
         
         const qCount = roomState.questions?.length || 2;
-        let limitMinutes = 30;
-        if (qCount === 4) limitMinutes = 90;
-        else if (qCount === 3) limitMinutes = 60;
-        else if (qCount === 2) limitMinutes = 40;
+        const limitMinutes = getRoomTimeLimitMinutes(qCount);
         
         const limitSeconds = limitMinutes * 60;
         const remaining = Math.max(0, limitSeconds - timePassed);
@@ -147,7 +156,16 @@ export default function DSALiveRoomPage() {
     socketIo.on('connect', () => {
       console.log('✅ Connected to DSA socket server');
       
-      const userId = auth.currentUser?.uid || `usr_${Math.random().toString(36).substring(2, 9)}`;
+      let userId = auth.currentUser?.uid;
+      if (!userId && typeof window !== 'undefined') {
+        userId = sessionStorage.getItem('dsa_guest_id');
+        if (!userId) {
+          userId = `usr_${Math.random().toString(36).substring(2, 9)}`;
+          sessionStorage.setItem('dsa_guest_id', userId);
+        }
+      }
+      userId = userId || `usr_${Math.random().toString(36).substring(2, 9)}`;
+      setCurrentUserId(userId);
       
       socketIo.emit('dsa-join-room', {
         roomId: roomCode,
@@ -159,6 +177,9 @@ export default function DSALiveRoomPage() {
     socketIo.on('dsa-lobby-update', (state) => {
       console.log('👥 Room Lobby Update:', state);
       setRoomState(state);
+      if (Array.isArray(state.savedResults) && state.savedResults.length > 0) {
+        setSavedRoomResults(state.savedResults);
+      }
 
       if (state.status === 'playing' && state.questions && state.questions.length > 0) {
         setCodeMap((prev) => {
@@ -212,10 +233,32 @@ export default function DSALiveRoomPage() {
       toast.error(message);
     });
 
+    socketIo.on('dsa-results-updated', ({ results, submittedBy }) => {
+      if (Array.isArray(results)) {
+        setSavedRoomResults(results);
+      }
+      if (submittedBy && submittedBy !== usernameParam) {
+        toast.info(`${submittedBy} submitted and saved their final test result.`);
+      }
+    });
+
     return () => {
       socketIo.disconnect();
     };
   }, [roomCode, usernameParam]);
+
+  // Load persisted room results on mount so all participants see results even after others leave
+  useEffect(() => {
+    if (!roomCode) return;
+    fetch(`/api/dsa-room/results?roomCode=${encodeURIComponent(roomCode)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success && Array.isArray(data.results)) {
+          setSavedRoomResults(data.results);
+        }
+      })
+      .catch((err) => console.error('Failed to fetch saved DSA room results:', err));
+  }, [roomCode]);
 
   // Fetch and Start Game
   const handleStartGame = async () => {
@@ -340,6 +383,64 @@ export default function DSALiveRoomPage() {
   const currentParticipant = roomState.participants.find(p => p.socketId === socket?.id);
   const isHost = currentParticipant?.isHost;
 
+  const totalQuestionsCount = roomState.questions?.length || 0;
+  const mySolvedCount = totalQuestionsCount > 0 && currentParticipant?.questionStatuses
+    ? roomState.questions.filter((q) => currentParticipant.questionStatuses?.[q.id]?.status === 'solved').length
+    : 0;
+  const allQuestionsSolved =
+    roomState.status === 'playing' &&
+    totalQuestionsCount > 0 &&
+    mySolvedCount === totalQuestionsCount;
+
+  const myComputedPreview =
+    roomState.status === 'playing' && totalQuestionsCount > 0 && currentParticipant
+      ? computeDsaRoomResult({
+          roomCode,
+          participant: currentParticipant,
+          questions: roomState.questions,
+          startTime: roomState.startTime,
+          difficulty: difficultyParam,
+          userId: currentUserId || currentParticipant?.userId,
+          username: usernameParam,
+        })
+      : null;
+
+  const handleSaveFinalResult = async () => {
+    if (!myComputedPreview || savingFinalResult) return;
+    setSavingFinalResult(true);
+    try {
+      const res = await fetch('/api/dsa-room/results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(myComputedPreview),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Failed to save test result.');
+      }
+
+      const savedEntry = data.entry || myComputedPreview;
+      if (Array.isArray(data.results)) {
+        setSavedRoomResults(data.results);
+      }
+      setMyFinalResult(savedEntry);
+      setHasSubmittedFinalResult(true);
+      setShowFinalResultModal(true);
+
+      socketRef.current?.emit('dsa-submit-final-result', {
+        roomId: roomCode,
+        result: savedEntry,
+      });
+
+      toast.success(`Test result saved for Room #${roomCode}! You can leave anytime.`);
+    } catch (err) {
+      console.error('Failed to save final DSA room result:', err);
+      toast.error(err.message || 'Unable to save test result.');
+    } finally {
+      setSavingFinalResult(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between overflow-x-hidden font-sans">
       {/* Top bar */}
@@ -370,7 +471,21 @@ export default function DSALiveRoomPage() {
           </span>
         </div>
 
-        <div>
+        <div className="flex items-center gap-2">
+          {(allQuestionsSolved || hasSubmittedFinalResult) && (
+            <button
+              onClick={hasSubmittedFinalResult ? () => setShowFinalResultModal(true) : handleSaveFinalResult}
+              disabled={savingFinalResult}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-lg shadow-amber-500/20 transition cursor-pointer disabled:opacity-60"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {savingFinalResult
+                ? 'Saving Result...'
+                : hasSubmittedFinalResult
+                ? 'View Saved Result'
+                : 'Submit & Save Test Result'}
+            </button>
+          )}
           <button onClick={handleLeaveRoom} className="px-4 py-1.5 text-xs font-bold rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition">
             Leave Room
           </button>
@@ -699,22 +814,179 @@ export default function DSALiveRoomPage() {
               })()}
             </div>
           </div>
+
+          {/* Completion Banner when all questions are solved */}
+          {allQuestionsSolved && myComputedPreview && (
+            <div className="bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-indigo-500/15 border border-emerald-500/35 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Award className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-sm font-bold text-white">
+                    All {totalQuestionsCount} Questions Solved!
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Final Time: <b className="text-emerald-300">{formatDsaDuration(myComputedPreview.finalTimeMs)}</b> ·
+                  Score: <b className="text-indigo-300">{myComputedPreview.score}/100</b> ·
+                  Wrong Attempts: <b className="text-rose-300">{myComputedPreview.wrongAttempts}</b>
+                </p>
+              </div>
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  onClick={handleSaveFinalResult}
+                  disabled={savingFinalResult}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition cursor-pointer disabled:opacity-60"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {savingFinalResult
+                    ? 'Saving...'
+                    : hasSubmittedFinalResult
+                    ? 'Update Saved Result'
+                    : 'Submit & Save Test Result'}
+                </button>
+                {hasSubmittedFinalResult && (
+                  <button
+                    onClick={() => router.push('/dsa-room')}
+                    className="px-4 py-2 text-xs font-bold rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 transition cursor-pointer"
+                  >
+                    Leave Now
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Shared Room Saved Results Board (visible to all participants of this roomCode) */}
+          <DSARoomResultsBoard
+            roomCode={roomCode}
+            results={savedRoomResults}
+            currentUserId={currentUserId}
+            currentUsername={usernameParam}
+            title={`Saved Test Results · Room #${roomCode}`}
+          />
         </div>
 
       </div>
+
+      {/* Final Test Result Modal */}
+      {showFinalResultModal && myFinalResult && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
+          onClick={() => setShowFinalResultModal(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                  <Trophy className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Test Result Saved</h3>
+                  <p className="text-xs text-slate-400">
+                    Room #{roomCode} · Visible to all room participants
+                  </p>
+                </div>
+              </div>
+              <span className="text-sm font-black px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/35 text-indigo-300">
+                {myFinalResult.score}/100
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+              <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
+                <p className="text-[10px] uppercase text-slate-500 font-semibold">Solved</p>
+                <p className="text-base font-black text-emerald-400 mt-1">
+                  {myFinalResult.questionsSolved}/{myFinalResult.totalQuestions}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
+                <p className="text-[10px] uppercase text-slate-500 font-semibold">Final Time</p>
+                <p className="text-base font-black text-sky-400 mt-1">
+                  {formatDsaDuration(myFinalResult.finalTimeMs)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
+                <p className="text-[10px] uppercase text-slate-500 font-semibold">Wrong Tries</p>
+                <p className="text-base font-black text-rose-400 mt-1">
+                  {myFinalResult.wrongAttempts}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
+                <p className="text-[10px] uppercase text-slate-500 font-semibold">Time Left</p>
+                <p className="text-base font-black text-amber-400 mt-1">
+                  {formatDsaDuration(myFinalResult.timeRemainingMs)}
+                </p>
+              </div>
+            </div>
+
+            {Array.isArray(myFinalResult.questionBreakdown) && myFinalResult.questionBreakdown.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Question Breakdown
+                </p>
+                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                  {myFinalResult.questionBreakdown.map((q, idx) => (
+                    <div
+                      key={q.questionId || idx}
+                      className="flex items-center justify-between gap-3 rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="font-bold text-slate-200">{q.label}:</span>
+                        <span className="text-slate-400 truncate">{q.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0 font-mono">
+                        <span className="text-emerald-400">{formatDsaDuration(q.timeTakenMs)}</span>
+                        <span className="text-rose-400">{q.wrongAttempts} wrong</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowFinalResultModal(false)}
+                className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-lg transition text-sm cursor-pointer"
+              >
+                Stay in Room
+              </button>
+              <button
+                onClick={() => {
+                  setShowFinalResultModal(false);
+                  router.push('/dsa-room');
+                }}
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold rounded-lg transition text-sm shadow-lg shadow-emerald-500/20 cursor-pointer"
+              >
+                Leave Room Safely
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Leave Room Confirmation Modal */}
       {showLeaveConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl animate-scaleUp">
             <div className="flex flex-col items-center text-center gap-4">
-              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-full">
-                <AlertCircle className="w-8 h-8" />
+              <div className={`p-3 rounded-full border ${
+                hasSubmittedFinalResult
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : 'bg-red-500/10 border-red-500/20 text-red-500'
+              }`}>
+                {hasSubmittedFinalResult ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Leave DSA Room?</h3>
                 <p className="text-slate-400 text-sm mt-1.5 leading-relaxed">
-                  Are you sure you want to exit the room? Your current code progress in this session will be lost.
+                  {hasSubmittedFinalResult
+                    ? `Your test result for Room #${roomCode} is saved and visible to everyone in this room. You can exit safely.`
+                    : 'Are you sure you want to exit the room? Your current code progress in this session will be lost.'}
                 </p>
               </div>
             </div>

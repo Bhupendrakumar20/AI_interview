@@ -422,8 +422,9 @@ export default function ProfileIdentityCard({ user, summary, achievements, readO
         </div>
 
         {/* 2. Coding Milestone */}
-        <div
-          className="rounded-xl border border-amber-400/35 bg-linear-to-br from-amber-500/10 via-slate-900/5 to-amber-500/15 dark:from-amber-500/12 dark:via-slate-800/60 dark:to-amber-500/12 p-2.5 flex flex-col justify-between gap-1 min-w-0"
+        <Link
+          href="/100-days-of-code"
+          className="rounded-xl border border-amber-400/35 bg-linear-to-br from-amber-500/10 via-slate-900/5 to-amber-500/15 dark:from-amber-500/12 dark:via-slate-800/60 dark:to-amber-500/12 p-2.5 flex flex-col justify-between gap-1 hover:border-amber-400/60 transition-colors min-w-0"
           title={highlightTitle}
         >
           <div className="flex items-center gap-1.5">
@@ -442,7 +443,7 @@ export default function ProfileIdentityCard({ user, summary, achievements, readO
               Coding Days
             </p>
           </div>
-        </div>
+        </Link>
 
         {/* 3. Completed Rounds */}
         <div className="premium-inset-tile p-2.5 flex flex-col justify-between gap-1 min-w-0">

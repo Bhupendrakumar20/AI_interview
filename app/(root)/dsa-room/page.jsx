@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Trophy, Code, Users, Zap } from 'lucide-react';
+import { ArrowLeft, Trophy, Code, Users, Zap, Search } from 'lucide-react';
 import { auth } from '@/firebase/client';
 import { toast } from 'sonner';
+import DSARoomResultsBoard from '@/components/DSARoomResultsBoard';
 
 export default function DSARoomPage() {
   const router = useRouter();
@@ -13,6 +14,10 @@ export default function DSARoomPage() {
   const [roomCode, setRoomCode] = useState('');
   const [difficulty, setDifficulty] = useState('Medium');
   const [questionCount, setQuestionCount] = useState(2);
+  const [lookupCode, setLookupCode] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupResults, setLookupResults] = useState(null);
+  const [lookupSearchedCode, setLookupSearchedCode] = useState('');
 
   useEffect(() => {
     // Prefill username if logged in
@@ -54,6 +59,33 @@ export default function DSARoomPage() {
 
     const cleanCode = roomCode.trim().toUpperCase();
     router.push(`/interview/dsa/${cleanCode}?username=${encodeURIComponent(username.trim())}`);
+  };
+
+  const handleLookupResults = async (e) => {
+    e.preventDefault();
+    const cleanCode = lookupCode.trim().toUpperCase();
+    if (cleanCode.length < 2) {
+      toast.error('Enter a valid room code to view results.');
+      return;
+    }
+
+    setLookupLoading(true);
+    try {
+      const res = await fetch(`/api/dsa-room/results?roomCode=${encodeURIComponent(cleanCode)}`);
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Could not load results.');
+      }
+      setLookupSearchedCode(cleanCode);
+      setLookupResults(data.results || []);
+      if (!data.results || data.results.length === 0) {
+        toast.info(`No saved test results yet for Room #${cleanCode}.`);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to load room results.');
+    } finally {
+      setLookupLoading(false);
+    }
   };
 
   return (
@@ -196,8 +228,45 @@ export default function DSARoomPage() {
               Join Room
             </button>
           </div>
+
+          <hr className="border-slate-800/80" />
+
+          {/* View Saved Room Results */}
+          <form onSubmit={handleLookupResults} className="space-y-2.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
+              Check Saved Room Results
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Room Code"
+                maxLength={10}
+                value={lookupCode}
+                onChange={(e) => setLookupCode(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 uppercase tracking-widest font-mono"
+              />
+              <button
+                type="submit"
+                disabled={lookupLoading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition cursor-pointer disabled:opacity-60"
+              >
+                <Search size={14} />
+                {lookupLoading ? 'Loading...' : 'Results'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
+
+      {lookupSearchedCode && Array.isArray(lookupResults) && lookupResults.length > 0 && (
+        <div className="max-w-4xl mx-auto w-full mt-8">
+          <DSARoomResultsBoard
+            roomCode={lookupSearchedCode}
+            results={lookupResults}
+            currentUsername={username.trim() || null}
+          />
+        </div>
+      )}
 
       {/* Footer */}
       <div className="max-w-7xl mx-auto w-full text-center text-xs text-slate-600">

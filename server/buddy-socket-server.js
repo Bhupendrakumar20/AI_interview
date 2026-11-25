@@ -143,6 +143,40 @@ const deleteDsaParticipant = async (roomId, socketId) => {
   }
 };
 
+const sortSavedDsaResults = (entries) => {
+  return [...entries].sort((a, b) => {
+    const scoreDiff = (b.score || 0) - (a.score || 0);
+    if (scoreDiff !== 0) return scoreDiff;
+    const solvedDiff = (b.questionsSolved || 0) - (a.questionsSolved || 0);
+    if (solvedDiff !== 0) return solvedDiff;
+    return (a.finalTimeMs || 0) - (b.finalTimeMs || 0);
+  });
+};
+
+const getDsaSavedResults = async (roomId) => {
+  try {
+    const data = await redisClient.hGetAll(`dsa:room:results:${roomId}`);
+    const results = [];
+    for (const val of Object.values(data)) {
+      results.push(JSON.parse(val));
+    }
+    return sortSavedDsaResults(results);
+  } catch (err) {
+    console.error("getDsaSavedResults error:", err);
+    return [];
+  }
+};
+
+const saveDsaResultEntry = async (roomId, entry) => {
+  try {
+    const key = String(entry.userId || entry.username || "guest").toLowerCase();
+    await redisClient.hSet(`dsa:room:results:${roomId}`, key, JSON.stringify(entry));
+    await redisClient.expire(`dsa:room:results:${roomId}`, 86400);
+  } catch (err) {
+    console.error("saveDsaResultEntry error:", err);
+  }
+};
+
 io.on("connection", (socket) => {
   let currentRoom = null;
   let currentDsaRoom = null;
@@ -325,6 +359,8 @@ io.on("connection", (socket) => {
 
     console.log(`⚔️ User ${username} joined DSA room [${cleanRoomId}] (Host: ${isHost})`);
 
+    const savedResults = await getDsaSavedResults(cleanRoomId);
+
     // Broadcast room state and updated user list
     io.to(`dsa-${cleanRoomId}`).emit("dsa-lobby-update", {
       roomId: cleanRoomId,
@@ -332,7 +368,8 @@ io.on("connection", (socket) => {
       questions: room.questions || [],
       question: room.question,
       startTime: room.startTime,
-      participants: Object.values(participantsMap)
+      participants: Object.values(participantsMap),
+      savedResults
     });
   });
 
@@ -415,6 +452,28 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("dsa-submit-final-result", async ({ roomId, result }) => {
+    const cleanRoomId = roomId?.toUpperCase();
+    if (!cleanRoomId || !result) return;
+
+    await saveDsaResultEntry(cleanRoomId, result);
+    const savedResults = await getDsaSavedResults(cleanRoomId);
+
+    const participantsMap = await getDsaParticipants(cleanRoomId);
+    const p = participantsMap[socket.id];
+    if (p) {
+      p.hasSubmittedFinal = true;
+      p.finalScore = result.score;
+      await setDsaParticipant(cleanRoomId, socket.id, p);
+    }
+
+    io.to(`dsa-${cleanRoomId}`).emit("dsa-results-updated", {
+      roomCode: cleanRoomId,
+      results: savedResults,
+      submittedBy: result.username
+    });
+  });
+
   socket.on("dsa-code-submit", async ({ roomId, questionId, isCorrect, code, passedCount, totalCases }) => {
     const cleanRoomId = roomId?.toUpperCase();
     const room = await getDsaRoom(cleanRoomId);
@@ -461,6 +520,8 @@ io.on("connection", (socket) => {
 
       // Compute overall stats for backwards compatibility
       p.attempts = Object.values(p.questionStatuses).reduce((sum, curr) => sum + (curr.attempts || 0), 0);
+      p.passedCount = Object.values(p.questionStatuses).reduce((sum, curr) => sum + (curr.passedCount || 0), 0);
+      p.totalCases = Object.values(p.questionStatuses).reduce((sum, curr) => sum + (curr.totalCases || 0), 0);
       const solvedAll = room.questions && room.questions.length > 0 &&
         room.questions.every(q => p.questionStatuses[q.id]?.status === "solved");
 
@@ -488,6 +549,28 @@ io.on("connection", (socket) => {
         participants: Object.values(participantsMap)
       });
     }
+  });
+
+  socket.on("dsa-submit-final-result", async ({ roomId, result }) => {
+    const cleanRoomId = roomId?.toUpperCase();
+    if (!cleanRoomId || !result) return;
+
+    await saveDsaResultEntry(cleanRoomId, result);
+    const savedResults = await getDsaSavedResults(cleanRoomId);
+
+    const participantsMap = await getDsaParticipants(cleanRoomId);
+    const p = participantsMap[socket.id];
+    if (p) {
+      p.hasSubmittedFinal = true;
+      p.finalScore = result.score;
+      await setDsaParticipant(cleanRoomId, socket.id, p);
+    }
+
+    io.to(`dsa-${cleanRoomId}`).emit("dsa-results-updated", {
+      roomCode: cleanRoomId,
+      results: savedResults,
+      submittedBy: result.username
+    });
   });
 
   // Listen for admin content updates and broadcast to all clients

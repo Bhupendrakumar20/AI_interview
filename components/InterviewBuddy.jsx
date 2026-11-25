@@ -8,32 +8,32 @@ import AiBuddyInterviewSession from "./AiBuddyInterviewSession";
 import AiBuddyResultsScreen from "./AiBuddyResultsScreen";
 
 const ComingSoonScreen = ({ title, icon: Icon, desc, onClose }) => (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between py-12 px-6 relative overflow-hidden transition-colors duration-300">
+  <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between py-12 px-6 relative overflow-hidden">
     <div className="absolute top-0 right-0 w-96 h-96 bg-linear-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -z-10"></div>
     <div className="absolute bottom-0 left-0 w-96 h-96 bg-linear-to-br from-purple-500/10 to-transparent rounded-full blur-3xl -z-10"></div>
     <div className="max-w-7xl mx-auto w-full">
-      <button onClick={onClose} className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition text-sm cursor-pointer bg-transparent border-0">
+      <button onClick={onClose} className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition text-sm cursor-pointer bg-transparent border-0">
         <span className="text-lg">←</span> Back to Mode Selection
       </button>
     </div>
     <div className="max-w-2xl mx-auto text-center my-auto flex flex-col items-center">
       <div className="w-20 h-20 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-8 shadow-lg shadow-blue-500/10 animate-pulse">
-        <Icon size={40} className="text-blue-600 dark:text-blue-400" />
+        <Icon size={40} className="text-blue-400" />
       </div>
-      <span className="text-xs font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase bg-blue-500/10 border border-blue-500/20 px-3.5 py-1.5 rounded-full mb-4">
+      <span className="text-xs font-bold tracking-widest text-blue-400 uppercase bg-blue-500/10 border border-blue-500/20 px-3.5 py-1.5 rounded-full mb-4">
         Coming Soon
       </span>
-      <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-300 dark:to-purple-400 bg-clip-text text-transparent">
+      <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight bg-linear-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
         {title}
       </h1>
-      <p className="text-slate-600 dark:text-slate-300 text-lg mb-8 max-w-md">
+      <p className="text-slate-300 text-lg mb-8 max-w-md">
         {desc}
       </p>
-      <button onClick={onClose} className="px-6 py-3 rounded-lg bg-linear-to-r from-blue-600 to-indigo-600 text-white font-medium hover:shadow-lg hover:shadow-blue-500/30 transition hover:scale-105 cursor-pointer border-0">
+      <button onClick={onClose} className="px-6 py-3 rounded-lg bg-linear-to-r from-blue-500 to-indigo-600 text-white font-medium hover:shadow-lg hover:shadow-blue-500/30 transition hover:scale-105 cursor-pointer border-0">
         Try AI Buddy Mode instead
       </button>
     </div>
-    <div className="max-w-7xl mx-auto w-full text-center text-xs text-slate-400 dark:text-slate-500">
+    <div className="max-w-7xl mx-auto w-full text-center text-xs text-slate-500">
       PrepWise · Shaping the future of technical interview prep
     </div>
   </div>
@@ -581,37 +581,37 @@ const InterviewBuddy = ({ userId }) => {
           onClose={handleAbandonSession}
         />
       ) : (
-        <div className="min-h-screen bg-transparent text-slate-900 dark:text-slate-100 transition-colors duration-300">
+        <div className="min-h-screen bg-background text-foreground">
       {/* HEADER */}
-      <div className="relative px-4 sm:px-6 md:px-10 pt-6 sm:pt-9 overflow-hidden">
+      <div className="relative px-10 pt-9 overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-linear-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -z-10"></div>
         <div className="absolute top-0 left-48 w-72 h-48 bg-linear-to-br from-purple-500/8 to-transparent rounded-full blur-3xl -z-10"></div>
 
-        <div className="text-xs text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2">
-          <span>Practice</span> <span className="opacity-40">›</span> <span className="text-slate-700 dark:text-slate-300 font-medium">Interview Buddy</span>
+        <div className="text-xs text-muted-foreground mb-4 flex items-center gap-2">
+          <span>Practice</span> <span className="opacity-40">›</span> Interview Buddy
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
+        <div className="flex items-start justify-between gap-5 mb-8">
           <div>
-            <h1 className="text-4xl sm:text-5xl font-black mb-3 leading-tight text-slate-900 dark:text-white">
+            <h1 className="text-5xl font-black mb-3 leading-tight">
               Interview<br />
-              <span className="bg-linear-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                 Buddy
               </span>
             </h1>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed max-w-md">
+            <p className="text-muted-foreground text-sm leading-relaxed max-w-md">
               Practice with a human partner or an AI interviewer. Get real-time coaching, adaptive questions, and a detailed post-session performance report.
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
             <button 
               onClick={() => setShowPastReports(true)}
-              className="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-xs hover:shadow-md cursor-pointer">
+              className="px-4 py-2.5 rounded-lg bg-secondary border border-border text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition hover:shadow-md">
               View Past Reports
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-medium shadow-md hover:shadow-lg hover:shadow-blue-500/30 hover:scale-105 transition cursor-pointer"
+              className="px-4 py-2.5 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-blue-500/40 hover:scale-105 transition"
             >
               New Session
             </button>
@@ -620,48 +620,44 @@ const InterviewBuddy = ({ userId }) => {
       </div>
 
       {/* STATS */}
-      <div className="px-4 sm:px-6 md:px-10 pb-6 flex gap-3 overflow-x-auto">
+      <div className="px-10 pb-6 flex gap-3 overflow-x-auto">
         {displayStats.map((stat, idx) => (
-          <div key={idx} className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs border border-slate-200 dark:border-slate-800 rounded-full px-4 py-2 whitespace-nowrap shadow-xs">
+          <div key={idx} className="flex items-center gap-2 bg-card border border-border rounded-full px-4 py-2 whitespace-nowrap">
             <div className={`w-2 h-2 rounded-full ${stat.color}`}></div>
-            <span className="font-bold text-slate-900 dark:text-slate-100">{stat.value}</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</span>
+            <span className="font-bold text-card-foreground">{stat.value}</span>
+            <span className="text-xs text-muted-foreground">{stat.label}</span>
           </div>
         ))}
       </div>
 
-      <div className="h-px bg-slate-200 dark:bg-slate-800 mx-4 sm:mx-6 md:mx-10 mb-8"></div>
+      <div className="h-px bg-border mx-10 mb-8"></div>
 
       {/* MODE SELECTOR */}
-      <div className="px-4 sm:px-6 md:px-10 mb-8">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">Choose Your Mode</h2>
+      <div className="px-10 mb-8">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">Choose Your Mode</h2>
         <div className="grid md:grid-cols-3 gap-4">
           {/* Human Mode Card */}
           <div
             onClick={() => setCurrentMode("human")}
             className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all ${
               currentMode === "human"
-                ? "border-blue-500 bg-blue-50/80 dark:bg-blue-500/10 shadow-lg shadow-blue-500/10 dark:shadow-blue-500/20"
-                : "border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-600 shadow-xs"
+                ? "border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20"
+                : "border-border bg-card hover:border-blue-500/50"
             }`}
           >
-            <div className={`absolute top-4 right-4 w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-bold ${
-              currentMode === "human"
-                ? "border-blue-500 bg-blue-500 text-white"
-                : "border-slate-300 dark:border-slate-600 text-transparent"
-            }`}>
+            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-border flex items-center justify-center text-sm font-bold">
               {currentMode === "human" ? "✓" : ""}
             </div>
-            <div className="mb-3 text-blue-500 dark:text-blue-400">
+            <div className="mb-3 text-blue-400">
               <Users size={32} />
             </div>
-            <h3 className="text-lg font-bold mb-2 text-slate-900 dark:text-white">Human Buddy Mode</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">
+            <h3 className="text-lg font-bold mb-2">Human Buddy Mode</h3>
+            <p className="text-sm text-muted-foreground mb-3">
               Connect with a peer via video call. One plays Interviewer, one plays Candidate. Real pressure, real collaboration, shared notes.
             </p>
             <div className="flex flex-wrap gap-2">
               {["Video Call", "Shared Editor", "Co-Pilot Tools", "Panel Sim"].map((tag) => (
-                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-transparent">
+                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300">
                   {tag}
                 </span>
               ))}
@@ -674,27 +670,23 @@ const InterviewBuddy = ({ userId }) => {
             onClick={() => setCurrentMode("ai")}
             className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all ${
               currentMode === "ai"
-                ? "border-purple-500 bg-purple-50/80 dark:bg-purple-500/10 shadow-lg shadow-purple-500/10 dark:shadow-purple-500/20"
-                : "border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-600 shadow-xs"
+                ? "border-purple-500 bg-purple-500/5 shadow-lg shadow-purple-500/20"
+                : "border-border bg-card hover:border-purple-500/50"
             }`}
           >
-            <div className={`absolute top-4 right-4 w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-bold ${
-              currentMode === "ai"
-                ? "border-purple-500 bg-purple-500 text-white"
-                : "border-slate-300 dark:border-slate-600 text-transparent"
-            }`}>
+            <div className="absolute top-4 right-4 w-6 h-6 rounded-full border-2 border-border flex items-center justify-center text-sm font-bold">
               {currentMode === "ai" ? "✓" : ""}
             </div>
-            <div className="mb-3 text-purple-500 dark:text-purple-400">
+            <div className="mb-3 text-purple-400">
               <Cpu size={32} />
             </div>
-            <h3 className="text-lg font-bold mb-2 text-slate-900 dark:text-white">AI Buddy Mode</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">
+            <h3 className="text-lg font-bold mb-2">AI Buddy Mode</h3>
+            <p className="text-sm text-muted-foreground mb-3">
               Your always-available AI interviewer. Adaptive questions, live sentiment analysis, on-screen coaching, and a granular performance report.
             </p>
             <div className="flex flex-wrap gap-2">
               {["TTS Questions", "Live Coaching", "Adaptive AI", "24/7 Available"].map((tag) => (
-                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-transparent">
+                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300">
                   {tag}
                 </span>
               ))}
@@ -704,21 +696,21 @@ const InterviewBuddy = ({ userId }) => {
           {/* DSA Room Mode Card */}
           <div
             onClick={() => window.location.href = "/dsa-room"}
-            className="relative p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/30 hover:border-emerald-500/50 dark:hover:border-slate-700 hover:bg-emerald-50/40 dark:hover:bg-slate-900/50 cursor-pointer transition-all shadow-xs"
+            className="relative p-6 rounded-2xl border border-border bg-card hover:border-emerald-500/50 hover:bg-muted/50 cursor-pointer transition-all opacity-85 hover:opacity-100"
           >
-            <span className="absolute top-4 right-4 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+            <span className="absolute top-4 right-4 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
               Live Duel
             </span>
-            <div className="mb-3 text-emerald-500 dark:text-emerald-400">
+            <div className="mb-3 text-emerald-400">
               <Trophy size={32} />
             </div>
-            <h3 className="text-lg font-bold mb-2 text-slate-900 dark:text-white">DSA Room Mode</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">
+            <h3 className="text-lg font-bold mb-2">DSA Room Mode</h3>
+            <p className="text-sm text-muted-foreground mb-3">
               Multiplayer competitive coding. Solve problems in real-time, compete on live leaderboards, and earn speed bonuses with up to 10 players.
             </p>
             <div className="flex flex-wrap gap-2">
               {["Multiplayer", "Live Leaderboard", "Speed Bonus", "20+ Languages"].map((tag) => (
-                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-transparent">
+                <span key={tag} className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                   {tag}
                 </span>
               ))}
@@ -729,12 +721,12 @@ const InterviewBuddy = ({ userId }) => {
       </div>
 
       {/* CONFIG SECTION */}
-      <div className="px-4 sm:px-6 md:px-10 mb-8">
+      <div className="px-10 mb-8">
         <div className="grid md:grid-cols-2 gap-4">
           {/* AI Persona */}
           {currentMode === "ai" && (
-            <div className="bg-white/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xs">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">AI Persona</h3>
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">AI Persona</h3>
               <div className="grid grid-cols-2 gap-3">
                 {personas.map((persona) => (
                   <div
@@ -742,13 +734,13 @@ const InterviewBuddy = ({ userId }) => {
                     onClick={() => setSelectedPersona(persona.id)}
                     className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
                       selectedPersona === persona.id
-                        ? "border-purple-500 bg-purple-50 dark:bg-purple-500/10 text-purple-900 dark:text-purple-100 shadow-xs"
-                        : "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200"
+                        ? "border-purple-500 bg-purple-500/10"
+                        : "border-border bg-muted/50 hover:border-purple-500/50"
                     }`}
                   >
                     <div className="text-2xl mb-2">{persona.emoji}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{persona.name}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">{persona.style}</div>
+                    <div className="text-sm font-bold">{persona.name}</div>
+                    <div className="text-xs text-muted-foreground">{persona.style}</div>
                   </div>
                 ))}
               </div>
@@ -757,17 +749,17 @@ const InterviewBuddy = ({ userId }) => {
 
 
           {/* Topics */}
-          <div className="bg-white/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xs">
-            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">Topic Focus</h3>
+          <div className="bg-card border border-border rounded-xl p-6">
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Topic Focus</h3>
             <div className="flex flex-wrap gap-2">
               {topics.map((topic) => (
                 <button
                   key={topic}
                   onClick={() => toggleTopic(topic)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     selectedTopics.includes(topic)
-                      ? "bg-blue-100 dark:bg-blue-500/30 border border-blue-500 text-blue-700 dark:text-blue-300 font-semibold shadow-xs"
-                      : "bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-slate-200"
+                      ? "bg-blue-500/10 border border-blue-500 text-blue-700 dark:text-blue-300"
+                      : "bg-muted border border-border text-muted-foreground hover:border-blue-500/50"
                   }`}
                 >
                   {topic}
@@ -777,22 +769,22 @@ const InterviewBuddy = ({ userId }) => {
           </div>
 
           {/* Difficulty & Duration */}
-          <div className="bg-white/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xs">
+          <div className="bg-card border border-border rounded-xl p-6">
             <div className="mb-6">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Difficulty</h3>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Difficulty</h3>
               <div className="flex gap-3">
                 {["Easy", "Medium", "Hard"].map((level) => (
                   <button
                     key={level}
                     onClick={() => setSelectedDifficulty(level.toLowerCase())}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                       selectedDifficulty === level.toLowerCase()
                         ? level === "Easy"
-                          ? "bg-emerald-100 dark:bg-emerald-500/30 border border-emerald-500 text-emerald-800 dark:text-emerald-300 font-bold"
+                          ? "bg-emerald-500/10 border border-emerald-500 text-emerald-700 dark:text-emerald-300"
                           : level === "Medium"
-                          ? "bg-amber-100 dark:bg-yellow-500/30 border border-amber-500 dark:border-yellow-500 text-amber-800 dark:text-yellow-300 font-bold"
-                          : "bg-red-100 dark:bg-red-500/30 border border-red-500 text-red-800 dark:text-red-300 font-bold"
-                        : "bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                          ? "bg-yellow-500/10 border border-yellow-500 text-amber-700 dark:text-yellow-300"
+                          : "bg-red-500/10 border border-red-500 text-red-700 dark:text-red-300"
+                        : "bg-muted border border-border text-muted-foreground hover:border-primary/50"
                     }`}
                   >
                     {level}
@@ -802,7 +794,7 @@ const InterviewBuddy = ({ userId }) => {
             </div>
 
             <div>
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">⧖ Session Duration</h3>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">⧖ Session Duration</h3>
               <div className="flex items-center gap-4">
                 <input
                   type="range"
@@ -811,44 +803,44 @@ const InterviewBuddy = ({ userId }) => {
                   step="5"
                   value={sessionDuration}
                   onChange={(e) => setSessionDuration(parseInt(e.target.value))}
-                  className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-blue-600 dark:accent-blue-500"
+                  className="flex-1 h-1 bg-muted rounded-full appearance-none cursor-pointer accent-blue-500"
                 />
-                <span className="text-sm font-bold text-blue-600 dark:text-blue-400 min-w-max">{sessionDuration}m</span>
+                <span className="text-sm font-bold text-blue-400 min-w-max">{sessionDuration}m</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="h-px bg-slate-200 dark:bg-slate-800 mx-4 sm:mx-6 md:mx-10 mb-8"></div>
+      <div className="h-px bg-border mx-10 mb-8"></div>
 
       {/* FEATURES GRID */}
-      <div className="px-4 sm:px-6 md:px-10 mb-8">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">Key Features</h2>
+      <div className="px-10 mb-8">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">Key Features</h2>
         <div className="grid md:grid-cols-3 gap-4">
           {features.map((feature, idx) => (
             <div
               key={idx}
-              className={`p-5 rounded-xl border transition-all hover:-translate-y-1 shadow-xs ${
+              className={`p-5 rounded-xl border transition-all hover:-translate-y-1 ${
                 feature.type === "human"
-                  ? "border-blue-200 dark:border-blue-500/30 bg-blue-50/60 dark:bg-blue-500/5 hover:border-blue-300 dark:hover:border-blue-500/50"
+                  ? "border-blue-500/30 bg-blue-500/5"
                   : feature.type === "ai"
-                  ? "border-purple-200 dark:border-purple-500/30 bg-purple-50/60 dark:bg-purple-500/5 hover:border-purple-300 dark:hover:border-purple-500/50"
-                  : "border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-500/5 hover:border-emerald-300 dark:hover:border-emerald-500/50"
+                  ? "border-purple-500/30 bg-purple-500/5"
+                  : "border-emerald-500/30 bg-emerald-500/5"
               }`}
             >
-              <div className="text-2xl mb-2 text-slate-500 dark:text-slate-400">
+              <div className="text-2xl mb-2 text-muted-foreground">
                 <feature.icon size={24} />
               </div>
-              <h4 className="font-bold text-sm mb-1 text-slate-900 dark:text-white">{feature.title}</h4>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 leading-relaxed">{feature.desc}</p>
+              <h4 className="font-bold text-sm mb-1">{feature.title}</h4>
+              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{feature.desc}</p>
               <span
-                className={`inline-block text-xs px-2.5 py-1 rounded-full font-medium ${
+                className={`inline-block text-xs px-2 py-1 rounded-full font-medium ${
                   feature.type === "human"
-                    ? "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-transparent"
+                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-300"
                     : feature.type === "ai"
-                    ? "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-transparent"
-                    : "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-transparent"
+                    ? "bg-purple-500/10 text-purple-700 dark:text-purple-300"
+                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                 }`}
               >
                 {feature.type === "human" ? "Human Mode" : feature.type === "ai" ? "AI Mode" : "Both Modes"}
@@ -858,15 +850,15 @@ const InterviewBuddy = ({ userId }) => {
         </div>
       </div>
 
-      <div className="h-px bg-slate-200 dark:bg-slate-800 mx-4 sm:mx-6 md:mx-10 mb-8"></div>
+      <div className="h-px bg-border mx-10 mb-8"></div>
 
       {/* RECENT SESSIONS */}
-      <div className="px-4 sm:px-6 md:px-10 pb-12">
+      <div className="px-10 pb-12">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">Recent Sessions</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2">Recent Sessions</h2>
           <button 
             onClick={() => setShowPastReports(true)}
-            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium hover:text-blue-400 transition flex items-center gap-1"
           >
             <Eye size={16} />
             View All →
@@ -878,7 +870,7 @@ const InterviewBuddy = ({ userId }) => {
             <div
               key={idx}
               onClick={() => setSelectedSessionForDetail(stats.recentSessions[idx])}
-              className="p-4 bg-white/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:border-blue-400 dark:hover:border-blue-500/50 cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-900/80 shadow-xs hover:shadow-md"
+              className="p-4 bg-card border border-border rounded-xl hover:border-blue-500/50 cursor-pointer transition-all hover:bg-muted/50 hover:shadow-lg hover:shadow-blue-500/10"
             >
               <div className="flex items-center gap-3">
                 <div
@@ -887,25 +879,25 @@ const InterviewBuddy = ({ userId }) => {
                   }`}
                 ></div>
                 <div className="flex-1">
-                  <div className="font-medium text-sm flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                  <div className="font-medium text-sm flex items-center gap-2">
                     {session.type === "human" ? (
-                      <Users size={16} className="text-blue-500 dark:text-blue-400" />
+                      <Users size={16} className="text-blue-400" />
                     ) : (
-                      <Brain size={16} className="text-purple-500 dark:text-purple-400" />
+                      <Brain size={16} className="text-purple-400" />
                     )}
                     {session.title}
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{session.meta}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{session.meta}</div>
                 </div>
                 <div className="text-right shrink-0">
                   <div
                     className={`font-bold text-lg ${
-                      session.scoreType === "good" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-yellow-400"
+                      session.scoreType === "good" ? "text-emerald-400" : "text-yellow-400"
                     }`}
                   >
                     {session.score}
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{session.label}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{session.label}</div>
                 </div>
                 <div className="flex gap-2">
                   <button 
@@ -914,7 +906,7 @@ const InterviewBuddy = ({ userId }) => {
                       setSelectedSessionForDetail(stats.recentSessions[idx]);
                       setShowPastReports(true);
                     }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-600/20 hover:bg-blue-200 dark:hover:bg-blue-600/40 text-blue-600 dark:text-blue-400 transition border border-blue-200 dark:border-blue-500/30 cursor-pointer"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 transition border border-blue-500/30"
                     title="View Stats"
                   >
                     <BarChart3 size={16} />
@@ -925,7 +917,7 @@ const InterviewBuddy = ({ userId }) => {
                       setSelectedSessionForDetail(stats.recentSessions[idx]);
                       setShowPastReports(true);
                     }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-600/20 hover:bg-emerald-200 dark:hover:bg-emerald-600/40 text-emerald-600 dark:text-emerald-400 transition border border-emerald-200 dark:border-emerald-500/30 cursor-pointer"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 transition border border-emerald-500/30"
                     title="View Details"
                   >
                     <Eye size={16} />
@@ -941,20 +933,20 @@ const InterviewBuddy = ({ userId }) => {
       {/* PAST REPORTS MODAL */}
       {showPastReports && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto">
-          <div className="min-h-screen bg-slate-50 dark:bg-linear-to-b dark:from-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100 transition-colors">
+          <div className="min-h-screen bg-linear-to-b from-slate-950 to-slate-900">
             {/* HEADER */}
-            <div className="sticky top-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 z-40">
+            <div className="sticky top-0 bg-slate-950/95 backdrop-blur border-b border-slate-800 z-40">
               <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900 dark:text-white">📊 Interview Performance</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Analyze your past interviews and track your growth</p>
+                  <h2 className="text-2xl font-black">📊 Interview Performance</h2>
+                  <p className="text-sm text-slate-400 mt-1">Analyze your past interviews and track your growth</p>
                 </div>
                 <button
                   onClick={() => {
                     setShowPastReports(false);
                     setSelectedSessionForDetail(null);
                   }}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition text-slate-300"
                 >
                   ✕
                 </button>
@@ -967,22 +959,22 @@ const InterviewBuddy = ({ userId }) => {
                 <>
                   {/* OVERVIEW STATS */}
                   <div className="grid md:grid-cols-4 gap-4 mb-8">
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 shadow-xs transition">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 transition">
                       <div className="text-sm text-slate-400 mb-2">Total Interviews</div>
                       <div className="text-4xl font-black text-blue-400">{stats.totalSessions}</div>
                       <div className="text-xs text-slate-500 mt-2">All time</div>
                     </div>
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 shadow-xs transition">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition">
                       <div className="text-sm text-slate-400 mb-2">Completed</div>
                       <div className="text-4xl font-black text-emerald-400">{stats.completedSessions}</div>
                       <div className="text-xs text-slate-500 mt-2">{stats.totalSessions > 0 ? Math.round((stats.completedSessions / stats.totalSessions) * 100) : 0}% completion rate</div>
                     </div>
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-500/50 shadow-xs transition">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500/50 transition">
                       <div className="text-sm text-slate-400 mb-2">Average Score</div>
                       <div className="text-4xl font-black text-purple-400">{stats.avgScore}%</div>
                       <div className="text-xs text-slate-500 mt-2">Based on {stats.completedSessions} interviews</div>
                     </div>
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-yellow-500/50 shadow-xs transition">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-yellow-500/50 transition">
                       <div className="text-sm text-slate-400 mb-2">Practice Time</div>
                       <div className="text-3xl font-black text-yellow-400">{stats.totalPracticeTime > 60 ? Math.floor(stats.totalPracticeTime / 60) + 'h' : stats.totalPracticeTime + 'm'}</div>
                       <div className="text-xs text-slate-500 mt-2">Total invested</div>
@@ -992,7 +984,7 @@ const InterviewBuddy = ({ userId }) => {
                   {/* CATEGORY BREAKDOWN */}
                   <div className="grid md:grid-cols-2 gap-6 mb-8">
                     {/* MODE BREAKDOWN */}
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
                       <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <Brain size={20} className="text-blue-400" />
                         Sessions by Mode
@@ -1001,7 +993,7 @@ const InterviewBuddy = ({ userId }) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                            <span className="text-sm text-slate-700 dark:text-slate-300">Human Buddy</span>
+                            <span className="text-sm text-slate-300">Human Buddy</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-blue-400">{stats.sessionsByMode?.human || 0}</span>
@@ -1011,7 +1003,7 @@ const InterviewBuddy = ({ userId }) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                            <span className="text-sm text-slate-700 dark:text-slate-300">AI Buddy</span>
+                            <span className="text-sm text-slate-300">AI Buddy</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-purple-400">{stats.sessionsByMode?.ai || 0}</span>
@@ -1022,7 +1014,7 @@ const InterviewBuddy = ({ userId }) => {
                     </div>
 
                     {/* DIFFICULTY BREAKDOWN */}
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
                       <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <Trophy size={20} className="text-yellow-400" />
                         Sessions by Difficulty
@@ -1031,7 +1023,7 @@ const InterviewBuddy = ({ userId }) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                            <span className="text-sm text-slate-700 dark:text-slate-300">Easy</span>
+                            <span className="text-sm text-slate-300">Easy</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-emerald-400">{stats.sessionsByDifficulty?.easy || 0}</span>
@@ -1041,7 +1033,7 @@ const InterviewBuddy = ({ userId }) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                            <span className="text-sm text-slate-700 dark:text-slate-300">Medium</span>
+                            <span className="text-sm text-slate-300">Medium</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-yellow-400">{stats.sessionsByDifficulty?.medium || 0}</span>
@@ -1051,7 +1043,7 @@ const InterviewBuddy = ({ userId }) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                            <span className="text-sm text-slate-700 dark:text-slate-300">Hard</span>
+                            <span className="text-sm text-slate-300">Hard</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-red-400">{stats.sessionsByDifficulty?.hard || 0}</span>
@@ -1063,7 +1055,7 @@ const InterviewBuddy = ({ userId }) => {
                   </div>
 
                   {/* TOPICS COVERED */}
-                  <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-8 shadow-xs">
+                  <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 mb-8">
                     <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                       <Code size={20} className="text-cyan-400" />
                       Topics Covered ({stats.topicsCovered?.length || 0})
@@ -1090,8 +1082,8 @@ const InterviewBuddy = ({ userId }) => {
                       onClick={() => setPastReportsFilter("all")}
                       className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
                         pastReportsFilter === "all"
-                          ? "bg-slate-800 text-white dark:bg-slate-700 dark:border-slate-600"
-                          : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                          ? "bg-slate-700 border border-slate-600 text-white"
+                          : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
                       }`}
                     >
                       All Sessions ({stats.totalSessions})
@@ -1100,8 +1092,8 @@ const InterviewBuddy = ({ userId }) => {
                       onClick={() => setPastReportsFilter("ai")}
                       className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
                         pastReportsFilter === "ai"
-                          ? "bg-purple-100 dark:bg-purple-500/30 border border-purple-400 dark:border-purple-500 text-purple-700 dark:text-purple-300 font-semibold"
-                          : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                          ? "bg-purple-500/30 border border-purple-500 text-purple-300"
+                          : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
                       }`}
                     >
                       AI Sessions ({stats.sessionsByMode?.ai || 0})
@@ -1110,8 +1102,8 @@ const InterviewBuddy = ({ userId }) => {
                       onClick={() => setPastReportsFilter("human")}
                       className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
                         pastReportsFilter === "human"
-                          ? "bg-blue-100 dark:bg-blue-500/30 border border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300 font-semibold"
-                          : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                          ? "bg-blue-500/30 border border-blue-500 text-blue-300"
+                          : "bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600"
                       }`}
                     >
                       Human Sessions ({stats.sessionsByMode?.human || 0})
@@ -1119,7 +1111,7 @@ const InterviewBuddy = ({ userId }) => {
                   </div>
 
                   {/* RECENT SESSIONS LIST */}
-                  <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                  <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
                     <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                       <BarChart3 size={20} className="text-slate-400" />
                       Session History
@@ -1135,7 +1127,7 @@ const InterviewBuddy = ({ userId }) => {
                             <div
                               key={session.id || idx}
                               onClick={() => setSelectedSessionForDetail(session)}
-                              className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer transition shadow-xs"
+                              className="p-4 bg-slate-800 border border-slate-700 rounded-lg hover:border-slate-600 hover:bg-slate-800/80 cursor-pointer transition"
                             >
                               <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1">
@@ -1143,7 +1135,7 @@ const InterviewBuddy = ({ userId }) => {
                                     <div className={`w-2.5 h-2.5 rounded-full ${
                                       session.mode === "ai" ? "bg-purple-500" : "bg-blue-500"
                                     }`}></div>
-                                    <span className="font-bold text-sm text-slate-900 dark:text-white">
+                                    <span className="font-bold text-sm">
                                       {session.mode === "ai" ? "🤖 AI Interview" : "👥 Human Buddy"}
                                     </span>
                                     <span className="text-xs text-slate-500 capitalize">
@@ -1159,7 +1151,7 @@ const InterviewBuddy = ({ userId }) => {
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-300 mb-2">
+                                  <div className="text-sm font-semibold text-slate-300 mb-2">
                                     {Array.isArray(session.topics) && session.topics.length > 0
                                       ? session.topics.join(", ")
                                       : session.topic || "Technical Interview"}
@@ -1182,7 +1174,7 @@ const InterviewBuddy = ({ userId }) => {
                                     {session.score || 0}%
                                   </div>
                                   <div className="text-xs text-slate-500 mt-1">Score</div>
-                                  <button className="mt-3 px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-medium transition cursor-pointer">
+                                  <button className="mt-3 px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs font-medium transition">
                                     View Details →
                                   </button>
                                 </div>
@@ -1203,13 +1195,13 @@ const InterviewBuddy = ({ userId }) => {
                 <div>
                   <button
                     onClick={() => setSelectedSessionForDetail(null)}
-                    className="mb-6 px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-xs cursor-pointer"
+                    className="mb-6 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium hover:bg-slate-700 transition"
                   >
                     ← Back to Reports
                   </button>
 
                   <div className="grid md:grid-cols-3 gap-6 mb-8">
-                    <div className="md:col-span-2 p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="md:col-span-2 p-6 rounded-xl bg-slate-900 border border-slate-800">
                       <h3 className="text-xl font-bold mb-4">Session Details</h3>
                       <div className="space-y-4">
                         <div>
@@ -1220,7 +1212,7 @@ const InterviewBuddy = ({ userId }) => {
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Topics</div>
-                          <div className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                          <div className="text-sm font-medium text-slate-200">
                             {Array.isArray(selectedSessionForDetail.topics) && selectedSessionForDetail.topics.length > 0
                               ? selectedSessionForDetail.topics.join(", ")
                               : selectedSessionForDetail.topic || "Mixed Topics"}
@@ -1263,7 +1255,7 @@ const InterviewBuddy = ({ userId }) => {
                       </div>
                     </div>
 
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
                       <h3 className="text-xl font-bold mb-4">Performance</h3>
                       <div className="text-5xl font-black mb-2" style={{
                         color: (selectedSessionForDetail.score || 0) >= 75 ? '#10b981' : (selectedSessionForDetail.score || 0) >= 50 ? '#f59e0b' : '#ef4444'
@@ -1273,42 +1265,42 @@ const InterviewBuddy = ({ userId }) => {
                       <div className="text-sm text-slate-400 mb-6">
                         {(selectedSessionForDetail.score || 0) >= 75 ? "Excellent Performance" : (selectedSessionForDetail.score || 0) >= 50 ? "Good Performance" : "Needs Improvement"}
                       </div>
-                      <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2 mb-6">
+                      <div className="w-full bg-slate-800 rounded-full h-2 mb-6">
                         <div
                           className="bg-linear-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
                           style={{ width: `${selectedSessionForDetail.score || 0}%` }}
                         ></div>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Based on technical correctness, communication, problem-solving, and confidence.</p>
+                      <p className="text-xs text-slate-400">Based on technical correctness, communication, problem-solving, and confidence.</p>
                     </div>
                   </div>
 
                   {/* FEEDBACK SUMMARY */}
                   {selectedSessionForDetail.feedback && (
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-8 shadow-xs">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 mb-8">
                       <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <FileText size={20} className="text-blue-400" />
                         📋 Feedback & Assessment
                       </h3>
-                      <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-lg p-5 text-sm text-slate-700 dark:text-slate-300 leading-relaxed space-y-4">
+                      <div className="bg-slate-800/50 rounded-lg p-5 text-sm text-slate-300 leading-relaxed space-y-4">
                         {typeof selectedSessionForDetail.feedback === 'string' ? (
                           <p>{selectedSessionForDetail.feedback}</p>
                         ) : (
                           <>
                             {selectedSessionForDetail.feedback.summary && (
-                              <p className="font-semibold text-slate-900 dark:text-slate-200">
+                              <p className="font-semibold text-slate-200">
                                 {selectedSessionForDetail.feedback.summary}
                               </p>
                             )}
                             {selectedSessionForDetail.feedback.finalAssessment && (
-                              <p className="text-slate-700 dark:text-slate-300">
+                              <p className="text-slate-300">
                                 {selectedSessionForDetail.feedback.finalAssessment}
                               </p>
                             )}
                             {Array.isArray(selectedSessionForDetail.feedback.strengths) && selectedSessionForDetail.feedback.strengths.length > 0 && (
                               <div>
                                 <div className="text-xs uppercase tracking-wider text-emerald-400 font-bold mb-1.5">Key Strengths</div>
-                                <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300 text-xs">
+                                <ul className="list-disc list-inside space-y-1 text-slate-300 text-xs">
                                   {selectedSessionForDetail.feedback.strengths.map((str, i) => (
                                     <li key={i}>{str}</li>
                                   ))}
@@ -1333,19 +1325,19 @@ const InterviewBuddy = ({ userId }) => {
 
                   {/* SCORE BY TOPIC */}
                   {selectedSessionForDetail.avgByTopic && Object.keys(selectedSessionForDetail.avgByTopic).length > 0 && (
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-8 shadow-xs">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 mb-8">
                       <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <BarChart3 size={20} className="text-purple-400" />
                         Score by Topic
                       </h3>
                       <div className="grid md:grid-cols-2 gap-4">
                         {Object.entries(selectedSessionForDetail.avgByTopic).map(([topic, avg]) => (
-                          <div key={topic} className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-4 border border-slate-200 dark:border-slate-700/60 shadow-xs">
+                          <div key={topic} className="bg-slate-800/60 rounded-lg p-4 border border-slate-700/60">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold text-slate-800 dark:text-slate-200 capitalize">{topic}</span>
+                              <span className="font-semibold text-slate-200 capitalize">{topic}</span>
                               <span className="text-blue-400 font-bold">{avg}/10</span>
                             </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                            <div className="w-full bg-slate-700 rounded-full h-2">
                               <div
                                 className="bg-linear-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
                                 style={{ width: `${Math.min(100, Math.max(0, (avg / 10) * 100))}%` }}
@@ -1359,20 +1351,20 @@ const InterviewBuddy = ({ userId }) => {
 
                   {/* QUESTION-BY-QUESTION BREAKDOWN WITH CANDIDATE ANSWERS */}
                   {Array.isArray(selectedSessionForDetail.performanceHistory) && selectedSessionForDetail.performanceHistory.length > 0 && (
-                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-8 shadow-xs">
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 mb-8">
                       <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <Brain size={20} className="text-blue-400" />
                         Question-by-Question Breakdown
                       </h3>
                       <div className="space-y-4">
                         {selectedSessionForDetail.performanceHistory.map((item, idx) => (
-                          <div key={idx} className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl p-5 shadow-xs">
+                          <div key={idx} className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
                             <div className="flex items-start justify-between gap-4 mb-2">
                               <div className="flex items-center gap-2">
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
                                   Q{idx + 1}
                                 </span>
-                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 capitalize">
+                                <span className="text-sm font-semibold text-slate-300 capitalize">
                                   {item.topic || 'General'}
                                 </span>
                               </div>
@@ -1385,23 +1377,23 @@ const InterviewBuddy = ({ userId }) => {
                               </div>
                             </div>
 
-                            <p className="text-slate-900 dark:text-slate-200 text-sm font-medium mb-3">
+                            <p className="text-slate-200 text-sm font-medium mb-3">
                               {item.question}
                             </p>
 
                             {/* Candidate's submitted answer */}
-                            <div className="bg-slate-100 dark:bg-slate-950/80 rounded-lg p-3.5 border border-slate-200 dark:border-slate-800 mb-3">
+                            <div className="bg-slate-950/80 rounded-lg p-3.5 border border-slate-800 mb-3">
                               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                                 Your Answer
                               </div>
-                              <pre className="text-xs text-slate-800 dark:text-slate-200 font-mono whitespace-pre-wrap break-words leading-relaxed font-normal">
+                              <pre className="text-xs text-slate-200 font-mono whitespace-pre-wrap break-words leading-relaxed font-normal">
                                 {item.answer?.trim() ? item.answer : '(No answer provided)'}
                               </pre>
                             </div>
 
                             {/* Evaluation / Feedback */}
                             {item.feedback && (
-                              <div className="text-xs text-slate-700 dark:text-slate-300 bg-blue-50/60 dark:bg-slate-900/60 rounded-lg p-3 border border-blue-200 dark:border-slate-800">
+                              <div className="text-xs text-slate-300 bg-slate-900/60 rounded-lg p-3 border border-slate-800">
                                 <span className="text-slate-400 font-semibold">Evaluation: </span>
                                 {item.feedback}
                               </div>
@@ -1432,19 +1424,19 @@ const InterviewBuddy = ({ userId }) => {
       {/* MAIN SESSION MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg mx-4 p-8 relative animate-in fade-in zoom-in-95 text-slate-900 dark:text-slate-100 shadow-2xl">
+          <div className="bg-card text-card-foreground border border-border rounded-2xl w-full max-w-lg mx-4 p-8 relative animate-in fade-in zoom-in-95">
             <button
               onClick={() => {
                 setIsModalOpen(false);
                 setModalTab("create");
                 setJoinCode("");
               }}
-              className="absolute top-5 right-5 w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition text-slate-500 dark:text-slate-400 cursor-pointer"
+              className="absolute top-5 right-5 w-7 h-7 flex items-center justify-center rounded-lg bg-muted hover:bg-muted/70 transition text-muted-foreground"
             >
               ✕
             </button>
 
-            <h2 className="text-2xl font-black mb-2 text-slate-900 dark:text-white">
+            <h2 className="text-2xl font-black mb-2">
               {currentMode === "human" ? "Human Buddy Session" : "Start New Session"}
             </h2>
 
@@ -1458,8 +1450,8 @@ const InterviewBuddy = ({ userId }) => {
                   }}
                   className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
                     modalTab === "create"
-                      ? "bg-blue-100 dark:bg-blue-500/30 border border-blue-500 text-blue-700 dark:text-blue-300 font-semibold"
-                      : "bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                      ? "bg-blue-500/10 border border-blue-500 text-blue-700 dark:text-blue-300"
+                      : "bg-muted border border-border text-muted-foreground hover:border-blue-500/50"
                   }`}
                 >
                   Create Session
@@ -1468,8 +1460,8 @@ const InterviewBuddy = ({ userId }) => {
                   onClick={() => setModalTab("join")}
                   className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
                     modalTab === "join"
-                      ? "bg-purple-100 dark:bg-purple-500/30 border border-purple-500 text-purple-700 dark:text-purple-300 font-semibold"
-                      : "bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                      ? "bg-purple-500/10 border border-purple-500 text-purple-700 dark:text-purple-300"
+                      : "bg-muted border border-border text-muted-foreground hover:border-purple-500/50"
                   }`}
                 >
                   Join Session
@@ -1477,7 +1469,7 @@ const InterviewBuddy = ({ userId }) => {
               </div>
             )}
 
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               {currentMode === "ai"
                 ? "Your AI interviewer is ready. Confirm settings and go live instantly."
                 : modalTab === "create"
@@ -1490,14 +1482,14 @@ const InterviewBuddy = ({ userId }) => {
               <div className="space-y-4">
                 {currentMode === "human" && (
                   <>
-                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3 mb-2">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           1
                         </div>
                         <div>
                           <div className="text-sm font-bold">🔗 Share this invite link</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Your buddy just needs to click the link - no code to enter!
                           </div>
                         </div>
@@ -1506,7 +1498,7 @@ const InterviewBuddy = ({ userId }) => {
 
                     {/* INVITE LINK */}
                     <div className="flex gap-2">
-                      <div className="flex-1 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-blue-600 dark:text-blue-400 break-all overflow-hidden">
+                      <div className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono text-blue-600 dark:text-blue-400 break-all overflow-hidden">
                         {inviteLink || "https://ai-interview.com/interview/buddy/IB-XXXXX"}
                       </div>
                       <button
@@ -1524,10 +1516,10 @@ const InterviewBuddy = ({ userId }) => {
                     </div>
 
                     {/* SESSION CODE (BACKUP) */}
-                    <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
-                      <div className="text-xs text-slate-500 mb-2">Or share the code:</div>
+                    <div className="bg-muted/50 border border-border rounded-lg p-3">
+                      <div className="text-xs text-muted-foreground mb-2">Or share the code:</div>
                       <div className="flex gap-2">
-                        <div className="flex-1 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-sm font-bold text-blue-600 dark:text-blue-400 text-center tracking-widest">
+                        <div className="flex-1 bg-background border border-border rounded px-2 py-1 text-sm font-bold text-blue-600 dark:text-blue-400 text-center tracking-widest">
                           {sessionCode || "IB-XXXXX"}
                         </div>
                         <button
@@ -1538,35 +1530,35 @@ const InterviewBuddy = ({ userId }) => {
                             }
                           }}
                           disabled={!sessionCode}
-                          className="px-3 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Copy
                         </button>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           2
                         </div>
                         <div>
                           <div className="text-sm font-bold">Assign roles in the Lobby</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Once both join, choose who is Interviewer and who is Candidate.
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           3
                         </div>
                         <div>
                           <div className="text-sm font-bold">Go live</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Video, camera, mic, screen share, and shared notes all activate.
                           </div>
                         </div>
@@ -1577,46 +1569,46 @@ const InterviewBuddy = ({ userId }) => {
 
                 {currentMode === "ai" && (
                   <>
-                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3 mb-2">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           1
                         </div>
                         <div>
                           <div className="text-sm font-bold">Confirm your persona & topic</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Selected: {personas.find((p) => p.id === selectedPersona)?.name} · {selectedTopics[0]} · {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} · {sessionDuration} min
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3 mb-2">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           2
                         </div>
                         <div>
                           <div className="text-sm font-bold">Optional: Upload a Job Description</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Drop a JD and AI generates tailored questions.
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-transparent rounded-lg p-8 text-center text-slate-500 dark:text-slate-400 text-sm cursor-pointer hover:border-slate-400 dark:hover:border-slate-600 transition">
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center text-muted-foreground text-sm cursor-pointer hover:border-blue-500/50 transition">
                       Drop JD here or <span className="text-blue-400">browse</span> &nbsp;·&nbsp; Optional
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex gap-3">
                         <div className="w-6 h-6 rounded-full bg-linear-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                           3
                         </div>
                         <div>
                           <div className="text-sm font-bold">Allow microphone access</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                          <div className="text-xs text-muted-foreground">
                             Required for speech-to-text analysis.
                           </div>
                         </div>
@@ -1630,14 +1622,14 @@ const InterviewBuddy = ({ userId }) => {
             {/* JOIN SESSION TAB */}
             {currentMode === "human" && modalTab === "join" && (
               <div className="space-y-4">
-                <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                   <div className="flex gap-3">
                     <div className="w-6 h-6 rounded-full bg-linear-to-r from-purple-400 to-pink-400 flex items-center justify-center text-white text-sm font-bold shrink-0">
                       �
                     </div>
                     <div>
                       <div className="text-sm font-bold">Paste the invite link or code</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="text-xs text-slate-400">
                         Your buddy will share either an invite link or a code like "IB-7X4K9".
                       </div>
                     </div>
@@ -1649,7 +1641,7 @@ const InterviewBuddy = ({ userId }) => {
                   placeholder="Paste link (https://...) or code (IB-7X4K9)"
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-3 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-center text-sm"
+                  className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500 font-mono text-center text-sm"
                 />
 
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
@@ -1679,7 +1671,7 @@ const InterviewBuddy = ({ userId }) => {
                   setModalTab("create");
                   setJoinCode("");
                 }}
-                className="flex-1 px-4 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-secondary border border-border text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition"
               >
                 Cancel
               </button>

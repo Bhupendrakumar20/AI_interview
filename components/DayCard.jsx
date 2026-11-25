@@ -1,11 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ExternalLink, Code } from "lucide-react";
+import { CheckCircle2, ChevronDown, ExternalLink, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import QuestionDetailsModal from "@/components/QuestionDetailsModal";
 
-export default function DayCard({ day, isExpanded, onToggleExpand, getDifficultyColor }) {
+export default function DayCard({
+  day,
+  isExpanded,
+  onToggleExpand,
+  getDifficultyColor,
+  isCompleted = false,
+  isUpdating = false,
+  canTrackProgress = false,
+  onMarkComplete,
+}) {
   const [selectedQuestion, setSelectedQuestion] = useState(null);
 
   return (
@@ -25,7 +34,7 @@ export default function DayCard({ day, isExpanded, onToggleExpand, getDifficulty
                 Day {day.day} - {day.topics.join(", ")}
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {day.questions.length} questions
+                {day.questions.length} questions{isCompleted ? " · Completed" : ""}
               </p>
             </div>
           </div>
@@ -39,6 +48,17 @@ export default function DayCard({ day, isExpanded, onToggleExpand, getDifficulty
         {/* Questions List */}
         {isExpanded && (
           <div className="border-t border-slate-200 dark:border-slate-700 px-6 py-4">
+            <div className="mb-4 flex justify-end">
+              <Button
+                size="sm"
+                variant={isCompleted ? "secondary" : "default"}
+                disabled={!canTrackProgress || isCompleted || isUpdating}
+                onClick={onMarkComplete}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                {isUpdating ? "Saving..." : isCompleted ? "Day completed" : "Mark day complete"}
+              </Button>
+            </div>
             <div className="space-y-3">
               {day.questions.map((question) => (
                 <div

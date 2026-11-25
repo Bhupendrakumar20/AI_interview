@@ -17,8 +17,7 @@ import {
 } from "@/lib/actions/interview-session.action";
 import { useExitConfirmation } from "@/lib/hooks/useExitConfirmation";
 import { toast } from "sonner";
-import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Star } from "lucide-react";
-import { DotsGridWave } from "@/components/ui/LoadingAnimations";
+import { Laptop, Mic, Layers, Zap, Settings, Eye, Play, Target, Star, Wind } from "lucide-react";
 
 const TEST_TYPES = [
   { id: "technical", name: "Technical Round", icon: Laptop, desc: "Core technical concepts", color: "from-purple-500 to-indigo-600" },
@@ -34,6 +33,14 @@ const CURATED_PACKS = [
   { id: 4, company: "Apple", level: "Medium", questions: 18, rating: 4.6, trend: "up" },
   { id: 5, company: "Microsoft", level: "Hard", questions: 22, rating: 4.8, trend: "up" },
   { id: 6, company: "Netflix", level: "Medium", questions: 17, rating: 4.7, trend: "flat" },
+];
+
+const PREPARATION_TIPS = [
+  "Explain your reasoning, not just your final answer.",
+  "For coding questions, consider edge cases before optimizing.",
+  "For system design, clarify requirements before drawing components.",
+  "Use specific examples to make behavioral answers memorable.",
+  "A brief pause to organize your thoughts is perfectly fine.",
 ];
 
 export default function MockTestPage() {
@@ -55,25 +62,106 @@ export default function MockTestPage() {
   const [isTestActive, setIsTestActive] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [recentResults, setRecentResults] = useState([]);
+  const [showAllResults, setShowAllResults] = useState(false);
   const [isStartingTest, setIsStartingTest] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [preparationTipIndex, setPreparationTipIndex] = useState(0);
+  const [breathingSeconds, setBreathingSeconds] = useState(30);
+  const [isBreathing, setIsBreathing] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useExitConfirmation(loading || isTestActive);
 
   // Tracks the "current" request so stale/overlapping responses can be ignored
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef(null);
-  const debounceTimerRef = useRef(null);
+  const preparationConfigRef = useRef(null);
+  const preparationStartedAtRef = useRef(null);
+
+  const loadedQuestionCount = questions.filter(
+    (question) => !question.isStreaming && question.question?.trim()
+  ).length;
+  const targetQuestionCount = preparationConfigRef.current?.filters.count || filters.count;
+  const canStartTest = loadedQuestionCount > 0;
+  const isPreparingTest = loading || questions.length > 0;
+  const questionProgress = targetQuestionCount > 0
+    ? Math.min(100, Math.round((loadedQuestionCount / targetQuestionCount) * 100))
+    : 0;
+  const estimatedSecondsRemaining = loadedQuestionCount > 0
+    ? Math.max(
+        0,
+        Math.ceil((Math.max(elapsedSeconds, 1) / loadedQuestionCount) * (targetQuestionCount - loadedQuestionCount))
+      )
+    : null;
+  const remainingTimeLabel = estimatedSecondsRemaining === null
+    ? "Estimating remaining time…"
+    : estimatedSecondsRemaining < 60
+    ? "Under a minute left"
+    : `About ${Math.ceil(estimatedSecondsRemaining / 60)} min left`;
+  const preparationStage = !loading
+    ? "Almost ready!"
+    : loadedQuestionCount === 0
+    ? "Selecting questions…"
+    : loadedQuestionCount >= targetQuestionCount
+    ? "Setting up your timer…"
+    : `Generating questions · ${loadedQuestionCount} ready`;
 
   useEffect(() => () => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     requestIdRef.current += 1;
     abortControllerRef.current?.abort();
   }, []);
 
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine);
+    updateOnlineStatus();
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+    return () => {
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loading) return undefined;
+    const tipInterval = setInterval(() => {
+      setPreparationTipIndex((current) => (current + 1) % PREPARATION_TIPS.length);
+    }, 6000);
+    return () => clearInterval(tipInterval);
+  }, [loading]);
+
+  useEffect(() => {
+    if (!loading || !preparationStartedAtRef.current) return undefined;
+    const elapsedInterval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - preparationStartedAtRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(elapsedInterval);
+  }, [loading]);
+
+  useEffect(() => {
+    if (!isBreathing) return undefined;
+    const breathingInterval = setInterval(() => {
+      setBreathingSeconds((remaining) => Math.max(0, remaining - 1));
+    }, 1000);
+    const breathingTimeout = setTimeout(() => {
+      setBreathingSeconds(0);
+      setIsBreathing(false);
+    }, 30000);
+    return () => {
+      clearInterval(breathingInterval);
+      clearTimeout(breathingTimeout);
+    };
+  }, [isBreathing]);
+
+  const startBreathingExercise = () => {
+    setBreathingSeconds(30);
+    setIsBreathing(true);
+  };
+
   const refreshResults = useCallback(async () => {
     try {
       const response = await fetch(
-        "/api/interview-sessions?mode=mock-test&limit=10&excludeActive=true",
+        "/api/interview-sessions?mode=mock-test&limit=50&excludeActive=true",
         { cache: "no-store" }
       );
       const data = await response.json();
@@ -98,8 +186,11 @@ export default function MockTestPage() {
 
     const myRequestId = ++requestIdRef.current;
 
+    preparationStartedAtRef.current = Date.now();
+    setElapsedSeconds(0);
     setLoading(true);
     setQuestions([]);
+    let loadedQuestions = [];
     try {
       const res = await fetch("/api/mock-test/stream", {
         method: "POST",
@@ -137,11 +228,20 @@ export default function MockTestPage() {
         if (myRequestId !== requestIdRef.current) return;
 
         if (event.type === "question_start") {
+          loadedQuestions = [
+            ...loadedQuestions,
+            { question: "", difficulty: event.difficulty, isStreaming: true },
+          ];
           setQuestions((current) => [
             ...current,
             { question: "", difficulty: event.difficulty, isStreaming: true },
           ]);
         } else if (event.type === "question_reset") {
+          loadedQuestions = loadedQuestions.map((question, index) =>
+            index === event.index
+              ? { ...question, question: "", isStreaming: true }
+              : question
+          );
           setQuestions((current) =>
             current.map((question, index) =>
               index === event.index
@@ -150,6 +250,11 @@ export default function MockTestPage() {
             )
           );
         } else if (event.type === "question_token") {
+          loadedQuestions = loadedQuestions.map((question, index) =>
+            index === event.index
+              ? { ...question, question: question.question + event.text }
+              : question
+          );
           setQuestions((current) =>
             current.map((question, index) =>
               index === event.index
@@ -158,6 +263,11 @@ export default function MockTestPage() {
             )
           );
         } else if (event.type === "question_complete") {
+          loadedQuestions = loadedQuestions.map((question, index) =>
+            index === event.index
+              ? { ...event.question, isStreaming: false }
+              : question
+          );
           setQuestions((current) =>
             current.map((question, index) =>
               index === event.index
@@ -165,6 +275,9 @@ export default function MockTestPage() {
                 : question
             )
           );
+          if (loadedQuestions.filter((question) => !question.isStreaming).length === 1) {
+            toast.info("Your first question is ready. You can start now while the rest load.");
+          }
         }
       };
 
@@ -186,32 +299,29 @@ export default function MockTestPage() {
       if (buffer.trim()) processLine(buffer);
 
       if (myRequestId === requestIdRef.current) {
+        if (loadedQuestions.length === 0 || loadedQuestions.some((question) => question.isStreaming)) {
+          throw new Error("Question generation finished before all questions were ready.");
+        }
         toast.success(`Loaded questions for ${activeFilters.company}`);
+        return loadedQuestions;
       }
+      return null;
     } catch (error) {
-      if (error.name === "AbortError") return; // expected when superseded — not a real error
+      if (error.name === "AbortError") return null; // expected when superseded — not a real error
       console.error("Error loading questions:", error);
       toast.error("Failed to load mock test questions");
       if (myRequestId === requestIdRef.current) setQuestions([]);
+      return null;
     } finally {
       if (myRequestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 
-  // Debounced trigger: fires ~500ms after filters stop changing
-  useEffect(() => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      loadQuestions(filters, selectedTestType);
-    }, 500);
-
-    return () => clearTimeout(debounceTimerRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, selectedTestType]);
-
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
+    setQuestions([]);
+    preparationConfigRef.current = null;
 
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
@@ -226,26 +336,31 @@ export default function MockTestPage() {
   };
 
   const handleStartTest = async () => {
-    if (questions.length === 0) {
-      toast.error("No questions loaded");
-      return;
-    }
-    if (questions.some((question) => question.isStreaming)) {
-      toast.error("Please wait for the questions to finish generating");
+    if (isStartingTest) return;
+
+    if (!isPreparingTest) {
+      const activeFilters = { ...filters };
+      const activeRound = selectedTestType;
+      preparationConfigRef.current = { filters: activeFilters, round: activeRound };
+      await loadQuestions(activeFilters, activeRound);
       return;
     }
 
+    if (!canStartTest) return;
+
     setIsStartingTest(true);
     try {
+      const activeFilters = preparationConfigRef.current?.filters || { ...filters };
+      const activeRound = preparationConfigRef.current?.round || selectedTestType;
       const response = await startInterviewModeSessionAction({
         mode: "mock-test",
         details: {
-          company: filters.company,
-          role: filters.role,
-          difficulty: filters.difficulty,
-          type: selectedTestType.name,
-          roundId: selectedTestType.id,
-          roundName: selectedTestType.name,
+          company: activeFilters.company,
+          role: activeFilters.role,
+          difficulty: activeFilters.difficulty,
+          type: activeRound.name,
+          roundId: activeRound.id,
+          roundName: activeRound.name,
         },
       });
       if (!response.success) {
@@ -303,6 +418,8 @@ export default function MockTestPage() {
       <MockTestWorkspace
         filters={{ ...filters, type: selectedTestType.name }}
         questions={questions}
+        questionCount={Number(preparationConfigRef.current?.filters.count || filters.count)}
+        isLoadingQuestions={loading}
         sessionId={activeSessionId}
         onClose={handleCloseTest}
         onSessionComplete={refreshResults}
@@ -341,10 +458,19 @@ export default function MockTestPage() {
                 <div className="flex flex-wrap gap-4">
                   <Button
                     onClick={handleStartTest}
-                    disabled={isStartingTest}
+                    disabled={isStartingTest || (isPreparingTest && !canStartTest)}
                     className="btn-primary flex items-center gap-2 px-6 py-2.5"
                   >
-                    <Play size={16} /> {isStartingTest ? "Starting..." : "Quick Start Test"}
+                    <Play size={16} />
+                    {isStartingTest
+                      ? "Starting..."
+                      : loading && !canStartTest
+                      ? "Preparing Test..."
+                      : isPreparingTest && canStartTest
+                      ? `Start Test (${loadedQuestionCount}/${targetQuestionCount})`
+                      : isPreparingTest
+                      ? "Start Test"
+                      : "Quick Start Test"}
                   </Button>
                   <Button
                     className="btn-secondary flex items-center gap-2 px-6 py-2.5"
@@ -372,10 +498,21 @@ export default function MockTestPage() {
       </section>
 
       <section id="mock-test-results" className="max-w-7xl mx-auto px-8 pt-8">
-        <h2 className="text-xl font-bold mb-4">Recent Mock Test Results</h2>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="text-xl font-bold">Recent Mock Test Results</h2>
+          {recentResults.length > 2 && (
+            <Button
+              variant="outline"
+              onClick={() => setShowAllResults((current) => !current)}
+              className="shrink-0"
+            >
+              {showAllResults ? "Show recent only" : "View all results"}
+            </Button>
+          )}
+        </div>
         {recentResults.length ? (
           <div className="grid gap-3 md:grid-cols-2">
-            {recentResults.map((session) => (
+            {(showAllResults ? recentResults : recentResults.slice(0, 2)).map((session) => (
               <article key={session.id} className="rounded-xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -468,7 +605,7 @@ export default function MockTestPage() {
                 </div>
               </div>
 
-              <div className="p-6 space-y-5">
+              <fieldset disabled={loading || isStartingTest} className="p-6 space-y-5 disabled:opacity-70">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
@@ -543,11 +680,21 @@ export default function MockTestPage() {
 
                 <button
                   onClick={handleStartTest}
-                  className="w-full btn-primary flex items-center justify-center gap-2 py-3 px-4 mt-4"
+                  disabled={isStartingTest || (isPreparingTest && !canStartTest)}
+                  className="w-full btn-primary flex items-center justify-center gap-2 py-3 px-4 mt-4 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <Play size={16} /> Start Test Now
+                  <Play size={16} />
+                  {isStartingTest
+                    ? "Starting..."
+                    : loading && !canStartTest
+                    ? "Preparing Test..."
+                    : isPreparingTest && canStartTest
+                    ? `Start Test (${loadedQuestionCount}/${targetQuestionCount})`
+                    : isPreparingTest
+                    ? "Start Test"
+                    : "Start Test Now"}
                 </button>
-              </div>
+              </fieldset>
             </div>
           </div>
 
@@ -635,26 +782,199 @@ export default function MockTestPage() {
           </div>
         </div>
 
+        {isPreparingTest && (
+          <section className="mb-10 rounded-2xl border border-primary/20 bg-card p-6 shadow-sm">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex-1">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+                    {loading ? "Step 1 · Preparing" : "Step 2 · Ready"}
+                  </span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isOnline ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-600 dark:text-rose-400"}`}>
+                    Internet {isOnline ? "connected" : "offline"}
+                  </span>
+                </div>
+                <h2 className="text-xl font-bold text-foreground">
+                  {preparationStage}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {loading
+                    ? loadedQuestionCount === 0
+                      ? "Selecting your questions now. We'll enable Start Test as soon as the first one is ready."
+                      : loadedQuestionCount < targetQuestionCount
+                      ? `Your test is being prepared. You can start with the ${loadedQuestionCount} ready ${loadedQuestionCount === 1 ? "question" : "questions"} or wait for the full set.`
+                      : "All questions are ready. Finishing the test setup."
+                    : "Questions are ready. Start when you feel prepared."}
+                </p>
+              </div>
+              {canStartTest && (
+                <Button
+                  onClick={handleStartTest}
+                  disabled={isStartingTest}
+                  className="btn-primary shrink-0"
+                >
+                  <Play size={16} />
+                  {isStartingTest ? "Starting..." : `Start Test (${loadedQuestionCount}/${targetQuestionCount})`}
+                </Button>
+              )}
+            </div>
+
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="font-semibold text-foreground">
+                  Loaded {loadedQuestionCount} / {targetQuestionCount} questions
+                </span>
+                <span className="font-semibold text-primary">
+                  {loading ? remainingTimeLabel : `${questionProgress}% complete`}
+                </span>
+              </div>
+              <div
+                className="relative h-3 overflow-hidden rounded-full bg-secondary"
+                role="progressbar"
+                aria-label="Mock test question generation progress"
+                aria-valuemin={0}
+                aria-valuemax={targetQuestionCount}
+                aria-valuenow={loadedQuestionCount}
+              >
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                  style={{ width: `${questionProgress}%` }}
+                />
+                {loading && questionProgress < 100 && (
+                  <div
+                    className="absolute bottom-0 top-0 rounded-full bg-primary/30 animate-pulse"
+                    style={{
+                      left: `${questionProgress}%`,
+                      width: `${Math.min(12, 100 - questionProgress)}%`,
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
+              {loading && loadedQuestionCount > 0 && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Time estimate is based on the questions generated so far and may change.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="rounded-xl border border-border bg-background/60 p-4">
+                <h3 className="text-sm font-bold text-foreground">Test instructions</h3>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Answer each question before moving on. You can review previous questions, and submit the full test when every answer is ready.
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-background/60 p-4">
+                <h3 className="text-sm font-bold text-foreground">Marking scheme</h3>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Responses are assessed for correctness, clarity, problem-solving approach, technical depth, and how well you explain trade-offs.
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-background/60 p-4">
+                <h3 className="text-sm font-bold text-foreground">Helpful tip</h3>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Explain your reasoning as you work. This practice test is not proctored, so camera and microphone access are not required.
+                </p>
+              </div>
+            </div>
+
+            {loading && (
+              <div className="mt-5 grid gap-4 border-t border-border pt-5 md:grid-cols-2">
+                <div className="rounded-xl border border-primary/15 bg-primary/5 p-4" aria-live="polite">
+                  <p className="text-xs font-bold uppercase tracking-wide text-primary">Quick tip</p>
+                  <p className="mt-2 min-h-10 text-sm font-medium text-foreground">
+                    {PREPARATION_TIPS[preparationTipIndex]}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-background/60 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-bold text-foreground">
+                        <Wind size={16} className="text-primary" />
+                        Calm your nerves
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {isBreathing
+                          ? breathingSeconds === 0
+                            ? "Nice work. You're ready when you are."
+                            : (30 - breathingSeconds) % 12 < 4
+                            ? "Breathe in slowly"
+                            : (30 - breathingSeconds) % 12 < 6
+                            ? "Hold gently"
+                            : "Breathe out slowly"
+                          : "Try a guided 30-second breathing reset."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={startBreathingExercise}
+                      className="shrink-0 rounded-lg border border-primary/30 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/10"
+                    >
+                      {isBreathing ? `${breathingSeconds}s left` : breathingSeconds === 0 ? "Again" : "Start"}
+                    </button>
+                  </div>
+                  <div className="mt-4 flex h-14 items-center justify-center">
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary ${isBreathing ? "ring-4 ring-primary/10" : ""}`}
+                      style={{
+                        transform: isBreathing && (30 - breathingSeconds) % 12 < 6 ? "scale(1.2)" : "scale(0.85)",
+                        transition: "transform 2s ease-in-out",
+                      }}
+                      aria-hidden="true"
+                    >
+                      {isBreathing ? breathingSeconds : "Breathe"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* QUESTIONS LIST */}
         <div className="mb-12">
           <h2 className="text-2xl font-bold mb-1 tracking-tight text-foreground" style={{ letterSpacing: "-0.02em" }}>Practice Questions</h2>
           <p className="text-muted-foreground text-sm mb-6">
-            {questions.length} of {filters.count} questions for {filters.company} - {filters.role} ({filters.difficulty})
+            {loadedQuestionCount} of {targetQuestionCount} questions loaded for {filters.company} - {filters.role} ({filters.difficulty})
           </p>
 
-          {loading && questions.length === 0 ? (
-            <div className="flex items-center justify-center py-20">
-              <DotsGridWave size="md" color="indigo" label="Synthesizing interview questions..." />
+          {loading ? (
+            <div
+              className="grid animate-pulse grid-cols-1 gap-4 py-4 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)]"
+              aria-label="Test workspace loading"
+            >
+              <div className="rounded-xl border border-border bg-card p-5">
+                <div className="mb-5 h-3 w-1/3 rounded bg-muted" />
+                <div className="mb-3 h-5 w-4/5 rounded bg-muted" />
+                <div className="mb-2 h-3 w-full rounded bg-muted" />
+                <div className="mb-6 h-3 w-2/3 rounded bg-muted" />
+                <div className="mb-3 h-9 w-full rounded bg-muted" />
+                <div className="h-9 w-full rounded bg-muted" />
+              </div>
+              <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <div className="flex items-center justify-between border-b border-border p-4">
+                  <div className="h-4 w-24 rounded bg-muted" />
+                  <div className="flex gap-2">
+                    {[0, 1, 2, 3].map((item) => (
+                      <div key={item} className="h-5 w-5 rounded-full bg-muted" />
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-3 p-5">
+                  <div className="h-3 w-2/3 rounded bg-muted" />
+                  <div className="h-3 w-full rounded bg-muted" />
+                  <div className="h-3 w-5/6 rounded bg-muted" />
+                  <div className="h-3 w-3/4 rounded bg-muted" />
+                  <div className="mt-6 h-24 rounded-lg bg-muted" />
+                </div>
+              </div>
             </div>
           ) : questions.length === 0 ? (
             <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
-              <p className="text-muted-foreground mb-4">No questions loaded yet</p>
-              <Button
-                onClick={handleStartTest}
-                className="btn-primary"
-              >
-                Load Questions
-              </Button>
+              <p className="text-muted-foreground mb-4">
+                Questions will be generated when you start the test.
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -668,12 +988,6 @@ export default function MockTestPage() {
                   isStreaming={q.isStreaming}
                 />
               ))}
-              {loading && questions.length < filters.count && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                 Generating question {(questions.findIndex((question) => question.isStreaming) + 1) || questions.length + 1} of {filters.count}…
-                </div>
-              )}
             </div>
           )}
         </div>

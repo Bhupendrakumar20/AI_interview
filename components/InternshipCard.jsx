@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { saveInternship, unsaveInternship, isInternshipSaved } from "@/lib/actions/saved-internships.action";
+import { trackApplicationIntent } from "@/lib/actions/profile-achievements.action";
 import { BookmarkSave, ParticleBurst } from "@/components/ui/MicroInteractions";
 
-const InternshipCard = ({ internship }) => {
+const InternshipCard = ({ internship, onApply }) => {
   const [applying, setApplying] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -26,21 +27,35 @@ const InternshipCard = ({ internship }) => {
   }, [internship.id]);
 
   const handleApply = async () => {
+    if (onApply) {
+      onApply();
+      return;
+    }
+
+    setApplying(true);
     try {
-      // If internship has an apply/registration link, redirect there
-      if (internship.applyLink || internship.url) {
-        window.open(internship.applyLink || internship.url, '_blank');
-        toast.success(`Redirecting to ${internship.company} application page...`);
+      const applyUrl = internship.applyLink || internship.url;
+      if (applyUrl) {
+        window.open(applyUrl, "_blank");
+        const result = await trackApplicationIntent({
+          applicationType: "internship",
+          listingId: String(internship.id || applyUrl),
+          title: internship.title,
+          company: internship.company,
+          applyUrl,
+        });
+        if (result.success) {
+          toast.success(result.created ? "Internship application tracked toward your rewards." : "This internship is already in your application progress.");
+        } else {
+          toast.error(result.error);
+        }
         return;
       }
 
-      // Otherwise, track the application
-      setApplying(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success(`Application tracked for ${internship.title} at ${internship.company}!`);
-
+      toast.info("Application link not available.");
     } catch (error) {
       toast.error("Failed to process application. Please try again.");
+      console.error("Failed to track internship application:", error);
     } finally {
       setApplying(false);
     }
@@ -69,20 +84,9 @@ const InternshipCard = ({ internship }) => {
 
   const applicationStatus = getApplicationStatus();
 
-  const handleCardClick = () => {
-    // If internship is open and has apply link, redirect to it
-    if (applicationStatus.status !== "closed" && internship.applyLink) {
-      window.open(internship.applyLink, '_blank');
-    }
-  };
-
   return (
     <div 
-      className={cn(
-        "premium-card-glass p-6 sm:p-7 flex flex-col justify-between h-full group",
-        applicationStatus.status !== "closed" && internship.applyLink && "cursor-pointer"
-      )}
-      onClick={handleCardClick}
+      className={cn("premium-card-glass p-6 sm:p-7 flex flex-col justify-between h-full group")}
     >
       <div>
         {/* Header */}

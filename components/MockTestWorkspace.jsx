@@ -34,7 +34,9 @@ import {
   TrendingUp,
   User,
   ExternalLink,
-  Loader2
+  Loader2,
+  Flag,
+  CircleHelp
 } from "lucide-react";
 import {
   Radar,
@@ -60,7 +62,38 @@ const INITIAL_CODE_TEMPLATES = {
   java: `// Write your Java solution here\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello PrepWise Java");\n    }\n}`
 };
 
-export default function MockTestWorkspace({ filters, questions, sessionId, onClose, onSessionComplete }) {
+const WORKSPACE_TOUR_STEPS = [
+  {
+    target: "timer",
+    title: "Keep an eye on time",
+    description: "The 45-minute timer is here. Pause it if you need a short break.",
+  },
+  {
+    target: "review",
+    title: "Mark questions for review",
+    description: "Flag a question to find it quickly when you review your work.",
+  },
+  {
+    target: "navigation",
+    title: "Move through the test",
+    description: "Use the arrows to go back or move forward. Submit your current answer to unlock the next question.",
+  },
+  {
+    target: "palette",
+    title: "Use the whiteboard palette",
+    description: "Choose a drawing tool and color to sketch your approach on the whiteboard.",
+  },
+];
+
+export default function MockTestWorkspace({
+  filters,
+  questions,
+  questionCount = questions.length,
+  isLoadingQuestions = false,
+  sessionId,
+  onClose,
+  onSessionComplete,
+}) {
   const [activeTab, setActiveTab] = useState("code"); // code, whiteboard, feedback, leaderboard
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
@@ -72,6 +105,9 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   // Timer state (45 minutes)
   const [timeLeft, setTimeLeft] = useState(45 * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
+  const [markedForReviewByIndex, setMarkedForReviewByIndex] = useState({});
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
 
   // Web Speech API
   const [isRecording, setIsRecording] = useState(false);
@@ -96,6 +132,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   // when navigating between questions and each question fetches independently.
   const [answersByIndex, setAnswersByIndex] = useState({}); // { [index]: string }
   const [candidateAnswersByIndex, setCandidateAnswersByIndex] = useState({});
+  const [submittedAnswersByIndex, setSubmittedAnswersByIndex] = useState({});
   const [codeByIndex, setCodeByIndex] = useState({});
   const [transcriptByIndex, setTranscriptByIndex] = useState({});
   const [whiteboardByIndex, setWhiteboardByIndex] = useState({});
@@ -129,6 +166,54 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
   const currentAnswer = answersByIndex[currentQuestionIndex];
   const currentTips = tipsByIndex[currentQuestionIndex];
+  const submittedAnswerCount = questions.filter((_, index) => submittedAnswersByIndex[index]).length;
+  const allAnswersSubmitted = !isLoadingQuestions &&
+    questions.length === questionCount &&
+    questionCount > 0 &&
+    submittedAnswerCount === questionCount;
+  const activeTutorialStep = isTutorialOpen ? WORKSPACE_TOUR_STEPS[tutorialStep] : null;
+
+  useEffect(() => {
+    if (window.sessionStorage.getItem("mock-test-workspace-tour-complete") !== "true") {
+      setIsTutorialOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!activeTutorialStep) return undefined;
+    if (activeTutorialStep.target === "palette" && activeTab !== "whiteboard") {
+      setActiveTab("whiteboard");
+      return undefined;
+    }
+
+    const target = document.querySelector(`[data-tour-target="${activeTutorialStep.target}"]`);
+    if (!target) return undefined;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    target.classList.add("outline", "outline-2", "outline-cyan-400", "outline-offset-4");
+    return () => {
+      target.classList.remove("outline", "outline-2", "outline-cyan-400", "outline-offset-4");
+    };
+  }, [activeTutorialStep, activeTab]);
+
+  const closeTutorial = () => {
+    setIsTutorialOpen(false);
+    setActiveTab("code");
+    window.sessionStorage.setItem("mock-test-workspace-tour-complete", "true");
+  };
+
+  const startTutorial = () => {
+    setTutorialStep(0);
+    setIsTutorialOpen(true);
+  };
+
+  const moveTutorialForward = () => {
+    if (tutorialStep === WORKSPACE_TOUR_STEPS.length - 1) {
+      closeTutorial();
+      return;
+    }
+    setTutorialStep((current) => current + 1);
+  };
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -191,6 +276,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
   const handleLanguageChange = (language) => {
     const starterCode = INITIAL_CODE_TEMPLATES[language] || "";
+    markCurrentAnswerIncomplete();
     setSelectedLanguage(language);
     setLanguageByIndex((previous) => ({
       ...previous,
@@ -255,8 +341,28 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
     };
   });
 
+  const hasAnswerContent = (submission) => {
+    const starterCode = INITIAL_CODE_TEMPLATES[submission.answer.language] || "";
+    return Boolean(
+      submission.answer.text.trim() ||
+      submission.answer.transcript.trim() ||
+      submission.answer.whiteboard.length ||
+      (submission.answer.code.trim() && submission.answer.code.trim() !== starterCode.trim())
+    );
+  };
+
+  const markCurrentAnswerIncomplete = () => {
+    setSubmittedAnswersByIndex((previous) => {
+      if (!previous[currentQuestionIndex]) return previous;
+      const next = { ...previous };
+      delete next[currentQuestionIndex];
+      return next;
+    });
+  };
+
   const handleEditorChange = (value) => {
     const code = value || "";
+    markCurrentAnswerIncomplete();
     setEditorCode(code);
     setCodeByIndex((previous) => ({ ...previous, [currentQuestionIndex]: code }));
   };
@@ -306,6 +412,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
             }
           }
           if (finalTranscript) {
+            markCurrentAnswerIncomplete();
             setTranscript((prev) => prev + finalTranscript);
           }
         };
@@ -348,6 +455,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
       setIsRecording(false);
       toast.success("Stopped voice recording.");
     } else {
+      markCurrentAnswerIncomplete();
       setTranscript("");
       recognitionRef.current.start();
       setIsRecording(true);
@@ -457,6 +565,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
     setIsDrawing(true);
 
     if (whiteboardTool === "pencil") {
+      markCurrentAnswerIncomplete();
       setCurrentShape({
         type: "pencil",
         color: strokeColor,
@@ -469,6 +578,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
         setIsDrawing(false);
         return;
       }
+      markCurrentAnswerIncomplete();
       setShapes((prev) => [
         ...prev,
         {
@@ -483,6 +593,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
       setWhiteboardText("");
       setIsDrawing(false);
     } else {
+      markCurrentAnswerIncomplete();
       setCurrentShape({
         type: whiteboardTool,
         color: strokeColor,
@@ -523,10 +634,12 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
   };
 
   const handleUndo = () => {
+    markCurrentAnswerIncomplete();
     setShapes((prev) => prev.slice(0, -1));
   };
 
   const handleClearCanvas = () => {
+    markCurrentAnswerIncomplete();
     setShapes([]);
     toast.success("Canvas cleared.");
   };
@@ -656,33 +769,54 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
     }
   };
 
+  const handleSubmitAnswer = () => {
+    const questionIndex = currentQuestionIndex;
+    if (isSubmitting || submittedAnswersByIndex[questionIndex]) return;
+
+    const submission = buildQuestionsAndAnswers()[questionIndex];
+    if (!hasAnswerContent(submission)) {
+      toast.error("Add an answer, code solution, transcript, or whiteboard work before submitting.");
+      return;
+    }
+
+    setSubmittedAnswersByIndex((previous) => ({ ...previous, [questionIndex]: true }));
+    toast.success(`Answer ${questionIndex + 1} submitted`);
+  };
+
   // ----------------------------------------------------
   // Structured AI Diagnostics Evaluation Submission
   // ----------------------------------------------------
   const handleSubmitTest = async () => {
+    if (!allAnswersSubmitted) {
+      setIsTimerRunning(false);
+      toast.error(
+        isLoadingQuestions
+          ? "Please wait for all questions to finish loading before submitting."
+          : `Submit an answer for every question first (${submittedAnswerCount}/${questionCount} submitted).`
+      );
+      return;
+    }
+
     setIsTimerRunning(false);
     setIsSubmitting(true);
     setActiveTab("feedback");
     toast.loading("Analyzing your submission...", { id: "eval-toast" });
 
-    // Generate drawing summary
-    const shapesSummary = shapes.map((s, idx) => `Shape ${idx + 1}: ${s.type} (color: ${s.color})`).join(", ");
-    const whiteboardSummary = shapesSummary || "No whiteboard drawings submitted.";
-
     try {
+      const questionsAndAnswers = buildQuestionsAndAnswers();
       const result = await evaluateMockTest({
-        question: currentQuestion.question,
-        code: editorCode,
-        language: selectedLanguage,
-        transcript: transcript,
-        whiteboardSummary,
+        submissions: questionsAndAnswers.map((submission) => ({
+          ...submission,
+          whiteboardSummary: submission.answer.whiteboard
+            .map((shape, index) => `Shape ${index + 1}: ${shape.type} (color: ${shape.color})`)
+            .join(", ") || "No whiteboard drawings submitted.",
+        })),
         company: filters.company,
-        role: filters.role
+        role: filters.role,
       });
 
       if (result.success) {
         setEvaluation(result.evaluation);
-        const questionsAndAnswers = buildQuestionsAndAnswers();
         const savedSession = await finishInterviewModeSessionAction({
           sessionId,
           result: {
@@ -770,7 +904,10 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
         {/* TIMER & QUICK SUBMIT */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5 bg-[#172237] px-4 py-1.5 rounded-lg border border-slate-700 shadow-inner">
+          <div
+            data-tour-target="timer"
+            className="flex items-center gap-2.5 bg-[#172237] px-4 py-1.5 rounded-lg border border-slate-700 shadow-inner"
+          >
             <span className={`w-2.5 h-2.5 rounded-full ${isTimerRunning ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
             <span className="font-mono text-lg font-bold text-slate-200">
               {formatTime(timeLeft)}
@@ -785,10 +922,26 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
           </div>
 
           <Button
+            variant="outline"
+            onClick={startTutorial}
+            className="border-slate-700 text-slate-300 hover:bg-slate-800"
+            title="Take the workspace tour"
+          >
+            <CircleHelp size={15} /> Tour
+          </Button>
+
+          <Button
             onClick={handleSubmitTest}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !allAnswersSubmitted}
             variant="aurora"
             className="text-white font-bold flex items-center gap-1.5 px-4 relative overflow-visible shadow-lg"
+            title={
+              isLoadingQuestions
+                ? "Wait for question generation to finish"
+                : !allAnswersSubmitted
+                ? "Submit every question's answer first"
+                : "Evaluate all submitted answers"
+            }
           >
             <ParticleBurst active={isSubmitting} count={8} color="#6366f1" />
             {isSubmitting ? (
@@ -798,7 +951,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               </>
             ) : (
               <>
-                <Send size={16} /> Submit Test
+                <Send size={16} /> Submit Test ({submittedAnswerCount}/{questionCount})
               </>
             )}
           </Button>
@@ -813,17 +966,48 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
         </div>
       </header>
 
+      {isLoadingQuestions && (
+        <div className="border-b border-blue-900/60 bg-blue-950/50 px-6 py-2 text-center text-xs text-blue-200">
+          More questions are being prepared in the background. You can continue with the questions already loaded.
+        </div>
+      )}
+
       {/* WORKSPACE CONTENT */}
       <main className="flex-1 flex overflow-hidden">
         {/* LEFT COLUMN: QUESTION & AI NUDGES */}
         <section className="w-[32%] border-r border-slate-800 bg-[#0a0e1a] p-5 flex flex-col gap-5 overflow-y-auto">
           {/* Question card */}
           <div className="bg-[#0e1526] border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-500">
-                Question {currentQuestionIndex + 1} of {questions.length}
+                Question {currentQuestionIndex + 1} of {questionCount}
               </span>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {submittedAnswersByIndex[currentQuestionIndex] && (
+                  <span className="rounded-full border border-emerald-700/60 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    Submitted
+                  </span>
+                )}
+                <Button
+                  data-tour-target="review"
+                  size="xs"
+                  variant="outline"
+                  aria-pressed={Boolean(markedForReviewByIndex[currentQuestionIndex])}
+                  onClick={() => setMarkedForReviewByIndex((previous) => ({
+                    ...previous,
+                    [currentQuestionIndex]: !previous[currentQuestionIndex],
+                  }))}
+                  className={`h-7 px-2 text-[10px] ${
+                    markedForReviewByIndex[currentQuestionIndex]
+                      ? "border-amber-500/60 bg-amber-500/10 text-amber-300"
+                      : "border-slate-800 text-slate-400"
+                  }`}
+                >
+                  <Flag size={12} />
+                  {markedForReviewByIndex[currentQuestionIndex] ? "Marked" : "Mark for review"}
+                </Button>
+              </div>
+              <div data-tour-target="navigation" className="flex items-center gap-1">
                 <Button
                   size="icon"
                   variant="outline"
@@ -837,7 +1021,10 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
                   size="icon"
                   variant="outline"
                   onClick={() => handleQuestionChange(currentQuestionIndex + 1)}
-                  disabled={currentQuestionIndex === questions.length - 1}
+                  disabled={
+                    currentQuestionIndex === questions.length - 1 ||
+                    !submittedAnswersByIndex[currentQuestionIndex]
+                  }
                   className="h-7 w-7 border-slate-800 text-slate-400 hover:text-slate-200"
                 >
                   <ChevronRight size={16} />
@@ -848,8 +1035,11 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
             {/* Segment Progress Bar */}
             <div className="my-1">
               <SegmentBar
-                totalSegments={questions.length || 1}
+                totalSegments={questionCount || 1}
                 currentSegment={currentQuestionIndex + 1}
+                completedSegments={Array.from({ length: questionCount }, (_, index) =>
+                  Boolean(submittedAnswersByIndex[index])
+                )}
               />
             </div>
 
@@ -945,6 +1135,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               value={candidateAnswersByIndex[currentQuestionIndex] || ""}
               onChange={(event) => {
                 const answer = event.target.value;
+                markCurrentAnswerIncomplete();
                 setCandidateAnswersByIndex((previous) => ({
                   ...previous,
                   [currentQuestionIndex]: answer,
@@ -953,6 +1144,27 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
               placeholder="Write your answer here..."
               className="min-h-24 w-full resize-y rounded-lg border border-slate-800 bg-[#090d16] p-3 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
             />
+            <Button
+              onClick={handleSubmitAnswer}
+              disabled={submittedAnswersByIndex[currentQuestionIndex] || isSubmitting}
+              className="mt-3 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-500"
+            >
+              {submittedAnswersByIndex[currentQuestionIndex]
+                ? <><CheckCircle2 size={14} /> Answer Submitted</>
+                : <><Send size={14} /> Submit Answer</>}
+            </Button>
+            <p className="mt-2 text-xs text-slate-500">
+              Evaluation runs once after every question has been submitted.
+            </p>
+            {submittedAnswersByIndex[currentQuestionIndex] &&
+              currentQuestionIndex < questions.length - 1 && (
+                <Button
+                  onClick={() => handleQuestionChange(currentQuestionIndex + 1)}
+                  className="mt-3 flex w-full items-center justify-center gap-2 bg-emerald-700 text-white hover:bg-emerald-600"
+                >
+                  Next Question <ChevronRight size={16} />
+                </Button>
+              )}
           </div>
 
           {/* continuous voice transcription */}
@@ -1160,7 +1372,10 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
 
                 {/* Colors & Actions */}
                 <div className="flex items-center gap-2">
-                  <div className="flex gap-1 items-center bg-slate-900 border border-slate-800 rounded p-0.5">
+                  <div
+                    data-tour-target="palette"
+                    className="flex gap-1 items-center bg-slate-900 border border-slate-800 rounded p-0.5"
+                  >
                     {["#3b82f6", "#ef4444", "#10b981", "#eab308", "#ffffff"].map((c) => (
                       <button
                         key={c}
@@ -1223,7 +1438,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
                   </div>
                   <h3 className="text-lg font-bold">Diagnostics Awaiting Submission</h3>
                   <p className="text-sm text-slate-400 max-w-md mt-2">
-                    Complete your interview mock test and click "Submit Test" to trigger RAG-powered automated evaluation and detailed diagnostics reports.
+                    Submit each answer, then click "Submit Test" for one AI evaluation of the complete interview.
                   </p>
                 </div>
               ) : (
@@ -1235,7 +1450,7 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
                         <Award className="text-blue-500" /> Evaluation Diagnostics Report
                       </h2>
                       <p className="text-sm text-slate-400 mt-1">
-                        Here is the deep architectural and conceptual diagnostics computed by Gemini.
+                        Here is the deep architectural and conceptual diagnostics computed by AI.
                       </p>
                     </div>
 
@@ -1409,6 +1624,47 @@ export default function MockTestWorkspace({ filters, questions, sessionId, onClo
           )}
         </section>
       </main>
+
+      {activeTutorialStep && (
+        <div
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="mock-test-tour-title"
+          className="fixed bottom-5 right-5 z-[70] w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl border border-cyan-500/30 bg-[#101a2d] p-5 shadow-2xl shadow-black/40"
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+              Workspace tour · {tutorialStep + 1}/{WORKSPACE_TOUR_STEPS.length}
+            </span>
+            <button
+              type="button"
+              onClick={closeTutorial}
+              className="text-xs font-semibold text-slate-400 hover:text-white"
+            >
+              Skip
+            </button>
+          </div>
+          <h3 id="mock-test-tour-title" className="text-base font-bold text-white">
+            {activeTutorialStep.title}
+          </h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-300">
+            {activeTutorialStep.description}
+          </p>
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex gap-1" aria-hidden="true">
+              {WORKSPACE_TOUR_STEPS.map((step, index) => (
+                <span
+                  key={step.target}
+                  className={`h-1.5 w-5 rounded-full ${index === tutorialStep ? "bg-cyan-400" : "bg-slate-700"}`}
+                />
+              ))}
+            </div>
+            <Button onClick={moveTutorialForward} size="sm" className="bg-cyan-600 text-white hover:bg-cyan-500">
+              {tutorialStep === WORKSPACE_TOUR_STEPS.length - 1 ? "Finish" : "Next"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

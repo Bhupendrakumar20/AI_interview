@@ -7,9 +7,9 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-8">
       {/* Header Section */}
-      <section className="blue-gradient-dark rounded-3xl px-8 py-8">
-        <h1 className="text-3xl font-semibold text-light-100">Settings</h1>
-        <p className="text-light-400 text-sm mt-2">
+      <section className="soft-indigo-header rounded-3xl px-8 py-8">
+        <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Settings</h1>
+        <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
           Manage your account, security, and preferences. All changes are saved to Firebase.
         </p>
       </section>

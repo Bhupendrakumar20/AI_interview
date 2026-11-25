@@ -1,9 +1,8 @@
 // components/QuickAccess.jsx
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Briefcase, DollarSign, Trophy, MessageSquare, Users, BookOpen, Mic, BookMarked, BarChart3, User, DollarSign as DollarSignIcon, Star } from "lucide-react";
+import { Briefcase, DollarSign, Trophy, MessageSquare, Users, BookOpen, Mic, BookMarked, User, DollarSign as DollarSignIcon, Star } from "lucide-react";
 
 const QuickAccess = () => {
   const router = useRouter();
@@ -18,7 +17,6 @@ const QuickAccess = () => {
     { label: "Courses", icon: BookOpen, href: "/courses" },
     { label: "Interview", icon: Mic, href: "/interview" },
     { label: "Question Bank", icon: BookMarked, href: "/question-bank" },
-    { label: "Analytics", icon: BarChart3, href: "/analytics" },
     { label: "Profile", icon: User, href: "/profile" },
     { label: "Salary Negotiate", icon: DollarSignIcon, href: "/salary-negotiation" },
     { label: "Upgrade", icon: Star, href: "/upgrade" },

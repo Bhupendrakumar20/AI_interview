@@ -5,17 +5,35 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { BookmarkSave, ParticleBurst } from "@/components/ui/MicroInteractions";
+import { trackApplicationIntent } from "@/lib/actions/profile-achievements.action";
 
 const JobCard = ({ job }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [applying, setApplying] = useState(false);
 
-  const handleApplyNow = () => {
+  const handleApplyNow = async () => {
     if (job.url && job.url !== "#") {
       setApplying(true);
       window.open(job.url, "_blank");
-      toast.success(`Opening application for ${job.title}...`);
-      setTimeout(() => setApplying(false), 1000);
+      try {
+        const result = await trackApplicationIntent({
+          applicationType: "job",
+          listingId: String(job.id || job.url),
+          title: job.title,
+          company: job.company,
+          applyUrl: job.url,
+        });
+        if (result.success) {
+          toast.success(result.created ? "Job application tracked toward your rewards." : "This job is already in your application progress.");
+        } else {
+          toast.error(result.error);
+        }
+      } catch (error) {
+        console.error("Failed to track job application:", error);
+        toast.error("The application page opened, but the application could not be tracked.");
+      } finally {
+        setApplying(false);
+      }
     } else {
       toast.info("Application link not available.");
     }

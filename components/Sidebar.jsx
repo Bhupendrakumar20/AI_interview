@@ -96,7 +96,6 @@ const Sidebar = ({ user, onCloseMobile }) => {
     { label: "100 Days to Code", href: "/100-days-of-code", icon: "zap" },
     { label: "Courses", href: "/courses", icon: "book" },
     { label: "Question Bank", href: "/question-bank", icon: "database" },
-    { label: "Analytics", href: "/analytics", icon: "trending-up" },
     { label: "Profile", href: "/profile", icon: "user" },
     { label: "Settings", href: "/settings", icon: "settings" },
     { label: "Salary Negotiate", href: "/salary-negotiation", icon: "message-circle" },

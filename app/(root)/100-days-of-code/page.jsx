@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { getAllDays, searchQuestions, getQuestionsByTopic, getQuestionsByDifficulty } from "@/constants/hundredDaysOfCode";
 import DayCard from "@/components/DayCard";
 import DailyQuestionSection from "@/components/DailyQuestionSection";
 import SearchUserStatsSection from "@/components/SearchUserStatsSection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { toast } from "sonner";
+import {
+  getCodingChallengeProgress,
+  markCodingChallengeDayComplete,
+} from "@/lib/actions/profile-achievements.action";
 
 export default function HundredDaysOfCodePage() {
   const allDays = getAllDays();
@@ -15,6 +20,26 @@ export default function HundredDaysOfCodePage() {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("all");
   const [expandedDays, setExpandedDays] = useState({});
+  const [completedDays, setCompletedDays] = useState([]);
+  const [progressLoaded, setProgressLoaded] = useState(false);
+  const [progressError, setProgressError] = useState("");
+  const [updatingDay, setUpdatingDay] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    getCodingChallengeProgress().then((result) => {
+      if (!active) return;
+      if (result.success) {
+        setCompletedDays(result.completedDays);
+      } else {
+        setProgressError(result.error);
+      }
+      setProgressLoaded(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Filter questions based on search and filters
   const filteredDays = useMemo(() => {
@@ -68,6 +93,23 @@ export default function HundredDaysOfCodePage() {
     }));
   };
 
+  const handleMarkDayComplete = async (dayNumber) => {
+    setUpdatingDay(dayNumber);
+    const result = await markCodingChallengeDayComplete(dayNumber);
+    if (result.success) {
+      setCompletedDays(result.completedDays);
+      setProgressError("");
+      toast.success(`Day ${dayNumber} marked complete.`);
+      result.newlyUnlocked.forEach((milestone) => {
+        toast.success(`${milestone}-day coding challenge reward unlocked!`);
+      });
+    } else {
+      setProgressError(result.error);
+      toast.error(result.error);
+    }
+    setUpdatingDay(null);
+  };
+
   const getDifficultyColor = (difficulty) => {
     switch(difficulty.toLowerCase()) {
       case "easy":
@@ -99,6 +141,36 @@ export default function HundredDaysOfCodePage() {
 
         {/* Search User Stats Section */}
         <SearchUserStatsSection />
+
+        <section className="mb-8 rounded-xl bg-white p-6 shadow-lg dark:bg-slate-800">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Your challenge progress</h2>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Mark a day complete after you finish its coding questions.
+              </p>
+            </div>
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              {completedDays.length} / {allDays.length} days
+            </span>
+          </div>
+          <div
+            className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+            role="progressbar"
+            aria-valuenow={completedDays.length}
+            aria-valuemin={0}
+            aria-valuemax={allDays.length}
+            aria-label="Coding challenge progress"
+          >
+            <div
+              className="h-full rounded-full bg-blue-600 transition-all"
+              style={{ width: `${(completedDays.length / allDays.length) * 100}%` }}
+            />
+          </div>
+          {progressError && (
+            <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">{progressError}</p>
+          )}
+        </section>
 
         {/* Search and Filters */}
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 mb-8">
@@ -212,6 +284,10 @@ export default function HundredDaysOfCodePage() {
                 isExpanded={expandedDays[day.day] || false}
                 onToggleExpand={() => toggleDayExpanded(day.day)}
                 getDifficultyColor={getDifficultyColor}
+                isCompleted={completedDays.includes(day.day)}
+                isUpdating={updatingDay === day.day}
+                canTrackProgress={progressLoaded && !progressError}
+                onMarkComplete={() => handleMarkDayComplete(day.day)}
               />
             ))
           )}

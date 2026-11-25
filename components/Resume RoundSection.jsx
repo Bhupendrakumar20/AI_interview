@@ -61,6 +61,13 @@ export default function ResumeRoundSection() {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [answers, setAnswers] = useState([]);
   const [targetQuestionCount, setTargetQuestionCount] = useState(0);
+  const [answerEvaluation, setAnswerEvaluation] = useState(null);
+  const [isAnswerEvaluating, setIsAnswerEvaluating] = useState(false);
+  const [answerEvaluationError, setAnswerEvaluationError] = useState("");
+  const [answerEvaluationStream, setAnswerEvaluationStream] = useState("");
+  const [topicScores, setTopicScores] = useState([]);
+  const [answerEvaluations, setAnswerEvaluations] = useState([]);
+  const [overallSuggestions, setOverallSuggestions] = useState([]);
 
   const resumeSessionIdRef = useRef(null);
 
@@ -129,6 +136,54 @@ export default function ResumeRoundSection() {
     }
   };
 
+  const streamAnswerEvaluation = async (response) => {
+    if (!response.ok || !response.body) {
+      throw new Error("Failed to stream resume answer evaluation.");
+    }
+
+    setAnswerEvaluationStream("");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+
+      for (const event of events) {
+        const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
+        if (!dataLine) continue;
+        const data = JSON.parse(dataLine.slice(6));
+
+        if (data.type === "chunk") {
+          setAnswerEvaluationStream((previous) => previous + data.text);
+        } else if (data.type === "done") {
+          const completedEvaluation = {
+            trustScore: data.trustScore,
+            verdict: data.verdict,
+            feedback: data.feedback,
+            topicScores: data.topicScores || [],
+            answerEvaluations: data.answerEvaluations || [],
+            overallSuggestions: data.overallSuggestions || [],
+          };
+          setAnswerEvaluation(completedEvaluation);
+          setTopicScores(completedEvaluation.topicScores);
+          setAnswerEvaluations(completedEvaluation.answerEvaluations);
+          setOverallSuggestions(completedEvaluation.overallSuggestions);
+          setAnswerEvaluationStream("");
+          return completedEvaluation;
+        } else if (data.type === "error") {
+          throw new Error(data.error || "Answer evaluation streaming failed.");
+        }
+      }
+
+      if (done) break;
+    }
+    return null;
+  };
+
   const handleRetryAction = () => {
     setUploadError(null);
     if (lastAction === "round") {
@@ -190,6 +245,14 @@ export default function ResumeRoundSection() {
       await streamFeedback(feedbackRes);
 
       setAnswers([]);
+      setAnswerEvaluation(null);
+      setIsAnswerEvaluating(false);
+      setAnswerEvaluationError("");
+      setAnswerEvaluationStream("");
+      setTopicScores([]);
+      setAnswerEvaluations([]);
+      setOverallSuggestions([]);
+      setAnswerEvaluationStream("");
     } catch (err) {
       console.error(err);
       setUploadError(err.message || "An error occurred during ATS score calculation.");
@@ -207,6 +270,12 @@ export default function ResumeRoundSection() {
     setCurrentQuestionIdx(0);
     setCurrentAnswer("");
     setAnswers([]);
+    setAnswerEvaluation(null);
+    setAnswerEvaluationError("");
+    setAnswerEvaluationStream("");
+    setTopicScores([]);
+    setAnswerEvaluations([]);
+    setOverallSuggestions([]);
     setIsGeneratingQuestions(true);
 
     for (let index = 0; index < totalQuestions; index++) {
@@ -340,33 +409,64 @@ export default function ResumeRoundSection() {
 
     setCurrentStep("report");
     setFeedback("");
+    setAnswerEvaluation(null);
+    setAnswerEvaluationError("");
+    setAnswerEvaluationStream("");
+    setTopicScores([]);
+    setAnswerEvaluations([]);
+    setOverallSuggestions([]);
+    setIsAnswerEvaluating(finalAnswers.length > 0);
+    let completedAnswerEvaluation = null;
 
     try {
-      const [feedbackRes, optimizeRes] = await Promise.all([
-        fetch("/api/resume/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ atsResult, jobDescription }),
-        }),
-        fetch("/api/resume/optimize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ parsedResume, atsResult }),
-        }).catch(() => null),
-      ]);
+      const evaluationRes = await (
+        finalAnswers.length > 0
+          ? fetch("/api/resume/evaluate-interview", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                answers: finalAnswers,
+                parsedResume,
+                focusArea: selectedFocus,
+              }),
+            }).catch((error) => ({ networkError: error }))
+          : Promise.resolve(null)
+      );
 
-      if (feedbackRes?.ok) {
-        await streamFeedback(feedbackRes);
-      }
-
-      if (optimizeRes?.ok) {
-        const optimizeData = await optimizeRes.json();
-        setOptimizedResume(optimizeData.optimizedResume);
+      if (evaluationRes?.networkError) {
+        const message = evaluationRes.networkError.message || "Could not connect to answer evaluation.";
+        setAnswerEvaluationError(message);
+        toast.error(message);
+      } else if (evaluationRes && !evaluationRes.ok) {
+        const message = await getApiErrorMessage(
+          evaluationRes,
+          "Failed to evaluate your Resume Round answers"
+        );
+        setAnswerEvaluationError(message);
+        toast.error(message);
+      } else if (evaluationRes) {
+        try {
+          if (!evaluationRes.body) {
+            const evaluationData = await evaluationRes.json();
+            const message = evaluationData.error || "Answer evaluation did not return a result.";
+            setAnswerEvaluationError(message);
+            toast.error(message);
+          } else {
+            completedAnswerEvaluation = await streamAnswerEvaluation(evaluationRes);
+          }
+        } catch (error) {
+          console.error("Could not read Resume Round answer evaluation:", error);
+          const message = "Could not read the answer evaluation response.";
+          setAnswerEvaluationError(message);
+          toast.error(message);
+        }
       }
     } catch (err) {
       console.error(err);
-      alert(err.message || "Unable to generate the final resume report.");
+      const message = err.message || "Unable to generate the final resume report.";
+      toast.error(message);
     } finally {
+      setIsAnswerEvaluating(false);
       if (resumeSessionIdRef.current) {
         const sessionId = resumeSessionIdRef.current;
         const result = await finishInterviewModeSessionAction({
@@ -375,6 +475,7 @@ export default function ResumeRoundSection() {
             focusArea: selectedFocus,
             persona: selectedPersona,
             answers: finalAnswers,
+            answerEvaluation: completedAnswerEvaluation,
             atsResult: atsResult
               ? {
                   final_score: atsResult.final_score ?? null,
@@ -438,6 +539,16 @@ export default function ResumeRoundSection() {
     setFeedback("");
     setIsFeedbackStreaming(false);
     setOptimizedResume(null);
+    setCurrentQuestionIdx(0);
+    setCurrentAnswer("");
+    setAnswers([]);
+    setAnswerEvaluation(null);
+    setIsAnswerEvaluating(false);
+    setAnswerEvaluationError("");
+    setAnswerEvaluationStream("");
+    setTopicScores([]);
+    setAnswerEvaluations([]);
+    setOverallSuggestions([]);
     setIsAtsProcessing(false);
     setIsProcessing(false);
     setIsGeneratingQuestions(false);
@@ -767,61 +878,231 @@ export default function ResumeRoundSection() {
 
       {currentStep === "report" && (
         <div className="flex flex-col gap-8 animate-fadeIn">
-          {/* Main Results Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            {/* ATS & Trust Scores */}
-            <div className="card-border bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center text-center">
-              <span className="text-sm font-semibold text-slate-500 mb-2">Resume Trust Score</span>
-              <div className={`w-32 h-32 rounded-full border-4 flex flex-col items-center justify-center font-bold ${getScoreColor(atsResult?.final_score || 85)}`}>
-                <span className="text-4xl">{atsResult?.final_score || 85}%</span>
-              </div>
-              <div className="mt-4 text-xs text-slate-400">
-                Determined by verification Q&A and red-flag checking
-              </div>
-            </div>
+          {lastAction === "ats" && (
+            <>
+              {/* ATS Score */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="card-border bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center text-center">
+                  <span className="text-sm font-semibold text-slate-500 mb-2">ATS Score</span>
+                  <div className={`w-32 h-32 rounded-full border-4 flex flex-col items-center justify-center font-bold ${getScoreColor(atsResult?.final_score || 0)}`}>
+                    <span className="text-4xl">{atsResult?.final_score || 0}%</span>
+                  </div>
+                  <div className="mt-4 text-xs text-slate-400">
+                    Based on resume match with the job description
+                  </div>
+                </div>
 
-            {/* Score Breakdown */}
-            <div className="card-border bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl md:col-span-2">
-              <h4 className="text-lg font-bold mb-4">ATS Analysis Breakdown</h4>
-              <div className="space-y-3.5">
-                {[
-                  { label: "Skills Alignment", val: atsResult?.skills_score || 90 },
-                  { label: "Work Experience Impact", val: atsResult?.experience_score || 80 },
-                  { label: "Projects Details", val: atsResult?.projects_score || 85 },
-                  { label: "Education Verification", val: atsResult?.education_score || 95 },
-                ].map((s, idx) => (
-                  <div key={idx}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-slate-700 dark:text-slate-300 font-medium">{s.label}</span>
-                      <span className="font-bold">{s.val}%</span>
+                <div className="card-border bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl md:col-span-2">
+                  <h4 className="text-lg font-bold mb-4">ATS Analysis Breakdown</h4>
+                  <div className="space-y-3.5">
+                    {[
+                      { label: "Skills Alignment", val: atsResult?.skills_score || 0 },
+                      { label: "Work Experience Impact", val: atsResult?.experience_score || 0 },
+                      { label: "Projects Details", val: atsResult?.projects_score || 0 },
+                      { label: "Education Verification", val: atsResult?.education_score || 0 },
+                    ].map((s, idx) => (
+                      <div key={idx}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-slate-700 dark:text-slate-300 font-medium">{s.label}</span>
+                          <span className="font-bold">{s.val}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                          <div className="bg-cyan-500 h-full" style={{ width: `${s.val}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 text-slate-100 p-8 rounded-2xl border border-cyan-500/20 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 text-xs text-cyan-400 font-bold flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5" /> Ollama Insight
+                </div>
+                <h4 className="text-xl font-bold text-white mb-3">Resume ATS Feedback</h4>
+                {isFeedbackStreaming && (
+                  <div className="mb-3 flex items-center gap-2 text-xs text-cyan-400">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Generating live feedback...
+                  </div>
+                )}
+                <p className="text-sm leading-relaxed text-slate-300 whitespace-pre-line">
+                  {feedback ? renderFeedbackMarkdown(feedback) : "Calculating feedback details..."}
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* Answer Evaluation */}
+          {answers.length > 0 && (
+            <div className="bg-white border border-slate-200 dark:bg-slate-900/60 dark:border-cyan-500/30 p-8 rounded-2xl">
+              <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
+                <div>
+                  <h4 className="text-xl font-bold flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-cyan-500" />
+                    Resume Question Score &amp; Evaluation
+                  </h4>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    AI score and evaluation of your Resume Round answers.
+                  </p>
+                </div>
+                {answerEvaluation && (
+                  <span className={`rounded-full border px-3 py-1 text-xs font-bold ${getScoreColor(answerEvaluation.trustScore)}`}>
+                    {answerEvaluation.verdict?.replaceAll("_", " ") || "Evaluated"}
+                  </span>
+                )}
+              </div>
+
+              {isAnswerEvaluating && (
+                <div className="flex items-center gap-2 text-sm text-cyan-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Evaluating all interview answers...
+                </div>
+              )}
+              {answerEvaluationError && (
+                <p className="text-sm text-rose-500">{answerEvaluationError}</p>
+              )}
+              {answerEvaluation && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <span className={`text-4xl font-black ${getScoreColor(answerEvaluation.trustScore).split(" ")[0]}`}>
+                      {answerEvaluation.trustScore}
+                    </span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">/100 Resume Question Score</span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line">
+                    {answerEvaluation.feedback}
+                  </p>
+                </div>
+              )}
+              {!answerEvaluation && answerEvaluationStream && (
+                <p className="mt-4 text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line">
+                  {answerEvaluationStream}
+                  <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-cyan-500 align-middle" />
+                </p>
+              )}
+
+              {topicScores.length > 0 && (
+                <div className="mt-6">
+                  <h5 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-200">
+                    Topic-wise Scores
+                  </h5>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {topicScores.map((topic, idx) => (
+                      <div key={`${topic.topic}-${idx}`} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{topic.topic}</span>
+                          <span className={`text-lg font-black ${getScoreColor(topic.score).split(" ")[0]}`}>
+                            {topic.score}/100
+                          </span>
+                        </div>
+                        <div className="mb-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                          <div className="h-full bg-cyan-500" style={{ width: `${topic.score}%` }} />
+                        </div>
+                        {topic.reason && (
+                          <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{topic.reason}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {overallSuggestions.length > 0 && (
+                <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+                  <h5 className="mb-3 text-sm font-bold text-amber-600 dark:text-amber-400">
+                    Overall Improvement Suggestions
+                  </h5>
+                  <ul className="space-y-2">
+                    {overallSuggestions.map((suggestion, idx) => (
+                      <li key={idx} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {answerEvaluations.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900/60">
+              <h4 className="mb-6 text-lg font-bold">Answer-by-Answer Evaluation</h4>
+              <div className="space-y-5">
+                {answerEvaluations.map((evaluation, idx) => (
+                  <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                      <div className="max-w-3xl">
+                        <p className="text-xs font-bold uppercase tracking-wide text-cyan-600 dark:text-cyan-400">
+                          Question {idx + 1}
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200">
+                          {evaluation.question || answers[idx]?.question}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-2xl font-black ${getScoreColor(evaluation.score).split(" ")[0]}`}>
+                          {evaluation.score}/100
+                        </span>
+                        {evaluation.verdict && (
+                          <span className="rounded-full border border-slate-300 px-2 py-1 text-[10px] font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                            {String(evaluation.verdict).replaceAll("_", " ")}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-cyan-500 h-full" style={{ width: `${s.val}%` }} />
+
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+                        <h5 className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                          What Was Good
+                        </h5>
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                          {evaluation.whatWasGood || "No clear strengths were demonstrated."}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-4">
+                        <h5 className="mb-2 text-xs font-bold uppercase tracking-wide text-rose-600 dark:text-rose-400">
+                          Why This Answer Was Weak
+                        </h5>
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                          {evaluation.whyNotGood || "The answer lacked specific evidence and technical depth."}
+                        </p>
+                      </div>
                     </div>
+
+                    {evaluation.suggestions?.length > 0 && (
+                      <div className="mt-4">
+                        <h5 className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                          How to Improve
+                        </h5>
+                        <ul className="space-y-2">
+                          {evaluation.suggestions.map((suggestion, suggestionIdx) => (
+                            <li key={suggestionIdx} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
+                              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                              {suggestion}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {evaluation.improvedAnswer && (
+                      <div className="mt-4 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-4">
+                        <h5 className="mb-2 text-xs font-bold uppercase tracking-wide text-cyan-600 dark:text-cyan-400">
+                          Stronger Example Answer
+                        </h5>
+                        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                          {evaluation.improvedAnswer}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
-
-          </div>
-
-          {/* AI Expert Feedback */}
-          <div className="bg-slate-900 text-slate-100 p-8 rounded-2xl border border-cyan-500/20 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 text-xs text-cyan-400 font-bold flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> Ollama Insight
-            </div>
-            <h4 className="text-xl font-bold text-white mb-3">ATS Expert Feedback</h4>
-            {isFeedbackStreaming && (
-              <div className="mb-3 flex items-center gap-2 text-xs text-cyan-400">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Generating live feedback...
-              </div>
-            )}
-            <p className="text-sm leading-relaxed text-slate-300 whitespace-pre-line">
-              {feedback ? renderFeedbackMarkdown(feedback) : "Calculating feedback details..."}
-            </p>
-          </div>
+          )}
 
           {/* Optimized Resume Tips */}
           {optimizedResume && (
@@ -854,7 +1135,7 @@ export default function ResumeRoundSection() {
           {/* Q&A Summary Review */}
           {answers && answers.length > 0 && (
             <div className="bg-white border border-slate-200 dark:bg-slate-900/60 dark:border-slate-800 p-8 rounded-2xl">
-              <h4 className="text-lg font-bold mb-6">Verification Interview Log</h4>
+              <h4 className="text-lg font-bold mb-6">Resume Questions &amp; Your Answers</h4>
               <div className="space-y-6">
                 {answers.map((item, idx) => (
                   <div key={idx} className="p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-xl">

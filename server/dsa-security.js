@@ -83,9 +83,10 @@ function setupSocketSecurityMiddleware(io) {
   io.use((socket, next) => {
     // Check origin (CORS)
     const allowedOrigins = [
+      'http://localhost:4001',
       'http://localhost:3000',
       'http://localhost:3001',
-      process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4001',
     ];
 
     const origin = socket.handshake.headers.origin;

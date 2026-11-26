@@ -146,8 +146,10 @@ from ATSScoreChecker.ats_score_checker import ATSScorer
 from ResumeGeneration.generator import generate_optimized_resume
 from ResumeQuestionGeneration.resume_question_generation import generate_questions_for_resume
 from ResumeFeedBack.resume_feedback import ask_ollama_stream
+from HackathonDiscovery.api import router as competition_router
 
 app = FastAPI(title="Resume Interview API")
+app.include_router(competition_router)
 resume_api_basic_auth = HTTPBasic()
 
 

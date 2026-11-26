@@ -8,7 +8,7 @@ from typing import Any
 
 import psycopg
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from HackathonDiscovery.database import ensure_schema, list_competitions, upsert_competitions
 from HackathonDiscovery.providers import SOURCES, fetch_all_providers
@@ -19,7 +19,7 @@ load_dotenv(ROOT_DIR / ".env.local", override=False)
 load_dotenv(ROOT_DIR / ".env", override=False)
 
 logger = logging.getLogger(__name__)
-app = FastAPI(title="PrepWise Hackathon Discovery API", version="1.0.0")
+router = APIRouter(prefix="/api/competitions", tags=["competitions"])
 _sync_lock = Lock()
 
 
@@ -34,7 +34,7 @@ def _database_ready() -> None:
         ) from error
 
 
-@app.get("/health")
+@router.get("/health")
 def health() -> dict[str, Any]:
     configured_sources = [
         source
@@ -59,7 +59,7 @@ def health() -> dict[str, Any]:
     }
 
 
-@app.get("/api/competitions")
+@router.get("")
 def get_competitions(
     search: str | None = Query(default=None, max_length=120),
     source: str | None = Query(default=None, pattern="^(unstop|kaggle)$"),
@@ -76,7 +76,7 @@ def get_competitions(
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
-@app.post("/api/competitions/sync")
+@router.post("/sync")
 def sync_competitions() -> dict[str, Any]:
     _database_ready()
     if not _sync_lock.acquire(blocking=False):

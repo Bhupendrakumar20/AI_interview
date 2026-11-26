@@ -1,4 +1,4 @@
-const DEFAULT_DISCOVERY_API_URL = "http://127.0.0.1:8002";
+const DEFAULT_DISCOVERY_API_URL = "http://127.0.0.1:8000";
 
 function getDiscoveryApiUrl() {
   return (process.env.HACKATHON_DISCOVERY_API_URL || DEFAULT_DISCOVERY_API_URL).replace(/\/+$/, "");

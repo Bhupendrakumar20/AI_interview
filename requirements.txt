@@ -15,3 +15,6 @@ spacy
 rapidfuzz
 pytest
 redis
+psycopg[binary]>=3.2,<4
+kaggle>=1.0
+six

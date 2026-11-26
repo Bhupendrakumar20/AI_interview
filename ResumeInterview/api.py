@@ -141,6 +141,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ResumeParser.parser import parse_resume
+from ResumeValidate.validator import validate_resume_pdf
 from ATSScoreChecker.ats_score_checker import ATSScorer
 from ResumeGeneration.generator import generate_optimized_resume
 from ResumeQuestionGeneration.resume_question_generation import generate_questions_for_resume
@@ -250,9 +251,9 @@ def health():
 # Step 1: Upload Resume -> POST /parse -> parsedResume
 # ---------------------------------------------------------------------------
 
-@app.post("/parse", dependencies=[Depends(require_resume_api_auth)])
-async def parse(resume: UploadFile = File(...)):
-    if not resume.filename.lower().endswith(".pdf"):
+@app.post("/validate", dependencies=[Depends(require_resume_api_auth)])
+async def validate_resume(resume: UploadFile = File(...)):
+    if not resume.filename or not resume.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF supported")
 
     tmp_path = None
@@ -260,6 +261,29 @@ async def parse(resume: UploadFile = File(...)):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             shutil.copyfileobj(resume.file, tmp)
             tmp_path = tmp.name
+
+        return validate_resume_pdf(tmp_path)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+@app.post("/parse", dependencies=[Depends(require_resume_api_auth)])
+async def parse(resume: UploadFile = File(...)):
+    if not resume.filename or not resume.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF supported")
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            shutil.copyfileobj(resume.file, tmp)
+            tmp_path = tmp.name
+
+        validation = validate_resume_pdf(tmp_path)
+        if not validation["valid"]:
+            raise HTTPException(status_code=422, detail=validation["message"])
 
         parsed_resume = parse_resume(tmp_path)
         
@@ -274,6 +298,8 @@ async def parse(resume: UploadFile = File(...)):
             "rawText": raw_text,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

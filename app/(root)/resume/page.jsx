@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import ResumeRoundSection from "@/components/Resume RoundSection";
 import { SquareMorphs } from "@/components/ui/LoadingAnimations";
 import FileUploadDropzone from "@/components/ui/FileUploadDropzone";
+import { validateResumeUpload } from "@/lib/resume-validation";
 
 export default function ResumePage() {
   const [activeTab, setActiveTab] = useState("ats-match"); // "ats-match" | "builder"
@@ -42,6 +43,7 @@ export default function ResumePage() {
   
   // States for generation results
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStage, setGenerationStage] = useState("");
   const [generatedJson, setGeneratedJson] = useState(null);
   const [generatedLatex, setGeneratedLatex] = useState("");
   const [isCopied, setIsCopied] = useState(false);
@@ -147,6 +149,7 @@ export default function ResumePage() {
     }
 
     setIsGenerating(true);
+    setGenerationStage(builderMethod === "document" ? "validating" : "generating");
     setGeneratedJson(null);
     setGeneratedLatex("");
     setDocError(null);
@@ -156,6 +159,9 @@ export default function ResumePage() {
 
       // If document method is selected, we upload and parse the document first
       if (builderMethod === "document") {
+        await validateResumeUpload(docFile);
+        setGenerationStage("parsing");
+
         const uploadFormData = new FormData();
         uploadFormData.append("resume", docFile);
 
@@ -172,6 +178,7 @@ export default function ResumePage() {
       }
 
       // Generate resume JSON & LaTeX code
+      setGenerationStage("generating");
       const response = await fetch("/api/resume/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -199,6 +206,7 @@ export default function ResumePage() {
       toast.error(error.message || "An error occurred during resume generation.");
     } finally {
       setIsGenerating(false);
+      setGenerationStage("");
     }
   };
 
@@ -208,6 +216,7 @@ export default function ResumePage() {
     setDescription("");
     setDocFile(null);
     setDocError(null);
+    setGenerationStage("");
     setGeneratedJson(null);
     setGeneratedLatex("");
     setOutputTab("latex");
@@ -351,18 +360,24 @@ export default function ResumePage() {
                     setDocFile(null);
                     setDocError(null);
                   }}
-                  accept=".pdf,.txt,.png,.jpg,.jpeg"
-                  acceptedBadges={["PDF", "TXT", "PNG", "JPG"]}
+                  accept=".pdf"
+                  acceptedBadges={["PDF"]}
                   maxSizeMB={15}
                   isUploading={isGenerating}
-                  uploadStage="Extracting document details & compiling..."
+                  uploadStage={
+                    generationStage === "validating"
+                      ? "Validating resume..."
+                      : generationStage === "parsing"
+                        ? "Parsing resume..."
+                        : "Generating resume..."
+                  }
                   error={docError}
                   onRetry={() => {
                     setDocError(null);
                     handleGenerateResume();
                   }}
                   title="Drop your draft resume or document here"
-                  subtitle="Supports PDF, TXT, PNG, or JPG drafts"
+                  subtitle="Upload a PDF resume"
                 />
               </div>
             )}
@@ -377,7 +392,11 @@ export default function ResumePage() {
                 {isGenerating ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Formatting Resume LaTeX...
+                    {generationStage === "validating"
+                      ? "Validating resume..."
+                      : generationStage === "parsing"
+                        ? "Parsing resume..."
+                        : "Formatting Resume LaTeX..."}
                   </>
                 ) : (
                   <>
@@ -412,9 +431,19 @@ export default function ResumePage() {
             {isGenerating && (
               <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[460px] gap-4">
                 <SquareMorphs size="lg" color="cyan" />
-                <h3 className="font-bold text-slate-700 dark:text-slate-300 text-lg">Formatting Resume Structures</h3>
+                <h3 className="font-bold text-slate-700 dark:text-slate-300 text-lg">
+                  {generationStage === "validating"
+                    ? "Validating Resume"
+                    : generationStage === "parsing"
+                      ? "Parsing Resume"
+                      : "Formatting Resume Structures"}
+                </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
-                  Gemini is normalizing coordinates, optimizing summaries, formatting skills lists, and building LaTeX packages...
+                  {generationStage === "validating"
+                    ? "Checking that Education, Skills, and Projects each contain at least one entry."
+                    : generationStage === "parsing"
+                      ? "Extracting resume content before generating your template."
+                      : "Gemini is normalizing coordinates, optimizing summaries, formatting skills lists, and building LaTeX packages..."}
                 </p>
               </div>
             )}

@@ -68,5 +68,4 @@ class Resume(TypedDict):
     achievements: ResumeAchievements
     custom: ResumeCustom
 
-
 ResumeKey = Literal["profile", "workExperiences", "educations", "projects", "skills", "achievements", "custom"]

@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import { FileText, Briefcase, User, Clock, CheckCircle, Upload, Shield, AlertTriangle, ArrowRight, Loader2, Sparkles, RefreshCw, Users, Rocket, Zap } from "lucide-react";
 import FileUploadDropzone from "@/components/ui/FileUploadDropzone";
+import { validateResumeUpload } from "@/lib/resume-validation";
 import {
   finishInterviewModeSessionAction,
   startInterviewModeSessionAction,
@@ -204,13 +205,16 @@ export default function ResumeRoundSection() {
     }
 
     setIsAtsProcessing(true);
-    setProcessingStage("parsing");
+    setProcessingStage("validating");
     setUploadError(null);
     setLastAction("ats");
 
     try {
       const uploadFormData = new FormData();
       uploadFormData.append("resume", file);
+
+      await validateResumeUpload(file);
+      setProcessingStage("parsing");
       
       const parseRes = await fetch("/api/resume/upload", {
         method: "POST",
@@ -327,11 +331,13 @@ export default function ResumeRoundSection() {
     }
 
     setIsProcessing(true);
-    setProcessingStage("parsing");
+    setProcessingStage("validating");
     setUploadError(null);
     setLastAction("round");
 
     try {
+      await validateResumeUpload(file);
+
       const sessionResponse = await startInterviewModeSessionAction({
         mode: "resume-round",
         details: {
@@ -350,6 +356,7 @@ export default function ResumeRoundSection() {
       }
       resumeSessionIdRef.current = sessionResponse.sessionId;
 
+      setProcessingStage("parsing");
       const uploadFormData = new FormData();
       uploadFormData.append("resume", file);
 
@@ -569,9 +576,10 @@ export default function ResumeRoundSection() {
   const currentQuestion = questions[currentQuestionIdx];
 
   const processingStages = [
-    { key: "parsing", label: "Parsing resume", active: processingStage === "parsing", done: processingStage !== "" && ["parsing", "ats", "feedback"].indexOf(processingStage) >= 0 },
-    { key: "ats", label: "ATS score calculated", active: processingStage === "ats", done: ["ats", "feedback"].includes(processingStage) },
-    { key: "feedback", label: "Generating feedback", active: processingStage === "feedback", done: processingStage === "feedback" },
+    { key: "validating", label: "Validating resume", active: processingStage === "validating", done: ["parsing", "ats", "feedback"].includes(processingStage) },
+    { key: "parsing", label: "Parsing resume", active: processingStage === "parsing", done: ["ats", "feedback"].includes(processingStage) },
+    { key: "ats", label: "ATS score calculated", active: processingStage === "ats", done: processingStage === "feedback" },
+    { key: "feedback", label: "Generating feedback", active: processingStage === "feedback", done: false },
   ];
 
   return (
@@ -602,13 +610,14 @@ export default function ResumeRoundSection() {
                     Resume workflow
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {processingStage === "validating" && "Validating resume..."}
                     {processingStage === "parsing" && "Parsing resume..."}
                     {processingStage === "ats" && "ATS score calculated successfully"}
                     {processingStage === "feedback" && "Generating feedback..."}
                     {!processingStage && "Preparing..."}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   {processingStages.map((stage) => {
                     const isActive = stage.active;
                     const isDone = stage.done;
@@ -644,12 +653,14 @@ export default function ResumeRoundSection() {
                   setUploadError(null);
                   setParsedResume(null);
                 }}
-                accept=".pdf,.txt,.png,.jpg,.jpeg"
-                acceptedBadges={["PDF", "TXT", "PNG", "JPG"]}
+                accept=".pdf"
+                acceptedBadges={["PDF"]}
                 maxSizeMB={15}
                 isUploading={isProcessing || isAtsProcessing}
                 uploadStage={
-                  processingStage === "parsing"
+                  processingStage === "validating"
+                    ? "Validating resume..."
+                    : processingStage === "parsing"
                     ? "Parsing resume..."
                     : processingStage === "ats"
                       ? "ATS score calculated successfully"
@@ -660,7 +671,7 @@ export default function ResumeRoundSection() {
                 error={uploadError}
                 onRetry={handleRetryAction}
                 title="Drop your resume here"
-                subtitle="Supports PDF, TXT, PNG, or JPG (Up to 15MB)"
+                subtitle="Upload a PDF resume (Up to 15MB)"
               />
 
               {/* Job Description Input */}
@@ -761,6 +772,7 @@ export default function ResumeRoundSection() {
                   {isAtsProcessing ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
+                      {processingStage === "validating" && "Validating resume..."}
                       {processingStage === "parsing" && "Parsing resume..."}
                       {processingStage === "ats" && "ATS score calculated successfully"}
                       {processingStage === "feedback" && "Generating feedback..."}
@@ -781,6 +793,7 @@ export default function ResumeRoundSection() {
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
+                      {processingStage === "validating" && "Validating resume..."}
                       {processingStage === "parsing" && "Parsing resume..."}
                       {processingStage === "ats" && "ATS score calculated successfully"}
                       {processingStage === "feedback" && "Generating feedback..."}
